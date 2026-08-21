@@ -1,11 +1,12 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency } from "@/lib/format";
-import ReportHeader from "@/components/ReportHeader";
+import PrintButton from "@/components/PrintButton";
 
 export const dynamic = "force-dynamic";
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
-export default async function FluxoPage() {
+export default async function FluxoPage({ searchParams }: { searchParams: { ano?: string } }) {
   const supabase = createClient();
   const [{ data: fluxo }, { data: contas }] = await Promise.all([
     supabase.from("vw_fluxo_mensal").select("*"),
@@ -16,10 +17,17 @@ export default async function FluxoPage() {
   const saldoContas = (contas ?? []).reduce((s: number, c: any) => s + Number(c.saldo_atual ?? 0), 0);
 
   const anos = Array.from(new Set(linhas.map((l) => (l.mes ?? "").slice(0, 4)).filter(Boolean))).sort().reverse();
-  const ano = anos[0] ?? String(new Date().getFullYear());
+  // padrão: ano atual se tiver dados; senão o ano com mais movimento realizado; senão o mais recente
+  const anoAtual = String(new Date().getFullYear());
+  const realizadoPorAno: Record<string, number> = {};
+  for (const l of linhas) {
+    const a = (l.mes ?? "").slice(0, 4);
+    realizadoPorAno[a] = (realizadoPorAno[a] || 0) + Number(l.entradas || 0) + Number(l.saidas || 0);
+  }
+  const anoComMovimento = Object.entries(realizadoPorAno).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const ano = searchParams.ano ?? (anos.includes(anoAtual) && realizadoPorAno[anoAtual] ? anoAtual : (anoComMovimento ?? anos[0] ?? anoAtual));
   const doAno = linhas.filter((l) => (l.mes ?? "").slice(0, 4) === ano).sort((a, b) => a.mes.localeCompare(b.mes));
 
-  // saldo acumulado do realizado ao longo do ano
   let acum = 0;
   const meses = doAno.map((l) => {
     const liquido = Number(l.entradas || 0) - Number(l.saidas || 0);
@@ -34,7 +42,20 @@ export default async function FluxoPage() {
 
   return (
     <div className="space-y-6">
-      <ReportHeader titulo={`💵 Fluxo de caixa · ${ano}`} subtitulo="Realizado (pago) e previsto (em aberto), por mês" />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">💵 Fluxo de caixa · {ano}</h1>
+          <p className="text-sm text-gray-500">Realizado (pago) e previsto (em aberto), por mês</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="no-print flex flex-wrap gap-1">
+            {anos.map((a) => (
+              <Link key={a} href={`/financeiro/fluxo?ano=${a}`} className={`rounded-lg px-3 py-1.5 text-sm ${a === ano ? "bg-brand-600 text-white" : "bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50"}`}>{a}</Link>
+            ))}
+          </div>
+          <PrintButton />
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card t="Saldo em contas" v={formatCurrency(saldoContas)} />
@@ -58,7 +79,7 @@ export default async function FluxoPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {meses.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Sem lançamentos.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Sem lançamentos neste ano.</td></tr>
             ) : meses.map((m) => (
               <tr key={m.mes} className="hover:bg-gray-50">
                 <td className="px-4 py-2 font-medium">{MESES[parseInt(m.mes.slice(5, 7)) - 1]}/{m.mes.slice(2, 4)}</td>
