@@ -1,0 +1,2 @@
+Coloque aqui as FOTOS da proposta (jpg/png).
+Elas ficam acessiveis no app em /fotos-proposta/nome-do-arquivo.jpg

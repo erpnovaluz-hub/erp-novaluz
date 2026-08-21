@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+.env.local
+.env*.local
+*.log
+.DS_Store
+next-env.d.ts
+
+# Dados / PII e fontes de importação — NÃO vão pro repositório
+*.xlsx
+/supabase/import_*.sql
+/modelo-proposta/

@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-gray-50 text-gray-800 antialiased;
+}
+
+/* inputs padrão do app */
+.inp {
+  @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none
+         focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition;
+}
+.lbl {
+  @apply block text-xs font-medium text-gray-500 mb-1;
+}
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition;
+}
+.btn-primary {
+  @apply btn bg-brand-600 text-white hover:bg-brand-700;
+}
+.btn-ghost {
+  @apply btn text-gray-600 hover:bg-gray-100;
+}
+.card {
+  @apply rounded-xl border border-gray-200 bg-white shadow-sm;
+}
+
+/* Impressão / PDF */
+.print-only { display: none; }
+.page-break { break-before: page; }
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  body { background: #fff; }
+  main { padding: 0 !important; max-width: none !important; }
+  .card { box-shadow: none !important; border-color: #e5e7eb !important; break-inside: avoid; }
+  table { break-inside: auto; }
+  tr { break-inside: avoid; }
+  a { color: inherit !important; text-decoration: none !important; }
+  .doc { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { margin: 1.2cm; }
+}
+.doc { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
