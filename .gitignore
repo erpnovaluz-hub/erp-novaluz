@@ -11,3 +11,6 @@ next-env.d.ts
 *.xlsx
 /supabase/import_*.sql
 /modelo-proposta/
+
+# logo fonte (grande) — usar os gerados em public/ e src/app/
+/logo ERPNOVALUZ.jpg

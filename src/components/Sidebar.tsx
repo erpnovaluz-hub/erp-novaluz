@@ -44,8 +44,9 @@ export default function Sidebar({ empresaNome, email, isSuper }: { empresaNome: 
   const conteudo = (
     <div className="flex h-full flex-col">
       <div className="border-b px-4 py-4">
-        <div className="flex items-center gap-2 text-base font-semibold text-gray-900"><span>⚡</span> ERP Novaluz</div>
-        <p className="mt-0.5 truncate text-xs text-gray-400">{empresaNome}</p>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-novaluz.png" alt="Novaluz" className="h-auto w-[170px]" />
+        <p className="mt-1 truncate text-xs text-gray-400">{empresaNome}</p>
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
@@ -96,8 +97,9 @@ export default function Sidebar({ empresaNome, email, isSuper }: { empresaNome: 
   return (
     <>
       {/* barra mobile */}
-      <div className="flex items-center justify-between border-b bg-white px-4 py-3 md:hidden">
-        <span className="font-semibold">⚡ ERP Novaluz</span>
+      <div className="flex items-center justify-between border-b bg-white px-4 py-2 md:hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-novaluz.png" alt="Novaluz" className="h-8 w-auto" />
         <button className="btn-ghost" onClick={() => setMobile(true)}>☰</button>
       </div>
       {mobile && (

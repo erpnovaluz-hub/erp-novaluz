@@ -30,9 +30,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-white px-4">
       <div className="card w-full max-w-sm p-8">
         <div className="mb-6 text-center">
-          <div className="text-3xl">⚡</div>
-          <h1 className="mt-2 text-xl font-semibold text-gray-900">CRM Novaluz</h1>
-          <p className="text-sm text-gray-500">Acesse sua carteira</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-novaluz.png" alt="Novaluz" className="mx-auto h-auto w-52" />
+          <p className="mt-2 text-sm text-gray-500">Acesse o sistema</p>
         </div>
         <form onSubmit={entrar} className="space-y-4">
           <div>
