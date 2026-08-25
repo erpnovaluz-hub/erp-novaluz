@@ -65,6 +65,7 @@ export const GROUPS: GroupDef[] = [
     { href: "/financeiro/receber", label: "Contas a Receber", icon: "🟢" },
     { href: "/financeiro/dre", label: "DRE mensal", icon: "📈" },
     { href: "/financeiro/fluxo", label: "Fluxo de caixa", icon: "💵" },
+    { href: "/financeiro/relatorio", label: "Relatório financeiro", icon: "📊" },
   ] },
   { key: "impacto", label: "Impacto / Produção", icon: "🏭", extras: [
     { href: "/impacto/producao", label: "Lançamentos de produção", icon: "⚙️" },
