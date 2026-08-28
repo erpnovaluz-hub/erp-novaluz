@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
+import { ultimoDiaMes } from "@/lib/folha";
 import PrintButton from "@/components/PrintButton";
 
 type Colab = { id: string; nome: string; cargo: string | null; salario_base: number | null };
@@ -14,7 +15,12 @@ type Linha = {
   nome: string;
   cargo: string | null;
   lancamento_id: string | null;
-  titulo_id: string | null;
+  titulo_adiantamento_id: string | null;
+  titulo_fechamento_id: string | null;
+  pct_adiantamento: number;
+  bonificacao: number;
+  adicional: number;
+  abono_familia: number;
   salario_liquido: string;
   horas_extras: string;
   descontos: string;
@@ -85,7 +91,12 @@ export default function FolhaView() {
         nome: c.nome,
         cargo: c.cargo,
         lancamento_id: l?.id ?? null,
-        titulo_id: l?.titulo_id ?? null,
+        titulo_adiantamento_id: l?.titulo_adiantamento_id ?? null,
+        titulo_fechamento_id: l?.titulo_fechamento_id ?? null,
+        pct_adiantamento: l?.pct_adiantamento != null ? Number(l.pct_adiantamento) : 40,
+        bonificacao: Number(l?.bonificacao ?? 0),
+        adicional: Number(l?.adicional ?? 0),
+        abono_familia: Number(l?.abono_familia ?? 0),
         salario_liquido: l ? String(l.salario_liquido ?? "") : "",
         horas_extras: l ? String(l.horas_extras ?? "") : "",
         descontos: l ? String(l.descontos ?? "") : "",
@@ -106,6 +117,7 @@ export default function FolhaView() {
 
   const custoLinha = (l: Linha) =>
     num(l.salario_liquido) + num(l.horas_extras) +
+    l.bonificacao + l.adicional + l.abono_familia +
     tipos.reduce((s, t) => s + num(l.beneficios[t.id]), 0) - num(l.descontos);
 
   const temDados = (l: Linha) =>
@@ -173,47 +185,49 @@ export default function FolhaView() {
   }
 
   async function gerarAPagar() {
-    if (!confirm(`Gerar/atualizar as contas a pagar da folha de ${MESES[+mes - 1]}/${ano}?\nUm título por colaborador será criado no Financeiro (Contas a Pagar).`)) return;
+    if (!confirm(`Gerar/atualizar as contas a pagar da folha de ${MESES[+mes - 1]}/${ano}?\nPor colaborador: adiantamento (dia 15) + fechamento (último dia do mês).`)) return;
     setGerando(true); setErro(null); setMsg(null);
     const ok = await salvar();
     if (!ok) { setGerando(false); return; }
     try {
       const catId = await categoriaFolhaId();
-      // vencimento padrão: dia 5 do mês seguinte
-      const m = +mes, y = +ano;
-      const venc = m === 12 ? `${y + 1}-01-05` : `${y}-${String(m + 1).padStart(2, "0")}-05`;
-      const rotulo = `${MESES_LONGO[m - 1]}/${ano}`;
+      const rotulo = `${MESES_LONGO[+mes - 1]}/${ano}`;
+      const vencAdiant = `${ano}-${mes}-15`;
+      const vencFech = ultimoDiaMes(competencia);
       let criados = 0, atualizados = 0;
-      for (const l of linhas) {
-        const custo = Math.round(custoLinha(l) * 100) / 100;
-        if (custo <= 0 || !l.lancamento_id) continue;
-        const titulo = {
-          tipo: "pagar",
-          descricao: `Folha ${rotulo} — ${l.nome}`,
-          valor: custo,
-          categoria_id: catId,
-          competencia,
-          vencimento: venc,
-          status: "aberto",
-          origem: "folha",
-          referencia_id: l.colaborador_id,
-        };
-        if (l.titulo_id) {
-          const { error } = await supabase
-            .from("titulos_financeiros")
-            .update({ descricao: titulo.descricao, valor: titulo.valor, categoria_id: catId, competencia, vencimento: venc })
-            .eq("id", l.titulo_id).eq("status", "aberto");
+
+      const upsert = async (
+        atualId: string | null, campo: "titulo_adiantamento_id" | "titulo_fechamento_id",
+        descricao: string, valor: number, vencimento: string, lancId: string, refId: string,
+      ): Promise<string | null> => {
+        if (valor <= 0) return atualId;
+        if (atualId) {
+          const { error } = await supabase.from("titulos_financeiros")
+            .update({ descricao, valor, categoria_id: catId, competencia, vencimento })
+            .eq("id", atualId).eq("status", "aberto");
           if (error) throw error;
           atualizados++;
-        } else {
-          const { data, error } = await supabase.from("titulos_financeiros").insert(titulo).select("id").single();
-          if (error) throw error;
-          await supabase.from("folha_lancamentos").update({ titulo_id: data.id }).eq("id", l.lancamento_id);
-          l.titulo_id = data.id;
-          criados++;
+          return atualId;
         }
+        const { data, error } = await supabase.from("titulos_financeiros")
+          .insert({ tipo: "pagar", descricao, valor, categoria_id: catId, competencia, vencimento, status: "aberto", origem: "folha", referencia_id: refId })
+          .select("id").single();
+        if (error) throw error;
+        await supabase.from("folha_lancamentos").update({ [campo]: data.id }).eq("id", lancId);
+        criados++;
+        return data.id;
+      };
+
+      for (const l of linhas) {
+        if (!l.lancamento_id) continue;
+        const custo = Math.round(custoLinha(l) * 100) / 100;
+        if (custo <= 0) continue;
+        const adiant = Math.round(num(l.salario_liquido) * (l.pct_adiantamento || 0)) / 100;
+        const fech = Math.round((custo - adiant) * 100) / 100;
+        l.titulo_adiantamento_id = await upsert(l.titulo_adiantamento_id, "titulo_adiantamento_id", `Adiantamento ${rotulo} — ${l.nome}`, adiant, vencAdiant, l.lancamento_id, l.colaborador_id);
+        l.titulo_fechamento_id = await upsert(l.titulo_fechamento_id, "titulo_fechamento_id", `Folha (fechamento) ${rotulo} — ${l.nome}`, fech, vencFech, l.lancamento_id, l.colaborador_id);
       }
-      setMsg(`Contas a pagar: ${criados} criada(s), ${atualizados} atualizada(s). Veja em Financeiro › Contas a Pagar.`);
+      setMsg(`Contas a pagar: ${criados} criada(s), ${atualizados} atualizada(s) — adiantamento (dia 15) e fechamento (último dia). Veja em Financeiro › Contas a Pagar.`);
     } catch (e: any) {
       setErro(e.message ?? "Erro ao gerar contas a pagar.");
     } finally {
@@ -277,7 +291,12 @@ export default function FolhaView() {
               {linhas.map((l, idx) => (
                 <tr key={l.colaborador_id} className="hover:bg-gray-50/60">
                   <td className="px-3 py-2">
-                    <div className="font-medium text-gray-900">{l.nome}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900">{l.nome}</span>
+                      <a href={`/rh/calculadora?colab=${l.colaborador_id}&mes=${mes}&ano=${ano}`}
+                        title="Abrir na calculadora (extras, adiantamento…)"
+                        className="no-print text-xs text-gray-300 hover:text-brand-600">🧮</a>
+                    </div>
                     {l.cargo && <div className="text-xs text-gray-400">{l.cargo}</div>}
                   </td>
                   <td className="px-2 py-1"><CelInput valor={l.salario_liquido} onChange={(v) => setCampo(idx, "salario_liquido", v)} /></td>
@@ -288,7 +307,7 @@ export default function FolhaView() {
                   <td className="px-2 py-1"><CelInput valor={l.descontos} onChange={(v) => setCampo(idx, "descontos", v)} /></td>
                   <td className="px-3 py-2 text-right font-medium tabular-nums text-gray-900">
                     {formatCurrency(custoLinha(l))}
-                    {l.titulo_id && <span title="Título a pagar gerado" className="ml-1 text-green-500">•</span>}
+                    {(l.titulo_adiantamento_id || l.titulo_fechamento_id) && <span title="Contas a pagar geradas" className="ml-1 text-green-500">•</span>}
                   </td>
                 </tr>
               ))}
@@ -308,9 +327,11 @@ export default function FolhaView() {
       </div>
 
       <p className="mt-3 text-xs text-gray-400">
-        Dica: preencha o líquido, os benefícios, horas extras e descontos, clique em <b>Salvar</b>. O botão
-        <b> Gerar contas a pagar</b> cria um título por colaborador no Financeiro (categoria “{CATEGORIA_FOLHA}”),
-        com vencimento no dia 5 do mês seguinte — ao dar baixa, entra no fluxo de caixa e no DRE.
+        Esta grade é a visão rápida do mês (salário, benefícios, extras e descontos já em R$). Para calcular horas
+        extras (63%/100%), adiantamento e bonificação de um colaborador, use o <b>🧮</b> ao lado do nome ou a
+        <b> Calculadora da folha</b>. O botão <b>Gerar contas a pagar</b> cria, por colaborador, o <b>adiantamento
+        (dia 15)</b> e o <b>fechamento (último dia do mês)</b> no Financeiro (categoria “{CATEGORIA_FOLHA}”) — ao dar
+        baixa, entram no fluxo de caixa e no DRE.
       </p>
     </div>
   );

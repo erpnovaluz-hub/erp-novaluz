@@ -68,6 +68,7 @@ export const GROUPS: GroupDef[] = [
     { href: "/financeiro/relatorio", label: "Relatório financeiro", icon: "📊" },
   ] },
   { key: "rh", label: "RH / Folha", icon: "🧑‍💼", extras: [
+    { href: "/rh/calculadora", label: "Calculadora da folha", icon: "🧮" },
     { href: "/rh/folha", label: "Folha do mês", icon: "🧾" },
     { href: "/rh/relatorio", label: "Relatório da folha", icon: "📊" },
     { href: "/rh/beneficios", label: "Tipos de benefício", icon: "🎁" },
