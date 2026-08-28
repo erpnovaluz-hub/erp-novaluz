@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-type Tipo = { id: string; nome: string; ativo: boolean; ordem: number };
+type Tipo = { id: string; nome: string; ativo: boolean; ordem: number; modo: "diario" | "fixo" };
 
 export default function TiposBeneficioView() {
   const supabase = useMemo(() => createClient(), []);
@@ -41,12 +41,19 @@ export default function TiposBeneficioView() {
     if (error) { setErro(error.message); return; }
     carregar();
   }
+  async function alternarModo(t: Tipo) {
+    const modo = t.modo === "diario" ? "fixo" : "diario";
+    const { error } = await supabase.from("folha_tipos_beneficio").update({ modo }).eq("id", t.id);
+    if (error) { setErro(error.message); return; }
+    carregar();
+  }
 
   return (
     <div className="max-w-2xl">
       <h1 className="mb-1 flex items-center gap-2 text-xl font-semibold text-gray-900">🎁 Tipos de benefício</h1>
       <p className="mb-4 text-sm text-gray-500">
-        Cada tipo vira uma coluna na Folha do mês. Desative os que não usa (não some o histórico já lançado).
+        Cada tipo vira um campo na calculadora. <b>Por dia</b> = valor diário × dias presentes (VT/VR). <b>Fixo</b> = valor
+        do mês inteiro (plano de saúde). Desative os que não usa (não some o histórico já lançado).
       </p>
 
       {erro && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
@@ -65,6 +72,11 @@ export default function TiposBeneficioView() {
           tipos.map((t) => (
             <div key={t.id} className="flex items-center gap-3 px-4 py-2.5">
               <span className={`flex-1 ${t.ativo ? "text-gray-900" : "text-gray-400 line-through"}`}>{t.nome}</span>
+              <button onClick={() => alternarModo(t)}
+                className={`rounded-full px-2 py-0.5 text-xs ring-1 ${t.modo === "fixo" ? "bg-blue-50 text-blue-700 ring-blue-200" : "bg-green-50 text-green-700 ring-green-200"}`}
+                title="Alternar por dia / fixo no mês">
+                {t.modo === "fixo" ? "fixo/mês" : "por dia"}
+              </button>
               <button className="text-sm text-gray-500 hover:text-gray-800" onClick={() => renomear(t)}>renomear</button>
               <button className={`text-sm ${t.ativo ? "text-amber-600 hover:text-amber-700" : "text-green-600 hover:text-green-700"}`} onClick={() => alternar(t)}>
                 {t.ativo ? "desativar" : "ativar"}

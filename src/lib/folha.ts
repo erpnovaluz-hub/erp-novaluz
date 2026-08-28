@@ -49,6 +49,37 @@ export function calendarioMes(competencia: string): { diasMes: number; domingos:
   return { diasMes, domingos };
 }
 
+// ===== Apontamento diário (ponto) =====
+export type PontoStatus = "presente" | "falta" | "atestado" | "feriado" | "folga";
+export type Ponto = Record<string, PontoStatus>; // "yyyy-mm-dd" -> status
+
+const chaveDia = (y: number, m: number, d: number) =>
+  `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+// padrão: seg–sex presente, sáb/dom folga (igual à planilha; ajustável no calendário)
+export function pontoPadrao(competencia: string): Ponto {
+  const [y, m] = competencia.split("-").map(Number);
+  const diasMes = new Date(y, m, 0).getDate();
+  const p: Ponto = {};
+  for (let d = 1; d <= diasMes; d++) {
+    const dow = new Date(y, m - 1, d).getDay();
+    p[chaveDia(y, m, d)] = dow === 0 || dow === 6 ? "folga" : "presente";
+  }
+  return p;
+}
+
+export function contarPonto(ponto: Ponto) {
+  let presentes = 0, faltas = 0, atestados = 0, feriados = 0, folgas = 0;
+  for (const st of Object.values(ponto)) {
+    if (st === "presente") presentes++;
+    else if (st === "falta") faltas++;
+    else if (st === "atestado") atestados++;
+    else if (st === "feriado") feriados++;
+    else if (st === "folga") folgas++;
+  }
+  return { presentes, faltas, atestados, feriados, folgas };
+}
+
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 export function calcularFolha(i: FolhaInput): FolhaCalc {

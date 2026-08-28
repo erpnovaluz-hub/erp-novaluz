@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
-import { calcularFolha, calendarioMes, ultimoDiaMes } from "@/lib/folha";
+import { calcularFolha, calendarioMes, ultimoDiaMes, pontoPadrao, contarPonto, type Ponto, type PontoStatus } from "@/lib/folha";
 
 type Colab = { id: string; nome: string; cargo: string | null; salario_base: number | null };
-type Tipo = { id: string; nome: string };
+type Tipo = { id: string; nome: string; modo: "diario" | "fixo" };
 
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 const MESES_LONGO = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
@@ -41,8 +41,7 @@ export default function CalculadoraFolha() {
   const [beneficios, setBeneficios] = useState<Record<string, string>>({});
   const [heUtil, setHeUtil] = useState("");
   const [heDomingo, setHeDomingo] = useState("");
-  const [faltas, setFaltas] = useState("");
-  const [feriados, setFeriados] = useState("");
+  const [ponto, setPonto] = useState<Ponto>({});
   const [descHoras, setDescHoras] = useState("");
   const [descValor, setDescValor] = useState("");
   const [bonificacao, setBonificacao] = useState("");
@@ -69,7 +68,7 @@ export default function CalculadoraFolha() {
     (async () => {
       const [c, t] = await Promise.all([
         supabase.from("colaboradores").select("id, nome, cargo, salario_base").eq("ativo", true).order("nome").range(0, 4999),
-        supabase.from("folha_tipos_beneficio").select("id, nome").eq("ativo", true).order("ordem").range(0, 999),
+        supabase.from("folha_tipos_beneficio").select("id, nome, modo").eq("ativo", true).order("ordem").range(0, 999),
       ]);
       setColabs(c.data ?? []);
       setTipos(t.data ?? []);
@@ -91,8 +90,9 @@ export default function CalculadoraFolha() {
     let bens: Record<string, string> = Object.fromEntries(tipos.map((t) => [t.id, ""]));
     if (l) {
       const { data: bs } = await supabase
-        .from("folha_lancamento_beneficios").select("tipo_beneficio_id, valor").eq("lancamento_id", l.id);
-      for (const b of bs ?? []) bens[b.tipo_beneficio_id] = String(b.valor ?? "");
+        .from("folha_lancamento_beneficios").select("tipo_beneficio_id, valor_base, valor").eq("lancamento_id", l.id);
+      // valor_base = o que o usuário digita (por dia ou mensal); cai para valor no histórico antigo
+      for (const b of bs ?? []) bens[b.tipo_beneficio_id] = String(b.valor_base ?? b.valor ?? "");
     }
 
     const c = colabs.find((x) => x.id === colaboradorId);
@@ -103,8 +103,7 @@ export default function CalculadoraFolha() {
     setPct(l ? String(l.pct_adiantamento ?? "40") : "40");
     setHeUtil(l ? String(l.he_util_horas ?? "") : "");
     setHeDomingo(l ? String(l.he_domingo_horas ?? "") : "");
-    setFaltas(l ? String(l.faltas ?? "") : "");
-    setFeriados(l ? String(l.feriados ?? "") : "");
+    setPonto(l && l.ponto && Object.keys(l.ponto).length ? (l.ponto as Ponto) : pontoPadrao(competencia));
     setDescHoras(l ? String(l.desc_horas ?? "") : "");
     setDescValor(l ? String(l.desc_valor ?? "") : "");
     setBonificacao(l ? String(l.bonificacao ?? "") : "");
@@ -117,15 +116,18 @@ export default function CalculadoraFolha() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  const totalBeneficios = tipos.reduce((s, t) => s + num(beneficios[t.id]), 0);
   const cal = calendarioMes(competencia);
+  const cnt = contarPonto(ponto);
+  // benefício por dia = valor/dia × dias presentes; fixo = valor mensal
+  const beneficioTotal = (t: Tipo) => t.modo === "diario" ? num(beneficios[t.id]) * cnt.presentes : num(beneficios[t.id]);
+  const totalBeneficios = tipos.reduce((s, t) => s + beneficioTotal(t), 0);
   const calc = calcularFolha({
     salario: num(salario), pctAdiantamento: num(pct),
     heUtilHoras: num(heUtil), heDomingoHoras: num(heDomingo),
-    faltas: num(faltas), descHoras: num(descHoras), descValor: num(descValor),
+    faltas: cnt.faltas, descHoras: num(descHoras), descValor: num(descValor),
     bonificacao: num(bonificacao), adicional: num(adicional), abonoFamilia: num(abono),
     beneficios: totalBeneficios,
-    diasMes: cal.diasMes, domingos: cal.domingos, feriados: num(feriados),
+    diasMes: cal.diasMes, domingos: cal.domingos, feriados: cnt.feriados,
   });
 
   async function salvar(): Promise<boolean> {
@@ -139,8 +141,9 @@ export default function CalculadoraFolha() {
         pct_adiantamento: num(pct),
         he_util_horas: num(heUtil),
         he_domingo_horas: num(heDomingo),
-        faltas: num(faltas),
-        feriados: num(feriados),
+        ponto,
+        faltas: cnt.faltas,
+        feriados: cnt.feriados,
         desc_horas: num(descHoras),
         desc_valor: num(descValor),
         bonificacao: num(bonificacao),
@@ -161,7 +164,7 @@ export default function CalculadoraFolha() {
       }
       await supabase.from("folha_lancamento_beneficios").delete().eq("lancamento_id", id);
       const bens = tipos.filter((t) => num(beneficios[t.id]) !== 0)
-        .map((t) => ({ lancamento_id: id, tipo_beneficio_id: t.id, valor: num(beneficios[t.id]) }));
+        .map((t) => ({ lancamento_id: id, tipo_beneficio_id: t.id, valor_base: num(beneficios[t.id]), valor: beneficioTotal(t) }));
       if (bens.length) {
         const { error } = await supabase.from("folha_lancamento_beneficios").insert(bens);
         if (error) throw error;
@@ -272,8 +275,11 @@ export default function CalculadoraFolha() {
           {tipos.length > 0 && (
             <Secao titulo="Benefícios (fechamento)">
               {tipos.map((t) => (
-                <Campo key={t.id} label={`${t.nome} (R$)`}>
+                <Campo key={t.id} label={t.nome} dica={t.modo === "diario" ? "R$/dia" : "R$/mês"}>
                   <Inp valor={beneficios[t.id] ?? ""} onChange={(v) => setBeneficios((o) => ({ ...o, [t.id]: v }))} />
+                  {t.modo === "diario" && num(beneficios[t.id]) > 0 && (
+                    <span className="mt-0.5 block text-right text-[11px] text-gray-400">× {cnt.presentes}d = {formatCurrency(beneficioTotal(t))}</span>
+                  )}
                 </Campo>
               ))}
             </Secao>
@@ -290,9 +296,12 @@ export default function CalculadoraFolha() {
             <Campo label="Abono família (R$)"><Inp valor={abono} onChange={setAbono} /></Campo>
           </Secao>
 
-          <Secao titulo="Descontos">
-            <Campo label="Faltas (dias)" dica="salário ÷ 30"><Inp valor={faltas} onChange={setFaltas} /></Campo>
-            <Campo label="Feriados no mês" dica="p/ DSR"><Inp valor={feriados} onChange={setFeriados} /></Campo>
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Apontamento do mês</h3>
+            <CalendarioPonto competencia={competencia} ponto={ponto} setPonto={setPonto} contagem={cnt} />
+          </div>
+
+          <Secao titulo="Outros descontos">
             <Campo label="Horas descontadas"><Inp valor={descHoras} onChange={setDescHoras} /></Campo>
             <Campo label="Outros descontos (R$)"><Inp valor={descValor} onChange={setDescValor} /></Campo>
           </Secao>
@@ -314,9 +323,9 @@ export default function CalculadoraFolha() {
             <Linha label="Extra domingo (100%)" valor={calc.extraDomingo} />
             <Linha label="Total horas extras" valor={calc.totalExtras} forte />
             <div className="my-2 border-t border-gray-100" />
-            <Linha label="Benefícios" valor={totalBeneficios} />
+            <Linha label={`Benefícios (${cnt.presentes}d)`} valor={totalBeneficios} />
             <Linha label="Bonif./adicional/abono" valor={num(bonificacao) + num(adicional) + num(abono)} />
-            {num(faltas) > 0 && <Linha label={`Faltas (${num(faltas)}d)`} valor={-calc.descontoFaltas} negativo />}
+            {cnt.faltas > 0 && <Linha label={`Faltas (${cnt.faltas}d)`} valor={-calc.descontoFaltas} negativo />}
             {calc.descontoDSR > 0 && <Linha label="DSR sobre faltas" valor={-calc.descontoDSR} negativo sub={`${calc.repousos} rep. ÷ ${calc.diasUteis} úteis`} />}
             <Linha label="Total descontos" valor={-calc.totalDescontos} negativo />
             <div className="my-2 border-t border-gray-100" />
@@ -391,4 +400,69 @@ function Linha({ label, valor, sub, forte, negativo }: { label: string; valor: n
       <span className={`tabular-nums ${forte ? "font-semibold text-gray-900" : negativo ? "text-red-600" : "text-gray-700"}`}>{formatCurrency(valor)}</span>
     </div>
   );
+}
+
+const DOW = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const ORDEM_PONTO: PontoStatus[] = ["presente", "falta", "atestado", "feriado", "folga"];
+const ESTILO_PONTO: Record<PontoStatus, string> = {
+  presente: "bg-green-50 border-green-200 text-green-700",
+  falta: "bg-red-100 border-red-300 text-red-700",
+  atestado: "bg-amber-100 border-amber-300 text-amber-700",
+  feriado: "bg-purple-100 border-purple-300 text-purple-700",
+  folga: "bg-gray-100 border-gray-200 text-gray-400",
+};
+const ROTULO_PONTO: Record<PontoStatus, string> = { presente: "", falta: "Falta", atestado: "Atest.", feriado: "Fer.", folga: "Folga" };
+
+function CalendarioPonto({
+  competencia, ponto, setPonto, contagem,
+}: {
+  competencia: string; ponto: Ponto; setPonto: (p: Ponto) => void;
+  contagem: { presentes: number; faltas: number; atestados: number; feriados: number; folgas: number };
+}) {
+  const [y, m] = competencia.split("-").map(Number);
+  const diasMes = new Date(y, m, 0).getDate();
+  const offset = new Date(y, m - 1, 1).getDay();
+  const chave = (d: number) => `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const status = (d: number): PontoStatus => ponto[chave(d)] ?? (new Date(y, m - 1, d).getDay() === 0 ? "folga" : "presente");
+
+  const ciclar = (d: number) => {
+    if (new Date(y, m - 1, d).getDay() === 0) return; // domingo é folga fixa
+    const k = chave(d);
+    const prox = ORDEM_PONTO[(ORDEM_PONTO.indexOf(status(d)) + 1) % ORDEM_PONTO.length];
+    setPonto({ ...ponto, [k]: prox });
+  };
+
+  return (
+    <div>
+      <div className="grid grid-cols-7 gap-1 text-center">
+        {DOW.map((h) => <div key={h} className="text-[10px] font-medium text-gray-400">{h}</div>)}
+        {Array.from({ length: offset }).map((_, i) => <div key={`x${i}`} />)}
+        {Array.from({ length: diasMes }, (_, i) => i + 1).map((d) => {
+          const s = status(d);
+          const domingo = new Date(y, m - 1, d).getDay() === 0;
+          return (
+            <button key={d} type="button" onClick={() => ciclar(d)} disabled={domingo}
+              title={domingo ? "Domingo (folga)" : "Clique para alternar"}
+              className={`flex h-11 flex-col items-center justify-center rounded-md border text-xs ${ESTILO_PONTO[s]} ${domingo ? "cursor-default opacity-70" : "hover:ring-2 hover:ring-brand-300"}`}>
+              <span className="font-semibold leading-none">{d}</span>
+              <span className="mt-0.5 text-[9px] leading-none">{ROTULO_PONTO[s]}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-600">
+        <Leg cor="bg-green-100" t={`Presentes ${contagem.presentes}`} />
+        <Leg cor="bg-red-200" t={`Faltas ${contagem.faltas}`} />
+        <Leg cor="bg-amber-200" t={`Atestado ${contagem.atestados}`} />
+        <Leg cor="bg-purple-200" t={`Feriados ${contagem.feriados}`} />
+        <Leg cor="bg-gray-200" t={`Folgas ${contagem.folgas}`} />
+      </div>
+      <p className="mt-1 text-[11px] text-gray-400">
+        Clique num dia para alternar: Presente → Falta → Atestado → Feriado → Folga. Domingo é folga fixa. Atestado não desconta.
+      </p>
+    </div>
+  );
+}
+function Leg({ cor, t }: { cor: string; t: string }) {
+  return <span className="flex items-center gap-1"><span className={`inline-block h-2.5 w-2.5 rounded-sm ${cor}`} /> {t}</span>;
 }
