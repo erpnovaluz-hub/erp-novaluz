@@ -18,16 +18,13 @@ export type FolhaInput = {
   adicional: number;
   abonoFamilia: number;
   beneficios: number;        // soma dos benefícios (VT/VR/...)
-  diasMes: number;           // dias do mês (calendário)
-  domingos: number;          // nº de domingos do mês (calendário)
-  feriados: number;          // nº de feriados no mês (informado)
+  dsrDias: number;           // nº de DSRs perdidos (1 por semana com falta injustificada)
 };
 
 export type FolhaCalc = {
   valorHora: number;
   valorDia: number;
-  diasUteis: number;
-  repousos: number;       // domingos + feriados
+  dsrDias: number;        // DSRs perdidos
   extraUtil: number;
   extraDomingo: number;
   totalExtras: number;
@@ -68,6 +65,20 @@ export function pontoPadrao(competencia: string): Ponto {
   return p;
 }
 
+// DSRs perdidos = nº de semanas (seg–dom) distintas que contêm pelo menos uma falta.
+// Assim, 2 faltas na mesma semana perdem só 1 DSR (regra da Lei 605/49).
+export function contarDsrPerdidos(ponto: Ponto): number {
+  const semanas = new Set<string>();
+  for (const [dia, st] of Object.entries(ponto)) {
+    if (st !== "falta") continue;
+    const d = new Date(dia + "T00:00:00");
+    const segunda = new Date(d);
+    segunda.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // volta até a segunda-feira
+    semanas.add(segunda.toISOString().slice(0, 10));
+  }
+  return semanas.size;
+}
+
 export function contarPonto(ponto: Ponto) {
   let presentes = 0, faltas = 0, atestados = 0, feriados = 0, folgas = 0;
   for (const st of Object.values(ponto)) {
@@ -88,10 +99,9 @@ export function calcularFolha(i: FolhaInput): FolhaCalc {
   const extraUtil = r2(i.heUtilHoras * valorHora * FATOR_EXTRA_UTIL);
   const extraDomingo = r2(i.heDomingoHoras * valorHora * FATOR_EXTRA_DOMINGO);
   const totalExtras = r2(extraUtil + extraDomingo);
-  const repousos = Math.max(0, (i.domingos || 0) + (i.feriados || 0));
-  const diasUteis = Math.max(1, (i.diasMes || 30) - repousos);
   const descontoFaltas = r2(i.faltas * valorDia);
-  const descontoDSR = i.faltas > 0 ? r2((i.faltas / diasUteis) * repousos * valorDia) : 0;
+  // DSR: cada semana com falta injustificada perde 1 repouso = 1 diária (salário ÷ 30)
+  const descontoDSR = r2((i.dsrDias || 0) * valorDia);
   const descontoHoras = r2(i.descHoras * valorHora);
   const totalDescontos = r2(descontoFaltas + descontoDSR + descontoHoras + i.descValor);
   const adiantamento = r2(i.salario * (i.pctAdiantamento || 0) / 100);
@@ -99,7 +109,7 @@ export function calcularFolha(i: FolhaInput): FolhaCalc {
     i.salario + totalExtras + i.bonificacao + i.adicional + i.abonoFamilia + i.beneficios - totalDescontos
   );
   const fechamento = r2(totalMes - adiantamento);
-  return { valorHora: r2(valorHora), valorDia: r2(valorDia), diasUteis, repousos, extraUtil, extraDomingo, totalExtras, descontoFaltas, descontoDSR, descontoHoras, totalDescontos, adiantamento, fechamento, totalMes };
+  return { valorHora: r2(valorHora), valorDia: r2(valorDia), dsrDias: i.dsrDias || 0, extraUtil, extraDomingo, totalExtras, descontoFaltas, descontoDSR, descontoHoras, totalDescontos, adiantamento, fechamento, totalMes };
 }
 
 // último dia do mês da competência (yyyy-mm-01) → yyyy-mm-DD

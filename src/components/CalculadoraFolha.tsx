@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
-import { calcularFolha, calendarioMes, ultimoDiaMes, pontoPadrao, contarPonto, type Ponto, type PontoStatus } from "@/lib/folha";
+import { calcularFolha, ultimoDiaMes, pontoPadrao, contarPonto, contarDsrPerdidos, type Ponto, type PontoStatus } from "@/lib/folha";
 
 type Colab = { id: string; nome: string; cargo: string | null; salario_base: number | null };
 type Tipo = { id: string; nome: string; modo: "diario" | "fixo" };
@@ -116,8 +116,8 @@ export default function CalculadoraFolha() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  const cal = calendarioMes(competencia);
   const cnt = contarPonto(ponto);
+  const dsrDias = contarDsrPerdidos(ponto);
   // benefício por dia = valor/dia × dias presentes; fixo = valor mensal
   const beneficioTotal = (t: Tipo) => t.modo === "diario" ? num(beneficios[t.id]) * cnt.presentes : num(beneficios[t.id]);
   const totalBeneficios = tipos.reduce((s, t) => s + beneficioTotal(t), 0);
@@ -127,7 +127,7 @@ export default function CalculadoraFolha() {
     faltas: cnt.faltas, descHoras: num(descHoras), descValor: num(descValor),
     bonificacao: num(bonificacao), adicional: num(adicional), abonoFamilia: num(abono),
     beneficios: totalBeneficios,
-    diasMes: cal.diasMes, domingos: cal.domingos, feriados: cnt.feriados,
+    dsrDias,
   });
 
   async function salvar(): Promise<boolean> {
@@ -326,7 +326,7 @@ export default function CalculadoraFolha() {
             <Linha label={`Benefícios (${cnt.presentes}d)`} valor={totalBeneficios} />
             <Linha label="Bonif./adicional/abono" valor={num(bonificacao) + num(adicional) + num(abono)} />
             {cnt.faltas > 0 && <Linha label={`Faltas (${cnt.faltas}d)`} valor={-calc.descontoFaltas} negativo />}
-            {calc.descontoDSR > 0 && <Linha label="DSR sobre faltas" valor={-calc.descontoDSR} negativo sub={`${calc.repousos} rep. ÷ ${calc.diasUteis} úteis`} />}
+            {calc.descontoDSR > 0 && <Linha label="DSR sobre faltas" valor={-calc.descontoDSR} negativo sub={`${calc.dsrDias} DSR × diária`} />}
             <Linha label="Total descontos" valor={-calc.totalDescontos} negativo />
             <div className="my-2 border-t border-gray-100" />
             <div className="mb-2 rounded-lg bg-amber-50 p-3">
