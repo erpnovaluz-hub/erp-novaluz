@@ -14,3 +14,7 @@ next-env.d.ts
 
 # logo fonte (grande) — usar os gerados em public/ e src/app/
 /logo ERPNOVALUZ.jpg
+
+# build info / config local do agente
+tsconfig.tsbuildinfo
+.claude/

@@ -22,7 +22,7 @@ export type FieldDef = {
   placeholder?: string;
 };
 
-export type GroupKey = "comercial" | "cadastros" | "estoque" | "compras" | "financeiro" | "producao" | "impacto" | "os" | "relatorios";
+export type GroupKey = "comercial" | "cadastros" | "estoque" | "compras" | "financeiro" | "rh" | "producao" | "impacto" | "os" | "relatorios";
 
 export type EntityDef = {
   key: string;
@@ -66,6 +66,12 @@ export const GROUPS: GroupDef[] = [
     { href: "/financeiro/dre", label: "DRE mensal", icon: "📈" },
     { href: "/financeiro/fluxo", label: "Fluxo de caixa", icon: "💵" },
     { href: "/financeiro/relatorio", label: "Relatório financeiro", icon: "📊" },
+  ] },
+  { key: "rh", label: "RH / Folha", icon: "🧑‍💼", extras: [
+    { href: "/rh/folha", label: "Folha do mês", icon: "🧾" },
+    { href: "/rh/relatorio", label: "Relatório da folha", icon: "📊" },
+    { href: "/rh/beneficios", label: "Tipos de benefício", icon: "🎁" },
+    { href: "/e/colaboradores", label: "Colaboradores", icon: "👷" },
   ] },
   { key: "impacto", label: "Impacto / Produção", icon: "🏭", extras: [
     { href: "/impacto/producao", label: "Lançamentos de produção", icon: "⚙️" },
@@ -467,10 +473,13 @@ export const ENTITIES: Record<string, EntityDef> = {
   colaboradores: {
     key: "colaboradores", label: "Colaborador", labelPlural: "Colaboradores", icon: "👷", group: "cadastros",
     titleField: "nome", searchField: "nome", orderBy: { column: "nome", ascending: true },
-    listColumns: ["nome", "funcao_padrao", "custo_hora", "ativo"],
+    listColumns: ["nome", "cargo", "funcao_padrao", "salario_base", "ativo"],
     fields: [
       { key: "nome", label: "Nome", type: "text", required: true },
+      { key: "cargo", label: "Cargo", type: "text" },
       { key: "funcao_padrao", label: "Função padrão", type: "text" },
+      { key: "data_admissao", label: "Admissão", type: "date" },
+      { key: "salario_base", label: "Salário base", type: "currency" },
       { key: "custo_hora", label: "Custo/hora", type: "currency" },
       { key: "ativo", label: "Ativo", type: "boolean" },
     ],
