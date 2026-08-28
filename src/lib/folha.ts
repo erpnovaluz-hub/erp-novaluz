@@ -11,28 +11,43 @@ export type FolhaInput = {
   pctAdiantamento: number;   // ex.: 40
   heUtilHoras: number;       // qtd horas extras em dia útil
   heDomingoHoras: number;    // qtd horas extras em domingo/feriado
-  faltas: number;            // qtd de dias de falta
+  faltas: number;            // qtd de dias de falta (injustificada)
   descHoras: number;         // qtd horas descontadas
   descValor: number;         // outros descontos (R$)
   bonificacao: number;
   adicional: number;
   abonoFamilia: number;
   beneficios: number;        // soma dos benefícios (VT/VR/...)
+  diasMes: number;           // dias do mês (calendário)
+  domingos: number;          // nº de domingos do mês (calendário)
+  feriados: number;          // nº de feriados no mês (informado)
 };
 
 export type FolhaCalc = {
   valorHora: number;
   valorDia: number;
+  diasUteis: number;
+  repousos: number;       // domingos + feriados
   extraUtil: number;
   extraDomingo: number;
   totalExtras: number;
   descontoFaltas: number;
+  descontoDSR: number;    // reflexo da falta no DSR
   descontoHoras: number;
   totalDescontos: number;
   adiantamento: number;   // dia 15
   fechamento: number;     // último dia
   totalMes: number;       // adiantamento + fechamento
 };
+
+// dias do mês e nº de domingos, a partir da competência (yyyy-mm-01)
+export function calendarioMes(competencia: string): { diasMes: number; domingos: number } {
+  const [y, m] = competencia.split("-").map(Number);
+  const diasMes = new Date(y, m, 0).getDate();
+  let domingos = 0;
+  for (let d = 1; d <= diasMes; d++) if (new Date(y, m - 1, d).getDay() === 0) domingos++;
+  return { diasMes, domingos };
+}
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -42,15 +57,18 @@ export function calcularFolha(i: FolhaInput): FolhaCalc {
   const extraUtil = r2(i.heUtilHoras * valorHora * FATOR_EXTRA_UTIL);
   const extraDomingo = r2(i.heDomingoHoras * valorHora * FATOR_EXTRA_DOMINGO);
   const totalExtras = r2(extraUtil + extraDomingo);
+  const repousos = Math.max(0, (i.domingos || 0) + (i.feriados || 0));
+  const diasUteis = Math.max(1, (i.diasMes || 30) - repousos);
   const descontoFaltas = r2(i.faltas * valorDia);
+  const descontoDSR = i.faltas > 0 ? r2((i.faltas / diasUteis) * repousos * valorDia) : 0;
   const descontoHoras = r2(i.descHoras * valorHora);
-  const totalDescontos = r2(descontoFaltas + descontoHoras + i.descValor);
+  const totalDescontos = r2(descontoFaltas + descontoDSR + descontoHoras + i.descValor);
   const adiantamento = r2(i.salario * (i.pctAdiantamento || 0) / 100);
   const totalMes = r2(
     i.salario + totalExtras + i.bonificacao + i.adicional + i.abonoFamilia + i.beneficios - totalDescontos
   );
   const fechamento = r2(totalMes - adiantamento);
-  return { valorHora: r2(valorHora), valorDia: r2(valorDia), extraUtil, extraDomingo, totalExtras, descontoFaltas, descontoHoras, totalDescontos, adiantamento, fechamento, totalMes };
+  return { valorHora: r2(valorHora), valorDia: r2(valorDia), diasUteis, repousos, extraUtil, extraDomingo, totalExtras, descontoFaltas, descontoDSR, descontoHoras, totalDescontos, adiantamento, fechamento, totalMes };
 }
 
 // último dia do mês da competência (yyyy-mm-01) → yyyy-mm-DD

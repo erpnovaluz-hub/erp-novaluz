@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
-import { calcularFolha, ultimoDiaMes } from "@/lib/folha";
+import { calcularFolha, calendarioMes, ultimoDiaMes } from "@/lib/folha";
 
 type Colab = { id: string; nome: string; cargo: string | null; salario_base: number | null };
 type Tipo = { id: string; nome: string };
@@ -42,6 +42,7 @@ export default function CalculadoraFolha() {
   const [heUtil, setHeUtil] = useState("");
   const [heDomingo, setHeDomingo] = useState("");
   const [faltas, setFaltas] = useState("");
+  const [feriados, setFeriados] = useState("");
   const [descHoras, setDescHoras] = useState("");
   const [descValor, setDescValor] = useState("");
   const [bonificacao, setBonificacao] = useState("");
@@ -103,6 +104,7 @@ export default function CalculadoraFolha() {
     setHeUtil(l ? String(l.he_util_horas ?? "") : "");
     setHeDomingo(l ? String(l.he_domingo_horas ?? "") : "");
     setFaltas(l ? String(l.faltas ?? "") : "");
+    setFeriados(l ? String(l.feriados ?? "") : "");
     setDescHoras(l ? String(l.desc_horas ?? "") : "");
     setDescValor(l ? String(l.desc_valor ?? "") : "");
     setBonificacao(l ? String(l.bonificacao ?? "") : "");
@@ -116,12 +118,14 @@ export default function CalculadoraFolha() {
   useEffect(() => { carregar(); }, [carregar]);
 
   const totalBeneficios = tipos.reduce((s, t) => s + num(beneficios[t.id]), 0);
+  const cal = calendarioMes(competencia);
   const calc = calcularFolha({
     salario: num(salario), pctAdiantamento: num(pct),
     heUtilHoras: num(heUtil), heDomingoHoras: num(heDomingo),
     faltas: num(faltas), descHoras: num(descHoras), descValor: num(descValor),
     bonificacao: num(bonificacao), adicional: num(adicional), abonoFamilia: num(abono),
     beneficios: totalBeneficios,
+    diasMes: cal.diasMes, domingos: cal.domingos, feriados: num(feriados),
   });
 
   async function salvar(): Promise<boolean> {
@@ -136,6 +140,7 @@ export default function CalculadoraFolha() {
         he_util_horas: num(heUtil),
         he_domingo_horas: num(heDomingo),
         faltas: num(faltas),
+        feriados: num(feriados),
         desc_horas: num(descHoras),
         desc_valor: num(descValor),
         bonificacao: num(bonificacao),
@@ -287,6 +292,7 @@ export default function CalculadoraFolha() {
 
           <Secao titulo="Descontos">
             <Campo label="Faltas (dias)" dica="salário ÷ 30"><Inp valor={faltas} onChange={setFaltas} /></Campo>
+            <Campo label="Feriados no mês" dica="p/ DSR"><Inp valor={feriados} onChange={setFeriados} /></Campo>
             <Campo label="Horas descontadas"><Inp valor={descHoras} onChange={setDescHoras} /></Campo>
             <Campo label="Outros descontos (R$)"><Inp valor={descValor} onChange={setDescValor} /></Campo>
           </Secao>
@@ -311,6 +317,7 @@ export default function CalculadoraFolha() {
             <Linha label="Benefícios" valor={totalBeneficios} />
             <Linha label="Bonif./adicional/abono" valor={num(bonificacao) + num(adicional) + num(abono)} />
             {num(faltas) > 0 && <Linha label={`Faltas (${num(faltas)}d)`} valor={-calc.descontoFaltas} negativo />}
+            {calc.descontoDSR > 0 && <Linha label="DSR sobre faltas" valor={-calc.descontoDSR} negativo sub={`${calc.repousos} rep. ÷ ${calc.diasUteis} úteis`} />}
             <Linha label="Total descontos" valor={-calc.totalDescontos} negativo />
             <div className="my-2 border-t border-gray-100" />
             <div className="mb-2 rounded-lg bg-amber-50 p-3">

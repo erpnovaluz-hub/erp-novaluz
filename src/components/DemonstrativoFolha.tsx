@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
-import { calcularFolha, ultimoDiaMes, type FolhaCalc } from "@/lib/folha";
+import { calcularFolha, calendarioMes, ultimoDiaMes, type FolhaCalc } from "@/lib/folha";
 import PrintButton from "@/components/PrintButton";
 
 type Colab = { id: string; nome: string; cargo: string | null };
@@ -63,12 +63,14 @@ export default function DemonstrativoFolha() {
     const bens = (bnRes.data ?? []).map((b: any) => ({ label: tipoNome[b.tipo_beneficio_id] ?? "Benefício", valor: Number(b.valor) }));
     const totalBeneficios = bens.reduce((s, b) => s + b.valor, 0);
 
+    const cal = calendarioMes(competencia);
     const c = calcularFolha({
       salario: Number(l.salario_liquido), pctAdiantamento: Number(l.pct_adiantamento ?? 40),
       heUtilHoras: Number(l.he_util_horas), heDomingoHoras: Number(l.he_domingo_horas),
       faltas: Number(l.faltas ?? 0), descHoras: Number(l.desc_horas), descValor: Number(l.desc_valor),
       bonificacao: Number(l.bonificacao), adicional: Number(l.adicional), abonoFamilia: Number(l.abono_familia),
       beneficios: totalBeneficios,
+      diasMes: cal.diasMes, domingos: cal.domingos, feriados: Number(l.feriados ?? 0),
     });
 
     const prov: Item[] = [
@@ -83,6 +85,7 @@ export default function DemonstrativoFolha() {
 
     const desc: Item[] = [
       { label: `Faltas (${Number(l.faltas ?? 0)} dia(s))`, valor: c.descontoFaltas },
+      { label: `DSR sobre faltas (${c.repousos} rep.)`, valor: c.descontoDSR },
       { label: `Horas descontadas (${Number(l.desc_horas) || 0}h)`, valor: c.descontoHoras },
       { label: "Outros descontos", valor: Number(l.desc_valor) },
     ].filter((i) => i.valor !== 0);
@@ -185,7 +188,8 @@ export default function DemonstrativoFolha() {
           </div>
 
           <p className="mt-4 text-center text-[11px] text-gray-400">
-            Valor da hora {formatCurrency(calc.valorHora)} (salário ÷ 220) · valor do dia {formatCurrency(calc.valorDia)} (salário ÷ 30).
+            Hora {formatCurrency(calc.valorHora)} (÷220) · dia {formatCurrency(calc.valorDia)} (÷30)
+            {calc.descontoDSR > 0 && <> · DSR = (faltas ÷ {calc.diasUteis} dias úteis) × {calc.repousos} repousos × dia</>}.
             Documento interno de conferência — não substitui o holerite oficial.
           </p>
         </div>
