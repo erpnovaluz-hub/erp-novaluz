@@ -41,6 +41,7 @@ export default function CalculadoraFolha() {
   const [beneficios, setBeneficios] = useState<Record<string, string>>({});
   const [heUtil, setHeUtil] = useState("");
   const [heDomingo, setHeDomingo] = useState("");
+  const [faltas, setFaltas] = useState("");
   const [descHoras, setDescHoras] = useState("");
   const [descValor, setDescValor] = useState("");
   const [bonificacao, setBonificacao] = useState("");
@@ -101,6 +102,7 @@ export default function CalculadoraFolha() {
     setPct(l ? String(l.pct_adiantamento ?? "40") : "40");
     setHeUtil(l ? String(l.he_util_horas ?? "") : "");
     setHeDomingo(l ? String(l.he_domingo_horas ?? "") : "");
+    setFaltas(l ? String(l.faltas ?? "") : "");
     setDescHoras(l ? String(l.desc_horas ?? "") : "");
     setDescValor(l ? String(l.desc_valor ?? "") : "");
     setBonificacao(l ? String(l.bonificacao ?? "") : "");
@@ -117,7 +119,7 @@ export default function CalculadoraFolha() {
   const calc = calcularFolha({
     salario: num(salario), pctAdiantamento: num(pct),
     heUtilHoras: num(heUtil), heDomingoHoras: num(heDomingo),
-    descHoras: num(descHoras), descValor: num(descValor),
+    faltas: num(faltas), descHoras: num(descHoras), descValor: num(descValor),
     bonificacao: num(bonificacao), adicional: num(adicional), abonoFamilia: num(abono),
     beneficios: totalBeneficios,
   });
@@ -133,6 +135,7 @@ export default function CalculadoraFolha() {
         pct_adiantamento: num(pct),
         he_util_horas: num(heUtil),
         he_domingo_horas: num(heDomingo),
+        faltas: num(faltas),
         desc_horas: num(descHoras),
         desc_valor: num(descValor),
         bonificacao: num(bonificacao),
@@ -283,6 +286,7 @@ export default function CalculadoraFolha() {
           </Secao>
 
           <Secao titulo="Descontos">
+            <Campo label="Faltas (dias)" dica="salário ÷ 30"><Inp valor={faltas} onChange={setFaltas} /></Campo>
             <Campo label="Horas descontadas"><Inp valor={descHoras} onChange={setDescHoras} /></Campo>
             <Campo label="Outros descontos (R$)"><Inp valor={descValor} onChange={setDescValor} /></Campo>
           </Secao>
@@ -306,7 +310,8 @@ export default function CalculadoraFolha() {
             <div className="my-2 border-t border-gray-100" />
             <Linha label="Benefícios" valor={totalBeneficios} />
             <Linha label="Bonif./adicional/abono" valor={num(bonificacao) + num(adicional) + num(abono)} />
-            <Linha label="Descontos" valor={-calc.totalDescontos} negativo />
+            {num(faltas) > 0 && <Linha label={`Faltas (${num(faltas)}d)`} valor={-calc.descontoFaltas} negativo />}
+            <Linha label="Total descontos" valor={-calc.totalDescontos} negativo />
             <div className="my-2 border-t border-gray-100" />
             <div className="mb-2 rounded-lg bg-amber-50 p-3">
               <div className="flex items-center justify-between">
@@ -336,6 +341,10 @@ export default function CalculadoraFolha() {
               </button>
               {(tituloAdiantId || tituloFechId) && (
                 <p className="text-center text-xs text-green-600">✓ títulos já gerados para este mês</p>
+              )}
+              {colaboradorId && (
+                <a href={`/rh/demonstrativo?colab=${colaboradorId}&mes=${mes}&ano=${ano}`}
+                  className="text-center text-sm text-brand-600 hover:underline">📄 Ver demonstrativo (contracheque)</a>
               )}
             </div>
           </div>

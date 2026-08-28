@@ -2,6 +2,7 @@
 // Valor da hora = salário ÷ 220. Extra dia útil = 63% (×1,63). Domingo = 100% (×2,0).
 
 export const DIVISOR_HORA = 220;
+export const DIVISOR_DIA = 30;           // valor do dia = salário ÷ 30 (para faltas)
 export const FATOR_EXTRA_UTIL = 1.63;    // hora + 63%
 export const FATOR_EXTRA_DOMINGO = 2.0;  // hora + 100%
 
@@ -10,6 +11,7 @@ export type FolhaInput = {
   pctAdiantamento: number;   // ex.: 40
   heUtilHoras: number;       // qtd horas extras em dia útil
   heDomingoHoras: number;    // qtd horas extras em domingo/feriado
+  faltas: number;            // qtd de dias de falta
   descHoras: number;         // qtd horas descontadas
   descValor: number;         // outros descontos (R$)
   bonificacao: number;
@@ -20,9 +22,11 @@ export type FolhaInput = {
 
 export type FolhaCalc = {
   valorHora: number;
+  valorDia: number;
   extraUtil: number;
   extraDomingo: number;
   totalExtras: number;
+  descontoFaltas: number;
   descontoHoras: number;
   totalDescontos: number;
   adiantamento: number;   // dia 15
@@ -34,17 +38,19 @@ const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 export function calcularFolha(i: FolhaInput): FolhaCalc {
   const valorHora = i.salario > 0 ? i.salario / DIVISOR_HORA : 0;
+  const valorDia = i.salario > 0 ? i.salario / DIVISOR_DIA : 0;
   const extraUtil = r2(i.heUtilHoras * valorHora * FATOR_EXTRA_UTIL);
   const extraDomingo = r2(i.heDomingoHoras * valorHora * FATOR_EXTRA_DOMINGO);
   const totalExtras = r2(extraUtil + extraDomingo);
+  const descontoFaltas = r2(i.faltas * valorDia);
   const descontoHoras = r2(i.descHoras * valorHora);
-  const totalDescontos = r2(descontoHoras + i.descValor);
+  const totalDescontos = r2(descontoFaltas + descontoHoras + i.descValor);
   const adiantamento = r2(i.salario * (i.pctAdiantamento || 0) / 100);
   const totalMes = r2(
     i.salario + totalExtras + i.bonificacao + i.adicional + i.abonoFamilia + i.beneficios - totalDescontos
   );
   const fechamento = r2(totalMes - adiantamento);
-  return { valorHora: r2(valorHora), extraUtil, extraDomingo, totalExtras, descontoHoras, totalDescontos, adiantamento, fechamento, totalMes };
+  return { valorHora: r2(valorHora), valorDia: r2(valorDia), extraUtil, extraDomingo, totalExtras, descontoFaltas, descontoHoras, totalDescontos, adiantamento, fechamento, totalMes };
 }
 
 // último dia do mês da competência (yyyy-mm-01) → yyyy-mm-DD

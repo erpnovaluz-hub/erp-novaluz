@@ -72,11 +72,11 @@ export default function FolhaRelatorio() {
 
   // por colaborador (ano)
   const porColab = useMemo(() => {
-    const map: Record<string, { custo: number; meses: number }> = {};
+    const map: Record<string, { custo: number; meses: number; faltas: number }> = {};
     for (const l of lancs) {
       const k = l.colaborador_id;
-      (map[k] ??= { custo: 0, meses: 0 });
-      map[k].custo += num(l.custo_total); map[k].meses += 1;
+      (map[k] ??= { custo: 0, meses: 0, faltas: 0 });
+      map[k].custo += num(l.custo_total); map[k].meses += 1; map[k].faltas += num(l.faltas);
     }
     return Object.entries(map)
       .map(([id, v]) => ({ id, nome: colabNome[id] ?? "—", ...v }))
@@ -152,6 +152,7 @@ export default function FolhaRelatorio() {
                   <tr className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
                     <th className="py-2">Colaborador</th>
                     <th className="py-2 text-right">Meses</th>
+                    <th className="py-2 text-right">Faltas</th>
                     <th className="py-2 text-right">Média/mês</th>
                     <th className="py-2 text-right">Total ano</th>
                   </tr>
@@ -161,6 +162,7 @@ export default function FolhaRelatorio() {
                     <tr key={c.id}>
                       <td className="py-2 font-medium text-gray-900">{c.nome}</td>
                       <td className="py-2 text-right tabular-nums text-gray-500">{c.meses}</td>
+                      <td className={`py-2 text-right tabular-nums ${c.faltas > 0 ? "text-red-600" : "text-gray-400"}`}>{c.faltas || "—"}</td>
                       <td className="py-2 text-right tabular-nums text-gray-500">{formatCurrency(c.meses ? c.custo / c.meses : 0)}</td>
                       <td className="py-2 text-right font-medium tabular-nums text-gray-900">{formatCurrency(c.custo)}</td>
                     </tr>
