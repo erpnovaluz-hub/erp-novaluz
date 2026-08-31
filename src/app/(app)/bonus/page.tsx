@@ -17,6 +17,27 @@ function bonusDia(count: number, r?: Regra): number {
   return r.fixo + Math.floor((count - r.minimo) / 50) * r.por50;
 }
 
+// Bônus do dia por tipo, com a regra cruzada:
+// se bate a meta em >=1 tipo (dia elegível), os demais tipos pagam R$ por 50 peças
+// (taxa "por50", sem fixo e sem mínimo).
+function bonusDoDia(cont: Record<string, number>, regras: Record<string, Regra>): Record<string, number> {
+  const res: Record<string, number> = { LD: 0, LP: 0, LPP: 0 };
+  const bateuMeta: Record<string, boolean> = {};
+  let elegivel = false;
+  for (const tp of TIPOS) {
+    const r = regras[tp]; const c = cont[tp] || 0;
+    if (r && c >= r.minimo) { bateuMeta[tp] = true; elegivel = true; res[tp] = bonusDia(c, r); }
+  }
+  if (elegivel) {
+    for (const tp of TIPOS) {
+      if (bateuMeta[tp]) continue;
+      const r = regras[tp]; const c = cont[tp] || 0;
+      if (r) res[tp] = Math.floor(c / 50) * r.por50;
+    }
+  }
+  return res;
+}
+
 export default function BonusPage() {
   const supabase = useMemo(() => createClient(), []);
   const [dataDe, setDataDe] = useState("");
@@ -86,12 +107,8 @@ export default function BonusPage() {
     for (const [k, { cont, semTipo }] of dia) {
       const [d0, colab] = [k.split("|")[0], k.split("|")[1]];
       const p = m.get(colab) ?? { id: colab, pc: { LD: 0, LP: 0, LPP: 0 }, bn: { LD: 0, LP: 0, LPP: 0 }, semTipo: 0, detalhe: [] as any[] };
-      const bnDia: Record<string, number> = { LD: 0, LP: 0, LPP: 0 };
-      for (const tp of TIPOS) {
-        p.pc[tp] += cont[tp];
-        const b = bonusDia(cont[tp], regras[tp]);
-        p.bn[tp] += b; bnDia[tp] = b;
-      }
+      const bnDia = bonusDoDia(cont, regras);
+      for (const tp of TIPOS) { p.pc[tp] += cont[tp]; p.bn[tp] += bnDia[tp]; }
       p.semTipo += semTipo;
       p.detalhe.push({ data: d0, pc: { ...cont }, semTipo, bn: bnDia, total: bnDia.LD + bnDia.LP + bnDia.LPP });
       m.set(colab, p);
@@ -218,9 +235,9 @@ export default function BonusPage() {
       </div>
 
       <p className="mt-3 text-xs text-gray-400">
-        O tipo (LD/LP/LPP) vem do cadastro da peça (ou do campo Tipo do lançamento). Conta as peças por serviço de bônus e, por dia,
-        se atingem o mínimo, paga o fixo + R$ (por 50) a cada 50 peças acima do mínimo. “Dias” = dias com produção no período.
-        Regras editáveis em Cadastros → Regras de bônus.
+        O tipo (LD/LP/LPP) vem do cadastro da peça (ou do campo Tipo do lançamento). Por dia: o tipo que atinge o mínimo paga o
+        fixo + R$ (por 50) a cada 50 peças acima do mínimo. Batendo a meta em pelo menos um tipo no dia, os <b>demais tipos</b> também
+        pagam R$ (por 50) a cada 50 peças, mesmo sem atingir o próprio mínimo. “Dias” = dias com produção. Regras em Cadastros → Regras de bônus.
       </p>
     </div>
   );
