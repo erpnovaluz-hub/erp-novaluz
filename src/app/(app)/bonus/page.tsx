@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { tipoDaPeca } from "@/lib/pecas";
 import PrintButton from "@/components/PrintButton";
 
 type Row = Record<string, any>;
@@ -43,7 +44,7 @@ export default function BonusPage() {
   const carregar = useCallback(async () => {
     if (servicosBonus.length === 0) { setRows([]); setCarregando(false); return; }
     setCarregando(true);
-    let q = supabase.from("producao").select("data, colaborador_id, peca_id, tipo, quantidade")
+    let q = supabase.from("producao").select("data, colaborador_id, peca_id, peca_nome, tipo, quantidade")
       .in("servico_id", servicosBonus.map((s) => s.id));
     if (dataDe) q = q.gte("data", dataDe);
     if (dataAte) q = q.lte("data", dataAte);
@@ -55,8 +56,11 @@ export default function BonusPage() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // tipo autoritativo: cadastro da peça primeiro, depois o texto do lançamento
-  const tipoDe = useCallback((r: Row) => String((r.peca_id && pecasTipo[r.peca_id]) || r.tipo || "").toUpperCase(), [pecasTipo]);
+  // tipo: cadastro da peça → regra automática pelo nome → texto do lançamento
+  const tipoDe = useCallback(
+    (r: Row) => String((r.peca_id && pecasTipo[r.peca_id]) || tipoDaPeca(r.peca_nome) || r.tipo || "").toUpperCase(),
+    [pecasTipo]
+  );
 
   const porFunc = useMemo(() => {
     // 1) soma peças por (dia, funcionário, tipo) — o mínimo é por dia

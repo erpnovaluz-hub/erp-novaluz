@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
+import { tipoDaPeca } from "@/lib/pecas";
 
 type Opt = { id: string; nome: string };
 type Peca = { id: string; nome: string; peso: number; tipo?: string | null };
@@ -41,7 +42,11 @@ export default function ProducaoDrawer({
 
   function escolherPeca(id: string) {
     const p = pecas.find((x) => x.id === id);
-    setF((o) => ({ ...o, peca_id: id, peca_nome: p?.nome ?? o.peca_nome, peso_unit: p ? p.peso : o.peso_unit, tipo: p?.tipo ?? o.tipo }));
+    setF((o) => ({ ...o, peca_id: id, peca_nome: p?.nome ?? o.peca_nome, peso_unit: p ? p.peso : o.peso_unit, tipo: p?.tipo || tipoDaPeca(p?.nome) || o.tipo }));
+  }
+  // ao digitar o nome, deriva o tipo automaticamente (se ainda não definido)
+  function setPecaNome(v: string) {
+    setF((o) => ({ ...o, peca_nome: v, tipo: o.tipo || tipoDaPeca(v) }));
   }
   function escolherServico(id: string) {
     const s = servicos.find((x) => x.id === id);
@@ -117,7 +122,7 @@ export default function ProducaoDrawer({
               {pecas.map((p) => <option key={p.id} value={p.id}>{p.nome}{p.tipo ? ` [${p.tipo}]` : ""} · {p.peso} kg</option>)}
             </select>
             <div className="mt-2 grid grid-cols-3 gap-2">
-              <input className="inp col-span-2" placeholder="Nome da peça" value={f.peca_nome} onChange={(e) => set("peca_nome", e.target.value)} />
+              <input className="inp col-span-2" placeholder="Nome da peça" value={f.peca_nome} onChange={(e) => setPecaNome(e.target.value)} />
               <select className="inp" value={f.tipo} onChange={(e) => set("tipo", e.target.value)} title="Tipo p/ bônus">
                 <option value="">tipo…</option>
                 <option value="LD">LD</option>
@@ -125,7 +130,7 @@ export default function ProducaoDrawer({
                 <option value="LPP">LPP</option>
               </select>
             </div>
-            <p className="mt-1 text-[11px] text-gray-400">O tipo (LD/LP/LPP) define o bônus. Ao escolher a peça do cadastro ele vem automático.</p>
+            <p className="mt-1 text-[11px] text-gray-400">O tipo (LD/LP/LPP) define o bônus — vem automático pelo nome da peça (LD… → LD; LP com tamanho ≥ 200 → LP, senão LPP). Pode ajustar manualmente.</p>
           </div>
 
           <div>
