@@ -17,6 +17,13 @@ function bonusDia(count: number, r?: Regra): number {
   return r.fixo + Math.floor((count - r.minimo) / 50) * r.por50;
 }
 
+// Regra da SOMA (qualquer tipo somado): ≥300 peças no dia → R$30 + R$5 a cada 50 acima de 300.
+const REGRA_SOMA: Regra = { minimo: 300, fixo: 30, por50: 5 };
+function bonusSomaDia(totalPecas: number): number {
+  if (totalPecas < REGRA_SOMA.minimo) return 0;
+  return REGRA_SOMA.fixo + Math.floor((totalPecas - REGRA_SOMA.minimo) / 50) * REGRA_SOMA.por50;
+}
+
 // Bônus do dia por tipo, com a regra cruzada:
 // se bate a meta em >=1 tipo (dia elegível), os demais tipos pagam R$ por 50 peças
 // (taxa "por50", sem fixo e sem mínimo).
@@ -102,21 +109,25 @@ export default function BonusPage() {
       const s = diasProd.get(colab) ?? new Set<string>();
       s.add(d0); diasProd.set(colab, s);
     }
-    // 2) aplica a regra por dia, acumula por funcionário e guarda o detalhe diário
+    // 2) por dia: calcula os 2 métodos (por tipo/cruzada e soma total) e paga o MAIOR
     const m = new Map<string, any>();
     for (const [k, { cont, semTipo }] of dia) {
       const [d0, colab] = [k.split("|")[0], k.split("|")[1]];
-      const p = m.get(colab) ?? { id: colab, pc: { LD: 0, LP: 0, LPP: 0 }, bn: { LD: 0, LP: 0, LPP: 0 }, semTipo: 0, detalhe: [] as any[] };
-      const bnDia = bonusDoDia(cont, regras);
-      for (const tp of TIPOS) { p.pc[tp] += cont[tp]; p.bn[tp] += bnDia[tp]; }
-      p.semTipo += semTipo;
-      p.detalhe.push({ data: d0, pc: { ...cont }, semTipo, bn: bnDia, total: bnDia.LD + bnDia.LP + bnDia.LPP });
+      const p = m.get(colab) ?? { id: colab, pc: { LD: 0, LP: 0, LPP: 0 }, bTipo: 0, bSoma: 0, total: 0, semTipo: 0, detalhe: [] as any[] };
+      const bnObj = bonusDoDia(cont, regras);
+      const bTipoDia = bnObj.LD + bnObj.LP + bnObj.LPP;
+      const somaPecas = cont.LD + cont.LP + cont.LPP;
+      const bSomaDia = bonusSomaDia(somaPecas);
+      const totalDia = Math.max(bTipoDia, bSomaDia);
+      for (const tp of TIPOS) p.pc[tp] += cont[tp];
+      p.bTipo += bTipoDia; p.bSoma += bSomaDia; p.total += totalDia; p.semTipo += semTipo;
+      p.detalhe.push({ data: d0, pc: { ...cont }, somaPecas, semTipo, bTipo: bTipoDia, bSoma: bSomaDia, total: totalDia, metodo: bSomaDia > bTipoDia ? "soma" : "tipo" });
       m.set(colab, p);
     }
     return Array.from(m.values()).map((p) => ({
       id: p.id, nome: colNome[p.id] ?? "— (sem funcionário)",
-      dias: diasProd.get(p.id)?.size ?? 0, pc: p.pc, bn: p.bn, semTipo: p.semTipo,
-      total: p.bn.LD + p.bn.LP + p.bn.LPP,
+      dias: diasProd.get(p.id)?.size ?? 0, pc: p.pc, semTipo: p.semTipo,
+      bTipo: p.bTipo, bSoma: p.bSoma, total: p.total,
       detalhe: p.detalhe.sort((a: any, b: any) => a.data.localeCompare(b.data)),
     })).sort((a, b) => b.total - a.total);
   }, [rows, regras, colNome, tipoDe]);
@@ -178,15 +189,14 @@ export default function BonusPage() {
               <th className="px-3 py-2 text-right">LP pç</th>
               <th className="px-3 py-2 text-right">LPP pç</th>
               <th className="px-3 py-2 text-right">s/ tipo</th>
-              <th className="px-3 py-2 text-right">Bônus LD</th>
-              <th className="px-3 py-2 text-right">Bônus LP</th>
-              <th className="px-3 py-2 text-right">Bônus LPP</th>
-              <th className="px-3 py-2 text-right">Total</th>
+              <th className="px-3 py-2 text-right">Bônus p/ tipo</th>
+              <th className="px-3 py-2 text-right">Bônus soma</th>
+              <th className="px-3 py-2 text-right">Total (maior)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {porFunc.length === 0 ? (
-              <tr><td colSpan={10} className="px-4 py-10 text-center text-gray-400">Nenhuma produção de bônus no período.</td></tr>
+              <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">Nenhuma produção de bônus no período.</td></tr>
             ) : porFunc.map((p, i) => {
               const aberto = expandido.has(p.id);
               return (
@@ -200,22 +210,20 @@ export default function BonusPage() {
                 <td className="px-3 py-2 text-right tabular-nums text-gray-500">{nf(p.pc.LP)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-500">{nf(p.pc.LPP)}</td>
                 <td className={`px-3 py-2 text-right tabular-nums ${p.semTipo > 0 ? "text-amber-600" : "text-gray-300"}`}>{p.semTipo > 0 ? nf(p.semTipo) : "—"}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(p.bn.LD)}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(p.bn.LP)}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(p.bn.LPP)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-gray-500">{formatCurrency(p.bTipo)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-gray-500">{formatCurrency(p.bSoma)}</td>
                 <td className="px-3 py-2 text-right font-semibold tabular-nums text-brand-600">{formatCurrency(p.total)}</td>
               </tr>
               {aberto && p.detalhe.map((d: any, j: number) => (
                 <tr key={`${i}-${j}`} className="bg-gray-50/60 text-xs">
                   <td className="py-1 pl-8 pr-3 text-gray-500">{formatDate(d.data)}</td>
-                  <td className="px-3 py-1" />
+                  <td className="px-3 py-1 text-right tabular-nums text-gray-400">{nf(d.somaPecas)}</td>
                   <td className="px-3 py-1 text-right tabular-nums text-gray-500">{d.pc.LD ? nf(d.pc.LD) : "—"}</td>
                   <td className="px-3 py-1 text-right tabular-nums text-gray-500">{d.pc.LP ? nf(d.pc.LP) : "—"}</td>
                   <td className="px-3 py-1 text-right tabular-nums text-gray-500">{d.pc.LPP ? nf(d.pc.LPP) : "—"}</td>
                   <td className={`px-3 py-1 text-right tabular-nums ${d.semTipo > 0 ? "text-amber-600" : "text-gray-300"}`}>{d.semTipo > 0 ? nf(d.semTipo) : "—"}</td>
-                  <td className="px-3 py-1 text-right tabular-nums text-gray-500">{d.bn.LD ? formatCurrency(d.bn.LD) : "—"}</td>
-                  <td className="px-3 py-1 text-right tabular-nums text-gray-500">{d.bn.LP ? formatCurrency(d.bn.LP) : "—"}</td>
-                  <td className="px-3 py-1 text-right tabular-nums text-gray-500">{d.bn.LPP ? formatCurrency(d.bn.LPP) : "—"}</td>
+                  <td className={`px-3 py-1 text-right tabular-nums ${d.metodo === "tipo" && d.total > 0 ? "font-medium text-gray-700" : "text-gray-400"}`}>{d.bTipo ? formatCurrency(d.bTipo) : "—"}</td>
+                  <td className={`px-3 py-1 text-right tabular-nums ${d.metodo === "soma" && d.total > 0 ? "font-medium text-gray-700" : "text-gray-400"}`}>{d.bSoma ? formatCurrency(d.bSoma) : "—"}</td>
                   <td className="px-3 py-1 text-right tabular-nums font-medium text-gray-700">{d.total ? formatCurrency(d.total) : "—"}</td>
                 </tr>
               ))}
@@ -226,7 +234,7 @@ export default function BonusPage() {
           {porFunc.length > 0 && (
             <tfoot className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
               <tr>
-                <td className="px-3 py-2" colSpan={9}>Total a pagar no período</td>
+                <td className="px-3 py-2" colSpan={8}>Total a pagar no período</td>
                 <td className="px-3 py-2 text-right tabular-nums text-brand-600">{formatCurrency(totalGeral)}</td>
               </tr>
             </tfoot>
@@ -235,9 +243,11 @@ export default function BonusPage() {
       </div>
 
       <p className="mt-3 text-xs text-gray-400">
-        O tipo (LD/LP/LPP) vem do cadastro da peça (ou do campo Tipo do lançamento). Por dia: o tipo que atinge o mínimo paga o
-        fixo + R$ (por 50) a cada 50 peças acima do mínimo. Batendo a meta em pelo menos um tipo no dia, os <b>demais tipos</b> também
-        pagam R$ (por 50) a cada 50 peças, mesmo sem atingir o próprio mínimo. “Dias” = dias com produção. Regras em Cadastros → Regras de bônus.
+        Cada dia calcula de 2 formas e paga a <b>maior</b>:
+        <b> (1) por tipo</b> — o tipo que atinge o mínimo paga fixo + R$/50 acima do mínimo; batendo a meta em ≥1 tipo, os demais tipos
+        também pagam R$/50 a cada 50 peças; e <b> (2) soma</b> — somando todos os tipos, ≥ {nf(REGRA_SOMA.minimo)} peças no dia paga
+        {formatCurrency(REGRA_SOMA.fixo)} + {formatCurrency(REGRA_SOMA.por50)} a cada 50 acima de {nf(REGRA_SOMA.minimo)}.
+        O tipo vem do cadastro da peça (ou do nome). “Dias” = dias com produção; no detalhe diário, a 2ª coluna mostra o total de peças do dia.
       </p>
     </div>
   );
