@@ -337,11 +337,16 @@ export default function CalculadoraFolha() {
               <p className="text-xs text-amber-700/80">{pct || 0}% do salário</p>
             </div>
             <div className="mb-3 rounded-lg bg-blue-50 p-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-blue-800">Fechamento · último dia</span>
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="text-sm font-medium text-blue-800">Fechamento · fim do mês</span>
                 <span className="text-lg font-bold tabular-nums text-blue-900">{formatCurrency(calc.fechamento)}</span>
               </div>
-              <p className="text-xs text-blue-700/80">restante + extras + benefícios − descontos</p>
+              <div className="space-y-0.5 border-t border-blue-200/60 pt-1.5 text-xs text-blue-800/90">
+                <div className="flex justify-between"><span>1) Só saldo de salário</span><span className="tabular-nums">{formatCurrency(calc.fechSoSalario)}</span></div>
+                <div className="flex justify-between"><span>2) + horas extras / proventos</span><span className="tabular-nums">{formatCurrency(calc.fechSalarioExtras)}</span></div>
+                <div className="flex justify-between font-semibold"><span>3) + benefícios (total)</span><span className="tabular-nums">{formatCurrency(calc.fechamento)}</span></div>
+              </div>
+              <p className="mt-1 text-[11px] text-blue-700/70">saldo salário = 60% − descontos · use as camadas p/ pagar em dias diferentes</p>
             </div>
             <div className="mb-4 flex items-center justify-between rounded-lg bg-brand-600 p-3 text-white">
               <span className="text-sm font-medium">Total do mês</span>

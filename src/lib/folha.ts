@@ -32,10 +32,26 @@ export type FolhaCalc = {
   descontoDSR: number;    // reflexo da falta no DSR
   descontoHoras: number;
   totalDescontos: number;
-  adiantamento: number;   // dia 15
-  fechamento: number;     // último dia
+  adiantamento: number;   // dia 15 (líquido = % do salário)
+  // camadas do fechamento (fim do mês), acumuladas — para pagar em dias diferentes:
+  salario60: number;              // parte do salário do fechamento (100% − adiantamento)
+  fechSoSalario: number;          // 1) só saldo de salário: salario60 − descontos
+  fechSalarioExtras: number;      // 2) + horas extras e proventos (bonif/adic/abono)
+  fechamento: number;             // 3) + benefícios (= fechamento total do fim do mês)
   totalMes: number;       // adiantamento + fechamento
 };
+
+// Decompõe o pagamento do fim do mês em camadas acumuladas.
+export function camadasFechamento(x: {
+  salario: number; adiantamento: number; descontos: number; horasExtras: number;
+  bonificacao: number; adicional: number; abonoFamilia: number; beneficios: number;
+}) {
+  const salario60 = Math.round((x.salario - x.adiantamento) * 100) / 100;
+  const fechSoSalario = Math.round((salario60 - x.descontos) * 100) / 100;
+  const fechSalarioExtras = Math.round((fechSoSalario + x.horasExtras + x.bonificacao + x.adicional + x.abonoFamilia) * 100) / 100;
+  const fechamento = Math.round((fechSalarioExtras + x.beneficios) * 100) / 100;
+  return { salario60, fechSoSalario, fechSalarioExtras, fechamento };
+}
 
 // dias do mês e nº de domingos, a partir da competência (yyyy-mm-01)
 export function calendarioMes(competencia: string): { diasMes: number; domingos: number } {
@@ -108,8 +124,16 @@ export function calcularFolha(i: FolhaInput): FolhaCalc {
   const totalMes = r2(
     i.salario + totalExtras + i.bonificacao + i.adicional + i.abonoFamilia + i.beneficios - totalDescontos
   );
-  const fechamento = r2(totalMes - adiantamento);
-  return { valorHora: r2(valorHora), valorDia: r2(valorDia), dsrDias: i.dsrDias || 0, extraUtil, extraDomingo, totalExtras, descontoFaltas, descontoDSR, descontoHoras, totalDescontos, adiantamento, fechamento, totalMes };
+  const cam = camadasFechamento({
+    salario: i.salario, adiantamento, descontos: totalDescontos, horasExtras: totalExtras,
+    bonificacao: i.bonificacao, adicional: i.adicional, abonoFamilia: i.abonoFamilia, beneficios: i.beneficios,
+  });
+  return {
+    valorHora: r2(valorHora), valorDia: r2(valorDia), dsrDias: i.dsrDias || 0,
+    extraUtil, extraDomingo, totalExtras, descontoFaltas, descontoDSR, descontoHoras, totalDescontos,
+    adiantamento, salario60: cam.salario60, fechSoSalario: cam.fechSoSalario,
+    fechSalarioExtras: cam.fechSalarioExtras, fechamento: cam.fechamento, totalMes,
+  };
 }
 
 // último dia do mês da competência (yyyy-mm-01) → yyyy-mm-DD

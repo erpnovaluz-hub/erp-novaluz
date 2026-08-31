@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
+import { camadasFechamento } from "@/lib/folha";
 import PrintButton from "@/components/PrintButton";
 
 type Tipo = { id: string; nome: string };
@@ -70,12 +71,20 @@ export default function FolhaRelatorio() {
     return base;
   }, [lancs]);
 
-  // totais do escopo (mês selecionado ou ano)
-  const tot = useMemo(() => lancsF.reduce((a, l) => ({
-    salarios: a.salarios + num(l.salario_liquido), beneficios: a.beneficios + num(l.total_beneficios),
-    extras: a.extras + num(l.horas_extras), descontos: a.descontos + num(l.descontos),
-    custo: a.custo + num(l.custo_total), adiant: a.adiant + num(l.adiantamento), fech: a.fech + num(l.fechamento),
-  }), { salarios: 0, beneficios: 0, extras: 0, descontos: 0, custo: 0, adiant: 0, fech: 0 }), [lancsF]);
+  // totais do escopo (mês selecionado ou ano) — inclui camadas do fechamento
+  const tot = useMemo(() => lancsF.reduce((a, l) => {
+    const cam = camadasFechamento({
+      salario: num(l.salario_liquido), adiantamento: num(l.adiantamento), descontos: num(l.descontos),
+      horasExtras: num(l.horas_extras), bonificacao: num(l.bonificacao), adicional: num(l.adicional),
+      abonoFamilia: num(l.abono_familia), beneficios: num(l.total_beneficios),
+    });
+    return {
+      salarios: a.salarios + num(l.salario_liquido), beneficios: a.beneficios + num(l.total_beneficios),
+      extras: a.extras + num(l.horas_extras), descontos: a.descontos + num(l.descontos),
+      custo: a.custo + num(l.custo_total), adiant: a.adiant + num(l.adiantamento), fech: a.fech + num(l.fechamento),
+      fSalario: a.fSalario + cam.fechSoSalario, fExtras: a.fExtras + cam.fechSalarioExtras,
+    };
+  }, { salarios: 0, beneficios: 0, extras: 0, descontos: 0, custo: 0, adiant: 0, fech: 0, fSalario: 0, fExtras: 0 }), [lancsF]);
 
   const totAno = useMemo(() => porMes.reduce((a, m) => ({
     salarios: a.salarios + m.salarios, beneficios: a.beneficios + m.beneficios,
@@ -139,6 +148,24 @@ export default function FolhaRelatorio() {
             <Kpi titulo="Horas extras" valor={formatCurrency(tot.extras)} />
             <Kpi titulo="Descontos" valor={formatCurrency(tot.descontos)} />
             {!mes && <Kpi titulo="Média mensal" valor={formatCurrency(mesesComDados ? totAno.custo / mesesComDados : 0)} />}
+          </div>
+
+          {/* planejamento de pagamento */}
+          <div className="mb-5 grid gap-3 md:grid-cols-2">
+            <div className="card p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">Pagamento dia 15 — adiantamento</p>
+              <p className="text-2xl font-bold tabular-nums text-amber-900">{formatCurrency(tot.adiant)}</p>
+              <p className="mt-1 text-xs text-gray-400">líquido do adiantamento (% do salário) — {escopo}</p>
+            </div>
+            <div className="card p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-700">Pagamento fim do mês — fechamento (em camadas)</p>
+              <div className="space-y-1.5 text-sm">
+                <Camada n={1} rotulo="Só saldo de salário" dica="60% − descontos" valor={tot.fSalario} />
+                <Camada n={2} rotulo="+ Horas extras / proventos" valor={tot.fExtras} />
+                <Camada n={3} rotulo="+ Benefícios (fechamento total)" valor={tot.fech} forte />
+              </div>
+              <p className="mt-2 text-[11px] text-gray-400">Escolha a camada conforme o que for pagar em cada dia (salário num dia, benefícios em outro).</p>
+            </div>
           </div>
 
           {/* evolução mensal */}
@@ -280,6 +307,17 @@ export default function FolhaRelatorio() {
   );
 }
 
+function Camada({ n, rotulo, dica, valor, forte }: { n: number; rotulo: string; dica?: string; valor: number; forte?: boolean }) {
+  return (
+    <div className={`flex items-center justify-between rounded-md px-2 py-1 ${forte ? "bg-blue-50 font-semibold" : ""}`}>
+      <span className="text-gray-600">
+        <span className="mr-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-[10px] text-blue-700">{n}</span>
+        {rotulo}{dica && <span className="ml-1 text-xs text-gray-400">({dica})</span>}
+      </span>
+      <span className={`tabular-nums ${forte ? "text-blue-700" : "text-gray-900"}`}>{formatCurrency(valor)}</span>
+    </div>
+  );
+}
 function Seg({ w, cor }: { w: number; cor: string }) {
   if (w <= 0) return null;
   return <div style={{ width: `${w}%`, backgroundColor: cor }} className="h-full" />;

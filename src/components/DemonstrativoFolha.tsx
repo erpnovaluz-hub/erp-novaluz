@@ -187,6 +187,16 @@ export default function DemonstrativoFolha() {
             </div>
           </div>
 
+          {/* fechamento em camadas (para pagar em dias diferentes) */}
+          <div className="mt-3 rounded-lg border border-blue-200 p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-700">Fechamento em camadas</p>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between"><span className="text-gray-600">1) Só saldo de salário <span className="text-xs text-gray-400">(60% − descontos)</span></span><span className="tabular-nums text-gray-900">{formatCurrency(calc.fechSoSalario)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-600">2) + horas extras / proventos</span><span className="tabular-nums text-gray-900">{formatCurrency(calc.fechSalarioExtras)}</span></div>
+              <div className="flex justify-between border-t border-gray-100 pt-1 font-semibold"><span className="text-gray-700">3) + benefícios (total)</span><span className="tabular-nums text-blue-700">{formatCurrency(calc.fechamento)}</span></div>
+            </div>
+          </div>
+
           <p className="mt-4 text-center text-[11px] text-gray-400">
             Hora {formatCurrency(calc.valorHora)} (÷220) · dia {formatCurrency(calc.valorDia)} (÷30)
             {calc.descontoDSR > 0 && <> · DSR = {calc.dsrDias} semana(s) com falta × 1 diária</>}.
