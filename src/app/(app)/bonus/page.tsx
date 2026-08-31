@@ -25,6 +25,7 @@ export default function BonusPage() {
   const [regras, setRegras] = useState<Record<string, Regra>>({});
   const [colaboradores, setColaboradores] = useState<any[]>([]);
   const [servicosBonus, setServicosBonus] = useState<{ id: string; nome: string }[]>([]);
+  const [pecasTipo, setPecasTipo] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState(true);
 
   const colNome = useMemo(() => Object.fromEntries(colaboradores.map((c) => [c.id, c.nome])), [colaboradores]);
@@ -34,12 +35,15 @@ export default function BonusPage() {
     supabase.from("bonus_regras").select("tipo, minimo, bonus_fixo, bonus_por_50").eq("ativo", true).then(({ data }) =>
       setRegras(Object.fromEntries((data ?? []).map((r: any) => [String(r.tipo).toUpperCase(), { minimo: Number(r.minimo), fixo: Number(r.bonus_fixo), por50: Number(r.bonus_por_50) }]))));
     supabase.from("servicos").select("id, nome").eq("conta_bonus", true).then(({ data }) => setServicosBonus(data ?? []));
+    // tipo autoritativo pelo cadastro de peças (resolve confusão nome × tipo)
+    supabase.from("pecas").select("id, tipo").range(0, 9999).then(({ data }) =>
+      setPecasTipo(Object.fromEntries((data ?? []).filter((p: any) => p.tipo).map((p: any) => [p.id, String(p.tipo).toUpperCase()]))));
   }, [supabase]);
 
   const carregar = useCallback(async () => {
     if (servicosBonus.length === 0) { setRows([]); setCarregando(false); return; }
     setCarregando(true);
-    let q = supabase.from("producao").select("data, colaborador_id, tipo, quantidade")
+    let q = supabase.from("producao").select("data, colaborador_id, peca_id, tipo, quantidade")
       .in("servico_id", servicosBonus.map((s) => s.id));
     if (dataDe) q = q.gte("data", dataDe);
     if (dataAte) q = q.lte("data", dataAte);
@@ -51,39 +55,46 @@ export default function BonusPage() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  // tipo autoritativo: cadastro da peça primeiro, depois o texto do lançamento
+  const tipoDe = useCallback((r: Row) => String((r.peca_id && pecasTipo[r.peca_id]) || r.tipo || "").toUpperCase(), [pecasTipo]);
+
   const porFunc = useMemo(() => {
     // 1) soma peças por (dia, funcionário, tipo) — o mínimo é por dia
-    const dia = new Map<string, Record<string, number>>();
+    const dia = new Map<string, { cont: Record<string, number>; semTipo: number }>();
+    const diasProd = new Map<string, Set<string>>(); // dias com produção por funcionário
     for (const r of rows) {
-      const tp = String(r.tipo || "").toUpperCase();
-      if (!TIPOS.includes(tp)) continue;
-      const k = `${String(r.data).slice(0, 10)}|${r.colaborador_id || "—"}`;
-      const d = dia.get(k) ?? { LD: 0, LP: 0, LPP: 0 };
-      d[tp] += Number(r.quantidade || 0);
+      const colab = r.colaborador_id || "—";
+      const d0 = String(r.data).slice(0, 10);
+      const k = `${d0}|${colab}`;
+      const d = dia.get(k) ?? { cont: { LD: 0, LP: 0, LPP: 0 }, semTipo: 0 };
+      const tp = tipoDe(r);
+      if (TIPOS.includes(tp)) d.cont[tp] += Number(r.quantidade || 0);
+      else d.semTipo += Number(r.quantidade || 0);
       dia.set(k, d);
+      const s = diasProd.get(colab) ?? new Set<string>();
+      s.add(d0); diasProd.set(colab, s);
     }
     // 2) aplica a regra por dia e acumula por funcionário
     const m = new Map<string, any>();
-    for (const [k, cont] of dia) {
+    for (const [k, { cont, semTipo }] of dia) {
       const colab = k.split("|")[1];
-      const p = m.get(colab) ?? { id: colab, dias: new Set<string>(), pc: { LD: 0, LP: 0, LPP: 0 }, bn: { LD: 0, LP: 0, LPP: 0 } };
-      let ganhou = false;
+      const p = m.get(colab) ?? { id: colab, pc: { LD: 0, LP: 0, LPP: 0 }, bn: { LD: 0, LP: 0, LPP: 0 }, semTipo: 0 };
       for (const tp of TIPOS) {
         p.pc[tp] += cont[tp];
-        const b = bonusDia(cont[tp], regras[tp]);
-        p.bn[tp] += b;
-        if (b > 0) ganhou = true;
+        p.bn[tp] += bonusDia(cont[tp], regras[tp]);
       }
-      if (ganhou) p.dias.add(k.split("|")[0]);
+      p.semTipo += semTipo;
       m.set(colab, p);
     }
     return Array.from(m.values()).map((p) => ({
       nome: colNome[p.id] ?? "— (sem funcionário)",
-      dias: p.dias.size, pc: p.pc, bn: p.bn, total: p.bn.LD + p.bn.LP + p.bn.LPP,
+      dias: diasProd.get(p.id)?.size ?? 0, pc: p.pc, bn: p.bn, semTipo: p.semTipo,
+      total: p.bn.LD + p.bn.LP + p.bn.LPP,
     })).sort((a, b) => b.total - a.total);
-  }, [rows, regras, colNome]);
+  }, [rows, regras, colNome, tipoDe]);
 
   const totalGeral = porFunc.reduce((s, p) => s + p.total, 0);
+  const totalSemTipo = porFunc.reduce((s, p) => s + p.semTipo, 0);
 
   return (
     <div>
@@ -122,6 +133,13 @@ export default function BonusPage() {
         <span>Total a pagar: <b className="text-brand-600">{formatCurrency(totalGeral)}</b></span>
       </div>
 
+      {totalSemTipo > 0 && (
+        <div className="no-print mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+          ⚠️ <b>{nf(totalSemTipo)}</b> peça(s) de produção estão <b>sem tipo (LD/LP/LPP)</b> e não entram no bônus.
+          Defina o tipo no cadastro da peça (Cadastros → Peças) ou no lançamento (Impacto → Lançamentos de produção).
+        </div>
+      )}
+
       <div className="card overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
@@ -131,6 +149,7 @@ export default function BonusPage() {
               <th className="px-3 py-2 text-right">LD pç</th>
               <th className="px-3 py-2 text-right">LP pç</th>
               <th className="px-3 py-2 text-right">LPP pç</th>
+              <th className="px-3 py-2 text-right">s/ tipo</th>
               <th className="px-3 py-2 text-right">Bônus LD</th>
               <th className="px-3 py-2 text-right">Bônus LP</th>
               <th className="px-3 py-2 text-right">Bônus LPP</th>
@@ -139,7 +158,7 @@ export default function BonusPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {porFunc.length === 0 ? (
-              <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">Nenhuma produção de bônus no período.</td></tr>
+              <tr><td colSpan={10} className="px-4 py-10 text-center text-gray-400">Nenhuma produção de bônus no período.</td></tr>
             ) : porFunc.map((p, i) => (
               <tr key={i} className="hover:bg-gray-50">
                 <td className="px-3 py-2 font-medium text-gray-800">{p.nome}</td>
@@ -147,6 +166,7 @@ export default function BonusPage() {
                 <td className="px-3 py-2 text-right tabular-nums text-gray-500">{nf(p.pc.LD)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-500">{nf(p.pc.LP)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-500">{nf(p.pc.LPP)}</td>
+                <td className={`px-3 py-2 text-right tabular-nums ${p.semTipo > 0 ? "text-amber-600" : "text-gray-300"}`}>{p.semTipo > 0 ? nf(p.semTipo) : "—"}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(p.bn.LD)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(p.bn.LP)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(p.bn.LPP)}</td>
@@ -157,7 +177,7 @@ export default function BonusPage() {
           {porFunc.length > 0 && (
             <tfoot className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
               <tr>
-                <td className="px-3 py-2" colSpan={8}>Total a pagar no período</td>
+                <td className="px-3 py-2" colSpan={9}>Total a pagar no período</td>
                 <td className="px-3 py-2 text-right tabular-nums text-brand-600">{formatCurrency(totalGeral)}</td>
               </tr>
             </tfoot>
@@ -166,7 +186,9 @@ export default function BonusPage() {
       </div>
 
       <p className="mt-3 text-xs text-gray-400">
-        Conta as peças (LD/LP/LPP) dos lançamentos de produção cujo serviço conta para bônus. Por dia, se as peças do tipo atingem o mínimo, paga o fixo + R$ (por 50) a cada 50 peças acima do mínimo. Regras editáveis em Cadastros → Regras de bônus.
+        O tipo (LD/LP/LPP) vem do cadastro da peça (ou do campo Tipo do lançamento). Conta as peças por serviço de bônus e, por dia,
+        se atingem o mínimo, paga o fixo + R$ (por 50) a cada 50 peças acima do mínimo. “Dias” = dias com produção no período.
+        Regras editáveis em Cadastros → Regras de bônus.
       </p>
     </div>
   );

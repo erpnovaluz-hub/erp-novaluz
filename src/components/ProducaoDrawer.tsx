@@ -111,12 +111,21 @@ export default function ProducaoDrawer({
           </div>
 
           <div>
-            <label className="lbl">Peça <span className="text-xs text-gray-400">(puxa o peso)</span></label>
+            <label className="lbl">Peça <span className="text-xs text-gray-400">(puxa o peso e o tipo)</span></label>
             <select className="inp" value={f.peca_id} onChange={(e) => escolherPeca(e.target.value)}>
               <option value="">— (ou digite abaixo)</option>
-              {pecas.map((p) => <option key={p.id} value={p.id}>{p.nome} · {p.peso} kg</option>)}
+              {pecas.map((p) => <option key={p.id} value={p.id}>{p.nome}{p.tipo ? ` [${p.tipo}]` : ""} · {p.peso} kg</option>)}
             </select>
-            <input className="inp mt-2" placeholder="Nome da peça" value={f.peca_nome} onChange={(e) => set("peca_nome", e.target.value)} />
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <input className="inp col-span-2" placeholder="Nome da peça" value={f.peca_nome} onChange={(e) => set("peca_nome", e.target.value)} />
+              <select className="inp" value={f.tipo} onChange={(e) => set("tipo", e.target.value)} title="Tipo p/ bônus">
+                <option value="">tipo…</option>
+                <option value="LD">LD</option>
+                <option value="LP">LP</option>
+                <option value="LPP">LPP</option>
+              </select>
+            </div>
+            <p className="mt-1 text-[11px] text-gray-400">O tipo (LD/LP/LPP) define o bônus. Ao escolher a peça do cadastro ele vem automático.</p>
           </div>
 
           <div>
