@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { tipoDaPeca } from "@/lib/pecas";
@@ -27,7 +27,10 @@ export default function BonusPage() {
   const [colaboradores, setColaboradores] = useState<any[]>([]);
   const [servicosBonus, setServicosBonus] = useState<{ id: string; nome: string }[]>([]);
   const [pecasTipo, setPecasTipo] = useState<Record<string, string>>({});
+  const [expandido, setExpandido] = useState<Set<string>>(new Set());
   const [carregando, setCarregando] = useState(true);
+
+  const alternar = (id: string) => setExpandido((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const colNome = useMemo(() => Object.fromEntries(colaboradores.map((c) => [c.id, c.nome])), [colaboradores]);
 
@@ -78,22 +81,26 @@ export default function BonusPage() {
       const s = diasProd.get(colab) ?? new Set<string>();
       s.add(d0); diasProd.set(colab, s);
     }
-    // 2) aplica a regra por dia e acumula por funcionário
+    // 2) aplica a regra por dia, acumula por funcionário e guarda o detalhe diário
     const m = new Map<string, any>();
     for (const [k, { cont, semTipo }] of dia) {
-      const colab = k.split("|")[1];
-      const p = m.get(colab) ?? { id: colab, pc: { LD: 0, LP: 0, LPP: 0 }, bn: { LD: 0, LP: 0, LPP: 0 }, semTipo: 0 };
+      const [d0, colab] = [k.split("|")[0], k.split("|")[1]];
+      const p = m.get(colab) ?? { id: colab, pc: { LD: 0, LP: 0, LPP: 0 }, bn: { LD: 0, LP: 0, LPP: 0 }, semTipo: 0, detalhe: [] as any[] };
+      const bnDia: Record<string, number> = { LD: 0, LP: 0, LPP: 0 };
       for (const tp of TIPOS) {
         p.pc[tp] += cont[tp];
-        p.bn[tp] += bonusDia(cont[tp], regras[tp]);
+        const b = bonusDia(cont[tp], regras[tp]);
+        p.bn[tp] += b; bnDia[tp] = b;
       }
       p.semTipo += semTipo;
+      p.detalhe.push({ data: d0, pc: { ...cont }, semTipo, bn: bnDia, total: bnDia.LD + bnDia.LP + bnDia.LPP });
       m.set(colab, p);
     }
     return Array.from(m.values()).map((p) => ({
-      nome: colNome[p.id] ?? "— (sem funcionário)",
+      id: p.id, nome: colNome[p.id] ?? "— (sem funcionário)",
       dias: diasProd.get(p.id)?.size ?? 0, pc: p.pc, bn: p.bn, semTipo: p.semTipo,
       total: p.bn.LD + p.bn.LP + p.bn.LPP,
+      detalhe: p.detalhe.sort((a: any, b: any) => a.data.localeCompare(b.data)),
     })).sort((a, b) => b.total - a.total);
   }, [rows, regras, colNome, tipoDe]);
 
@@ -163,9 +170,14 @@ export default function BonusPage() {
           <tbody className="divide-y divide-gray-100">
             {porFunc.length === 0 ? (
               <tr><td colSpan={10} className="px-4 py-10 text-center text-gray-400">Nenhuma produção de bônus no período.</td></tr>
-            ) : porFunc.map((p, i) => (
-              <tr key={i} className="hover:bg-gray-50">
-                <td className="px-3 py-2 font-medium text-gray-800">{p.nome}</td>
+            ) : porFunc.map((p, i) => {
+              const aberto = expandido.has(p.id);
+              return (
+              <Fragment key={i}>
+              <tr className="cursor-pointer hover:bg-gray-50" onClick={() => alternar(p.id)}>
+                <td className="px-3 py-2 font-medium text-gray-800">
+                  <span className="mr-1 inline-block w-3 text-gray-400">{aberto ? "▾" : "▸"}</span>{p.nome}
+                </td>
                 <td className="px-3 py-2 text-right tabular-nums">{p.dias}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-500">{nf(p.pc.LD)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-500">{nf(p.pc.LP)}</td>
@@ -176,7 +188,23 @@ export default function BonusPage() {
                 <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(p.bn.LPP)}</td>
                 <td className="px-3 py-2 text-right font-semibold tabular-nums text-brand-600">{formatCurrency(p.total)}</td>
               </tr>
-            ))}
+              {aberto && p.detalhe.map((d: any, j: number) => (
+                <tr key={`${i}-${j}`} className="bg-gray-50/60 text-xs">
+                  <td className="py-1 pl-8 pr-3 text-gray-500">{formatDate(d.data)}</td>
+                  <td className="px-3 py-1" />
+                  <td className="px-3 py-1 text-right tabular-nums text-gray-500">{d.pc.LD ? nf(d.pc.LD) : "—"}</td>
+                  <td className="px-3 py-1 text-right tabular-nums text-gray-500">{d.pc.LP ? nf(d.pc.LP) : "—"}</td>
+                  <td className="px-3 py-1 text-right tabular-nums text-gray-500">{d.pc.LPP ? nf(d.pc.LPP) : "—"}</td>
+                  <td className={`px-3 py-1 text-right tabular-nums ${d.semTipo > 0 ? "text-amber-600" : "text-gray-300"}`}>{d.semTipo > 0 ? nf(d.semTipo) : "—"}</td>
+                  <td className="px-3 py-1 text-right tabular-nums text-gray-500">{d.bn.LD ? formatCurrency(d.bn.LD) : "—"}</td>
+                  <td className="px-3 py-1 text-right tabular-nums text-gray-500">{d.bn.LP ? formatCurrency(d.bn.LP) : "—"}</td>
+                  <td className="px-3 py-1 text-right tabular-nums text-gray-500">{d.bn.LPP ? formatCurrency(d.bn.LPP) : "—"}</td>
+                  <td className="px-3 py-1 text-right tabular-nums font-medium text-gray-700">{d.total ? formatCurrency(d.total) : "—"}</td>
+                </tr>
+              ))}
+              </Fragment>
+              );
+            })}
           </tbody>
           {porFunc.length > 0 && (
             <tfoot className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
