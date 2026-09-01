@@ -21,12 +21,25 @@ export default function RelatorioProducaoPage() {
   const [servico, setServico] = useState("");
   const [peca, setPeca] = useState("");
   const [pecaAtiva, setPecaAtiva] = useState("");
+  const [copiado, setCopiado] = useState(false);
 
   const [rows, setRows] = useState<Row[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
   const [colaboradores, setColaboradores] = useState<any[]>([]);
   const [servicos, setServicos] = useState<any[]>([]);
+  const [servicoIdsPeriodo, setServicoIdsPeriodo] = useState<Set<string>>(new Set());
   const [carregando, setCarregando] = useState(true);
+
+  // pré-seleção via query (?de=&ate=&cliente=&colab=&servico=&peca=) — lida só no cliente
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("de")) setDataDe(p.get("de")!);
+    if (p.get("ate")) setDataAte(p.get("ate")!);
+    if (p.get("cliente")) setCliente(p.get("cliente")!);
+    if (p.get("colab")) setColaborador(p.get("colab")!);
+    if (p.get("servico")) setServico(p.get("servico")!);
+    if (p.get("peca")) { setPeca(p.get("peca")!); setPecaAtiva(p.get("peca")!); }
+  }, []);
   const [sortCol, setSortCol] = useState<Col>("data");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -54,6 +67,49 @@ export default function RelatorioProducaoPage() {
   }, [supabase, dataDe, dataAte, cliente, colaborador, servico, pecaAtiva]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // serviços realmente realizados no período (respeita data/cliente/colaborador/peça — mas não o próprio filtro de serviço)
+  const carregarServicosPeriodo = useCallback(async () => {
+    let q = supabase.from("producao").select("servico_id");
+    if (dataDe) q = q.gte("data", dataDe);
+    if (dataAte) q = q.lte("data", dataAte);
+    if (cliente) q = q.eq("cliente_id", cliente);
+    if (colaborador) q = q.eq("colaborador_id", colaborador);
+    if (pecaAtiva.trim()) q = q.ilike("peca_nome", `%${pecaAtiva.trim()}%`);
+    const { data } = await q.range(0, 9999);
+    setServicoIdsPeriodo(new Set((data ?? []).map((r) => r.servico_id).filter(Boolean)));
+  }, [supabase, dataDe, dataAte, cliente, colaborador, pecaAtiva]);
+
+  useEffect(() => { carregarServicosPeriodo(); }, [carregarServicosPeriodo]);
+
+  // se o serviço selecionado não foi realizado no período atual, limpa a seleção
+  useEffect(() => {
+    if (servico && servicoIdsPeriodo.size > 0 && !servicoIdsPeriodo.has(servico)) setServico("");
+  }, [servicoIdsPeriodo, servico]);
+
+  const servicosNoPeriodo = useMemo(
+    () => servicos.filter((s) => servicoIdsPeriodo.has(s.id)),
+    [servicos, servicoIdsPeriodo],
+  );
+
+  const copiarLink = useCallback(async () => {
+    const p = new URLSearchParams();
+    if (dataDe) p.set("de", dataDe);
+    if (dataAte) p.set("ate", dataAte);
+    if (cliente) p.set("cliente", cliente);
+    if (colaborador) p.set("colab", colaborador);
+    if (servico) p.set("servico", servico);
+    if (pecaAtiva.trim()) p.set("peca", pecaAtiva.trim());
+    const qs = p.toString();
+    const url = `${window.location.origin}${window.location.pathname}${qs ? `?${qs}` : ""}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      window.prompt("Copie o link do relatório:", url);
+    }
+  }, [dataDe, dataAte, cliente, colaborador, servico, pecaAtiva]);
 
   const valor = (r: Row, c: Col): any => {
     if (c === "peca") return r.peca_nome ?? "";
@@ -102,7 +158,16 @@ export default function RelatorioProducaoPage() {
           <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">📄 Relatório de produção</h1>
           <p className="text-sm text-gray-500">Detalhado · clique no cabeçalho para ordenar por qualquer coluna</p>
         </div>
-        <PrintButton />
+        <div className="no-print flex items-center gap-2">
+          <button
+            onClick={copiarLink}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            title="Copiar link com os filtros atuais"
+          >
+            {copiado ? "✓ Link copiado" : "🔗 Copiar link"}
+          </button>
+          <PrintButton />
+        </div>
       </div>
 
       <div className="no-print mb-4 flex flex-wrap items-end gap-2">
@@ -124,7 +189,7 @@ export default function RelatorioProducaoPage() {
         </select>
         <select className="inp !w-auto py-1.5" value={servico} onChange={(e) => setServico(e.target.value)}>
           <option value="">Todo serviço</option>
-          {servicos.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+          {servicosNoPeriodo.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
         </select>
         <form onSubmit={(e) => { e.preventDefault(); setPecaAtiva(peca); }}>
           <input className="inp !w-40 py-1.5" placeholder="Peça…" value={peca} onChange={(e) => setPeca(e.target.value)} />
