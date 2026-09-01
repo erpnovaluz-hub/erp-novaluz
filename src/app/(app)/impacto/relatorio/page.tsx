@@ -28,6 +28,7 @@ export default function RelatorioProducaoPage() {
   const [colaboradores, setColaboradores] = useState<any[]>([]);
   const [servicos, setServicos] = useState<any[]>([]);
   const [servicoIdsPeriodo, setServicoIdsPeriodo] = useState<Set<string>>(new Set());
+  const [colaboradorIdsPeriodo, setColaboradorIdsPeriodo] = useState<Set<string>>(new Set());
   const [carregando, setCarregando] = useState(true);
 
   // pré-seleção via query (?de=&ate=&cliente=&colab=&servico=&peca=) — lida só no cliente
@@ -47,7 +48,7 @@ export default function RelatorioProducaoPage() {
   const servNome = useMemo(() => Object.fromEntries(servicos.map((s) => [s.id, s.nome])), [servicos]);
 
   useEffect(() => {
-    supabase.from("clientes").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setClientes(data ?? []));
+    supabase.from("clientes").select("id, nome, relatorio_token").order("nome").range(0, 4999).then(({ data }) => setClientes(data ?? []));
     supabase.from("colaboradores").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setColaboradores(data ?? []));
     supabase.from("servicos").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setServicos(data ?? []));
   }, [supabase]);
@@ -68,33 +69,48 @@ export default function RelatorioProducaoPage() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // serviços realmente realizados no período (respeita data/cliente/colaborador/peça — mas não o próprio filtro de serviço)
-  const carregarServicosPeriodo = useCallback(async () => {
-    let q = supabase.from("producao").select("servico_id");
-    if (dataDe) q = q.gte("data", dataDe);
-    if (dataAte) q = q.lte("data", dataAte);
-    if (cliente) q = q.eq("cliente_id", cliente);
-    if (colaborador) q = q.eq("colaborador_id", colaborador);
-    if (pecaAtiva.trim()) q = q.ilike("peca_nome", `%${pecaAtiva.trim()}%`);
-    const { data } = await q.range(0, 9999);
-    setServicoIdsPeriodo(new Set((data ?? []).map((r) => r.servico_id).filter(Boolean)));
-  }, [supabase, dataDe, dataAte, cliente, colaborador, pecaAtiva]);
+  // serviços e funcionários realmente presentes no período — cada lista ignora só o próprio filtro (data/cliente/peça valem para ambos)
+  const carregarFiltrosPeriodo = useCallback(async () => {
+    let qs = supabase.from("producao").select("servico_id");
+    let qc = supabase.from("producao").select("colaborador_id");
+    if (dataDe) { qs = qs.gte("data", dataDe); qc = qc.gte("data", dataDe); }
+    if (dataAte) { qs = qs.lte("data", dataAte); qc = qc.lte("data", dataAte); }
+    if (cliente) { qs = qs.eq("cliente_id", cliente); qc = qc.eq("cliente_id", cliente); }
+    if (pecaAtiva.trim()) { qs = qs.ilike("peca_nome", `%${pecaAtiva.trim()}%`); qc = qc.ilike("peca_nome", `%${pecaAtiva.trim()}%`); }
+    if (colaborador) qs = qs.eq("colaborador_id", colaborador); // lista de serviços respeita o funcionário selecionado
+    if (servico) qc = qc.eq("servico_id", servico);             // lista de funcionários respeita o serviço selecionado
+    const [{ data: ds }, { data: dc }] = await Promise.all([qs.range(0, 9999), qc.range(0, 9999)]);
+    setServicoIdsPeriodo(new Set((ds ?? []).map((r) => r.servico_id).filter(Boolean)));
+    setColaboradorIdsPeriodo(new Set((dc ?? []).map((r) => r.colaborador_id).filter(Boolean)));
+  }, [supabase, dataDe, dataAte, cliente, colaborador, servico, pecaAtiva]);
 
-  useEffect(() => { carregarServicosPeriodo(); }, [carregarServicosPeriodo]);
+  useEffect(() => { carregarFiltrosPeriodo(); }, [carregarFiltrosPeriodo]);
 
-  // se o serviço selecionado não foi realizado no período atual, limpa a seleção
+  // se o serviço/funcionário selecionado não existe no período atual, limpa a seleção
   useEffect(() => {
     if (servico && servicoIdsPeriodo.size > 0 && !servicoIdsPeriodo.has(servico)) setServico("");
   }, [servicoIdsPeriodo, servico]);
+  useEffect(() => {
+    if (colaborador && colaboradorIdsPeriodo.size > 0 && !colaboradorIdsPeriodo.has(colaborador)) setColaborador("");
+  }, [colaboradorIdsPeriodo, colaborador]);
 
   const servicosNoPeriodo = useMemo(
     () => servicos.filter((s) => servicoIdsPeriodo.has(s.id)),
     [servicos, servicoIdsPeriodo],
   );
+  const colaboradoresNoPeriodo = useMemo(
+    () => colaboradores.filter((c) => colaboradorIdsPeriodo.has(c.id)),
+    [colaboradores, colaboradorIdsPeriodo],
+  );
 
   const copiarLink = useCallback(async () => {
     if (!cliente) {
       window.alert("Selecione um cliente para gerar o link público (o relatório do cliente).");
+      return;
+    }
+    const token = clientes.find((c) => c.id === cliente)?.relatorio_token;
+    if (!token) {
+      window.alert("Este cliente ainda não tem token de link. Rode a migration 0034 no Supabase.");
       return;
     }
     const p = new URLSearchParams();
@@ -103,7 +119,7 @@ export default function RelatorioProducaoPage() {
     if (servico) p.set("servico", servico);
     if (pecaAtiva.trim()) p.set("peca", pecaAtiva.trim());
     const qs = p.toString();
-    const url = `${window.location.origin}/publico/relatorio/${cliente}${qs ? `?${qs}` : ""}`;
+    const url = `${window.location.origin}/publico/relatorio/${token}${qs ? `?${qs}` : ""}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopiado(true);
@@ -111,7 +127,7 @@ export default function RelatorioProducaoPage() {
     } catch {
       window.prompt("Copie o link do relatório:", url);
     }
-  }, [dataDe, dataAte, cliente, servico, pecaAtiva]);
+  }, [clientes, dataDe, dataAte, cliente, servico, pecaAtiva]);
 
   const valor = (r: Row, c: Col): any => {
     if (c === "peca") return r.peca_nome ?? "";
@@ -187,7 +203,7 @@ export default function RelatorioProducaoPage() {
         </select>
         <select className="inp !w-auto py-1.5" value={colaborador} onChange={(e) => setColaborador(e.target.value)}>
           <option value="">Todo funcionário</option>
-          {colaboradores.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          {colaboradoresNoPeriodo.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
         </select>
         <select className="inp !w-auto py-1.5" value={servico} onChange={(e) => setServico(e.target.value)}>
           <option value="">Todo serviço</option>

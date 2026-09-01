@@ -10,20 +10,21 @@ export default async function RelatorioPublicoPage({
   params,
   searchParams,
 }: {
-  params: { cliente: string };
+  params: { token: string };
   searchParams: SP;
 }) {
   const supabase = createAdminClient();
-  const clienteId = params.cliente;
 
+  // resolve o cliente pelo token opaco — não expõe cliente_id na URL
   const { data: cliente } = await supabase
     .from("clientes")
     .select("id, nome, empresa_consultora_id")
-    .eq("id", clienteId)
+    .eq("relatorio_token", params.token)
     .maybeSingle();
 
   if (!cliente) notFound();
 
+  const clienteId = (cliente as any).id;
   const empresaId = (cliente as any).empresa_consultora_id;
 
   let q = supabase
