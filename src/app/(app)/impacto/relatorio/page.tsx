@@ -93,15 +93,17 @@ export default function RelatorioProducaoPage() {
   );
 
   const copiarLink = useCallback(async () => {
+    if (!cliente) {
+      window.alert("Selecione um cliente para gerar o link público (o relatório do cliente).");
+      return;
+    }
     const p = new URLSearchParams();
     if (dataDe) p.set("de", dataDe);
     if (dataAte) p.set("ate", dataAte);
-    if (cliente) p.set("cliente", cliente);
-    if (colaborador) p.set("colab", colaborador);
     if (servico) p.set("servico", servico);
     if (pecaAtiva.trim()) p.set("peca", pecaAtiva.trim());
     const qs = p.toString();
-    const url = `${window.location.origin}${window.location.pathname}${qs ? `?${qs}` : ""}`;
+    const url = `${window.location.origin}/publico/relatorio/${cliente}${qs ? `?${qs}` : ""}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopiado(true);
@@ -109,7 +111,7 @@ export default function RelatorioProducaoPage() {
     } catch {
       window.prompt("Copie o link do relatório:", url);
     }
-  }, [dataDe, dataAte, cliente, colaborador, servico, pecaAtiva]);
+  }, [dataDe, dataAte, cliente, servico, pecaAtiva]);
 
   const valor = (r: Row, c: Col): any => {
     if (c === "peca") return r.peca_nome ?? "";
@@ -162,9 +164,9 @@ export default function RelatorioProducaoPage() {
           <button
             onClick={copiarLink}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            title="Copiar link com os filtros atuais"
+            title="Gera um link público do relatório deste cliente (sem login), com o período/filtros atuais"
           >
-            {copiado ? "✓ Link copiado" : "🔗 Copiar link"}
+            {copiado ? "✓ Link copiado" : "🔗 Link do cliente"}
           </button>
           <PrintButton />
         </div>
