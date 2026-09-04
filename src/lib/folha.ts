@@ -3,13 +3,15 @@
 
 export const DIVISOR_HORA = 220;
 export const DIVISOR_DIA = 30;           // valor do dia = salário ÷ 30 (para faltas)
-export const FATOR_EXTRA_UTIL = 1.63;    // hora + 63%
+export const FATOR_EXTRA_UTIL = 1.63;    // hora + 63% (padrão)
 export const FATOR_EXTRA_DOMINGO = 2.0;  // hora + 100%
+export const PCT_EXTRA_UTIL_PADRAO = 63; // adicional de hora extra em dia útil (50 ou 63)
 
 export type FolhaInput = {
   salario: number;
   pctAdiantamento: number;   // ex.: 40
   heUtilHoras: number;       // qtd horas extras em dia útil
+  heUtilPct?: number;        // adicional do dia útil (50 ou 63); default 63
   heDomingoHoras: number;    // qtd horas extras em domingo/feriado
   faltas: number;            // qtd de dias de falta (injustificada)
   descHoras: number;         // qtd horas descontadas
@@ -112,7 +114,9 @@ const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 export function calcularFolha(i: FolhaInput): FolhaCalc {
   const valorHora = i.salario > 0 ? i.salario / DIVISOR_HORA : 0;
   const valorDia = i.salario > 0 ? i.salario / DIVISOR_DIA : 0;
-  const extraUtil = r2(i.heUtilHoras * valorHora * FATOR_EXTRA_UTIL);
+  const pctUtil = i.heUtilPct ?? PCT_EXTRA_UTIL_PADRAO;
+  const fatorExtraUtil = 1 + pctUtil / 100;   // 50% → ×1,50 · 63% → ×1,63
+  const extraUtil = r2(i.heUtilHoras * valorHora * fatorExtraUtil);
   const extraDomingo = r2(i.heDomingoHoras * valorHora * FATOR_EXTRA_DOMINGO);
   const totalExtras = r2(extraUtil + extraDomingo);
   const descontoFaltas = r2(i.faltas * valorDia);

@@ -66,7 +66,7 @@ export default function DemonstrativoFolha() {
     const dsrDias = contarDsrPerdidos((l.ponto ?? {}) as Ponto);
     const c = calcularFolha({
       salario: Number(l.salario_liquido), pctAdiantamento: Number(l.pct_adiantamento ?? 40),
-      heUtilHoras: Number(l.he_util_horas), heDomingoHoras: Number(l.he_domingo_horas),
+      heUtilHoras: Number(l.he_util_horas), heUtilPct: Number(l.he_util_pct ?? 63), heDomingoHoras: Number(l.he_domingo_horas),
       faltas: Number(l.faltas ?? 0), descHoras: Number(l.desc_horas), descValor: Number(l.desc_valor),
       bonificacao: Number(l.bonificacao), adicional: Number(l.adicional), abonoFamilia: Number(l.abono_familia),
       beneficios: totalBeneficios,
@@ -75,7 +75,7 @@ export default function DemonstrativoFolha() {
 
     const prov: Item[] = [
       { label: "Salário base", valor: Number(l.salario_liquido) },
-      { label: `Horas extras 63% (${Number(l.he_util_horas) || 0}h)`, valor: c.extraUtil },
+      { label: `Horas extras ${Number(l.he_util_pct ?? 63)}% (${Number(l.he_util_horas) || 0}h)`, valor: c.extraUtil },
       { label: `Horas extras 100% (${Number(l.he_domingo_horas) || 0}h)`, valor: c.extraDomingo },
       { label: "Bonificação / produção", valor: Number(l.bonificacao) },
       { label: "Adicional", valor: Number(l.adicional) },

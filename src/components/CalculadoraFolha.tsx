@@ -40,6 +40,7 @@ export default function CalculadoraFolha() {
   const [pct, setPct] = useState("40");
   const [beneficios, setBeneficios] = useState<Record<string, string>>({});
   const [heUtil, setHeUtil] = useState("");
+  const [heUtilPct, setHeUtilPct] = useState("63");
   const [heDomingo, setHeDomingo] = useState("");
   const [ponto, setPonto] = useState<Ponto>({});
   const [descHoras, setDescHoras] = useState("");
@@ -102,6 +103,7 @@ export default function CalculadoraFolha() {
     setSalario(l ? String(l.salario_liquido ?? "") : (c?.salario_base != null ? String(c.salario_base) : ""));
     setPct(l ? String(l.pct_adiantamento ?? "40") : "40");
     setHeUtil(l ? String(l.he_util_horas ?? "") : "");
+    setHeUtilPct(l ? String(l.he_util_pct ?? "63") : "63");
     setHeDomingo(l ? String(l.he_domingo_horas ?? "") : "");
     setPonto(l && l.ponto && Object.keys(l.ponto).length ? (l.ponto as Ponto) : pontoPadrao(competencia));
     setDescHoras(l ? String(l.desc_horas ?? "") : "");
@@ -123,7 +125,7 @@ export default function CalculadoraFolha() {
   const totalBeneficios = tipos.reduce((s, t) => s + beneficioTotal(t), 0);
   const calc = calcularFolha({
     salario: num(salario), pctAdiantamento: num(pct),
-    heUtilHoras: num(heUtil), heDomingoHoras: num(heDomingo),
+    heUtilHoras: num(heUtil), heUtilPct: num(heUtilPct), heDomingoHoras: num(heDomingo),
     faltas: cnt.faltas, descHoras: num(descHoras), descValor: num(descValor),
     bonificacao: num(bonificacao), adicional: num(adicional), abonoFamilia: num(abono),
     beneficios: totalBeneficios,
@@ -140,6 +142,7 @@ export default function CalculadoraFolha() {
         salario_liquido: num(salario),
         pct_adiantamento: num(pct),
         he_util_horas: num(heUtil),
+        he_util_pct: num(heUtilPct),
         he_domingo_horas: num(heDomingo),
         ponto,
         faltas: cnt.faltas,
@@ -286,7 +289,14 @@ export default function CalculadoraFolha() {
           )}
 
           <Secao titulo="Horas extras">
-            <Campo label="Horas dia útil" dica="63%"><Inp valor={heUtil} onChange={setHeUtil} /></Campo>
+            <Campo label="Horas dia útil" dica={`${heUtilPct}%`}><Inp valor={heUtil} onChange={setHeUtil} /></Campo>
+            <Campo label="Adicional dia útil">
+              <select className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-right tabular-nums focus:border-brand-400 focus:outline-none"
+                value={heUtilPct} onChange={(e) => setHeUtilPct(e.target.value)}>
+                <option value="50">50%</option>
+                <option value="63">63%</option>
+              </select>
+            </Campo>
             <Campo label="Horas domingo/feriado" dica="100%"><Inp valor={heDomingo} onChange={setHeDomingo} /></Campo>
           </Secao>
 
@@ -319,7 +329,7 @@ export default function CalculadoraFolha() {
             <p className="mb-3 text-sm text-gray-500">Competência {MESES[+mes - 1]}/{ano}</p>
 
             <Linha label="Valor da hora" valor={calc.valorHora} sub="salário ÷ 220" />
-            <Linha label="Extra dia útil (63%)" valor={calc.extraUtil} />
+            <Linha label={`Extra dia útil (${heUtilPct}%)`} valor={calc.extraUtil} />
             <Linha label="Extra domingo (100%)" valor={calc.extraDomingo} />
             <Linha label="Total horas extras" valor={calc.totalExtras} forte />
             <div className="my-2 border-t border-gray-100" />
