@@ -1,7 +1,10 @@
-import { EMISSORA } from "@/lib/empresa";
+"use client";
+
+import { useEmissora } from "@/lib/useEmissora";
 
 // Cabeçalho padrão de documentos (proposta, pedido, OS).
 export default function DocHeader({ titulo, numero, subtitulo }: { titulo: string; numero?: string; subtitulo?: string }) {
+  const EMISSORA = useEmissora();
   return (
     <div className="flex items-start justify-between border-b-2 border-brand-600 pb-4">
       <div>

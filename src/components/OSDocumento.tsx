@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { EMISSORA } from "@/lib/empresa";
+import { useEmissora } from "@/lib/useEmissora";
 import DocHeader from "@/components/DocHeader";
 import PrintButton from "@/components/PrintButton";
 import Badge from "@/components/Badge";
@@ -15,6 +15,7 @@ const STATUS_ATIV = getEntity("atividades_os")!.fields.find((f) => f.key === "st
 
 export default function OSDocumento({ id }: { id: string }) {
   const supabase = useMemo(() => createClient(), []);
+  const EMISSORA = useEmissora();
   const [os, setOs] = useState<Row | null>(null);
   const [atividades, setAtividades] = useState<Row[]>([]);
   const [insumos, setInsumos] = useState<Row[]>([]);

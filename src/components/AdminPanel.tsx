@@ -25,6 +25,11 @@ export default function AdminPanel() {
   // form empresa
   const [empNome, setEmpNome] = useState("");
   const [empDoc, setEmpDoc] = useState("");
+  // edição da empresa (dados da emissora)
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Row>({});
+  const [salvando, setSalvando] = useState(false);
+  const [subindoLogo, setSubindoLogo] = useState(false);
   // form usuário
   const [uEmail, setUEmail] = useState("");
   const [uSenha, setUSenha] = useState("");
@@ -49,6 +54,43 @@ export default function AdminPanel() {
     const { error } = await supabase.from("empresas_consultoras").insert({ nome: empNome.trim(), documento: empDoc.trim() || null });
     if (error) { setMsg({ t: "erro", m: error.message }); return; }
     setEmpNome(""); setEmpDoc(""); setMsg({ t: "ok", m: "Empresa criada." }); carregar();
+  }
+
+  function abrirEdicao(e: Row) {
+    setEditId(e.id);
+    setEditForm({
+      nome: e.nome ?? "", documento: e.documento ?? "", endereco: e.endereco ?? "",
+      telefone: e.telefone ?? "", sistema: e.sistema ?? "", logo: e.logo ?? "",
+    });
+    setMsg(null);
+  }
+
+  async function salvarEmpresa(ev: React.FormEvent) {
+    ev.preventDefault(); if (!editId) return; setSalvando(true); setMsg(null);
+    const { error } = await supabase.from("empresas_consultoras").update({
+      nome: (editForm.nome ?? "").trim(),
+      documento: (editForm.documento ?? "").trim() || null,
+      endereco: (editForm.endereco ?? "").trim() || null,
+      telefone: (editForm.telefone ?? "").trim() || null,
+      sistema: (editForm.sistema ?? "").trim() || null,
+      logo: (editForm.logo ?? "").trim() || null,
+    }).eq("id", editId);
+    setSalvando(false);
+    if (error) { setMsg({ t: "erro", m: error.message }); return; }
+    setEditId(null); setMsg({ t: "ok", m: "Dados da empresa atualizados." }); carregar();
+  }
+
+  async function subirLogo(ev: React.ChangeEvent<HTMLInputElement>, empId: string) {
+    const file = ev.target.files?.[0]; if (!file) return;
+    setSubindoLogo(true); setMsg(null);
+    const ext = (file.name.split(".").pop() || "png").toLowerCase();
+    const path = `${empId}/logo-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("logos").upload(path, file, { upsert: true, cacheControl: "3600" });
+    setSubindoLogo(false);
+    ev.target.value = "";
+    if (error) { setMsg({ t: "erro", m: error.message }); return; }
+    const url = supabase.storage.from("logos").getPublicUrl(path).data.publicUrl;
+    setEditForm((f) => ({ ...f, logo: url }));
   }
 
   async function criarUsuario(ev: React.FormEvent) {
@@ -79,14 +121,51 @@ export default function AdminPanel() {
           <div className="card mb-3 divide-y divide-gray-100">
             {empresas.length === 0 ? <p className="p-4 text-sm text-gray-400">Nenhuma empresa.</p> :
               empresas.map((e) => (
-                <div key={e.id} className="flex items-center justify-between px-4 py-2 text-sm">
-                  <div>
-                    <span className="font-medium text-gray-800">{e.nome}</span>
-                    {e.documento && <span className="ml-2 text-xs text-gray-400">{e.documento}</span>}
+                <div key={e.id} className="px-4 py-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex min-w-0 items-center gap-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {e.logo && <img src={e.logo} alt="" className="h-6 w-6 shrink-0 rounded object-contain" />}
+                      <div className="min-w-0">
+                        <span className="font-medium text-gray-800">{e.nome}</span>
+                        {e.documento && <span className="ml-2 text-xs text-gray-400">{e.documento}</span>}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <button onClick={() => (editId === e.id ? setEditId(null) : abrirEdicao(e))} className="rounded-lg px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50">
+                        {editId === e.id ? "Fechar" : "Editar"}
+                      </button>
+                      <button onClick={() => entrarEmpresa(e.id)} className="rounded-lg px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-purple-200 hover:bg-purple-50">
+                        Entrar →
+                      </button>
+                    </div>
                   </div>
-                  <button onClick={() => entrarEmpresa(e.id)} className="rounded-lg px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-purple-200 hover:bg-purple-50">
-                    Entrar →
-                  </button>
+
+                  {editId === e.id && (
+                    <form onSubmit={salvarEmpresa} className="mt-3 space-y-2 rounded-lg bg-gray-50 p-3">
+                      <p className="text-xs font-medium text-gray-500">Dados que saem nos documentos (proposta, contrato, OS, pedido)</p>
+                      <input className="inp" placeholder="Nome / razão social" value={editForm.nome ?? ""} onChange={(ev) => setEditForm((f) => ({ ...f, nome: ev.target.value }))} required />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input className="inp" placeholder="CNPJ" value={editForm.documento ?? ""} onChange={(ev) => setEditForm((f) => ({ ...f, documento: ev.target.value }))} />
+                        <input className="inp" placeholder="Telefone" value={editForm.telefone ?? ""} onChange={(ev) => setEditForm((f) => ({ ...f, telefone: ev.target.value }))} />
+                      </div>
+                      <input className="inp" placeholder="Endereço" value={editForm.endereco ?? ""} onChange={(ev) => setEditForm((f) => ({ ...f, endereco: ev.target.value }))} />
+                      <input className="inp" placeholder="Rodapé do sistema (ex: SISTEMA NOVALUZ)" value={editForm.sistema ?? ""} onChange={(ev) => setEditForm((f) => ({ ...f, sistema: ev.target.value }))} />
+                      <div className="flex items-center gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {editForm.logo ? <img src={editForm.logo} alt="logo" className="h-10 w-10 rounded object-contain ring-1 ring-gray-200" /> : <div className="flex h-10 w-10 items-center justify-center rounded bg-gray-200 text-[10px] text-gray-400">logo</div>}
+                        <label className="cursor-pointer rounded-lg px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-200 hover:bg-white">
+                          {subindoLogo ? "Enviando…" : "Enviar logo"}
+                          <input type="file" accept="image/*" className="hidden" disabled={subindoLogo} onChange={(ev) => subirLogo(ev, e.id)} />
+                        </label>
+                        {editForm.logo && <button type="button" onClick={() => setEditForm((f) => ({ ...f, logo: "" }))} className="text-xs text-gray-400 hover:text-red-600">remover</button>}
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button className="btn-primary" disabled={salvando}>{salvando ? "Salvando…" : "Salvar"}</button>
+                        <button type="button" onClick={() => setEditId(null)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-100">Cancelar</button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               ))}
           </div>

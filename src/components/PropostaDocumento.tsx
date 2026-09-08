@@ -4,13 +4,15 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { EMISSORA, FOTOS_PORTFOLIO } from "@/lib/empresa";
+import { FOTOS_PORTFOLIO } from "@/lib/empresa";
+import { useEmissora } from "@/lib/useEmissora";
 import PrintButton from "@/components/PrintButton";
 
 type Row = Record<string, any>;
 
 export default function PropostaDocumento({ id }: { id: string }) {
   const supabase = useMemo(() => createClient(), []);
+  const EMISSORA = useEmissora();
   const [prop, setProp] = useState<Row | null>(null);
   const [itens, setItens] = useState<Row[]>([]);
   const [cliente, setCliente] = useState<Row | null>(null);

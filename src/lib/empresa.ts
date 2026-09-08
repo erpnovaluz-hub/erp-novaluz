@@ -1,5 +1,6 @@
-// Dados da empresa emissora (usados no cabeçalho/rodapé de propostas e contratos).
-// Extraídos do modelo. Ajuste aqui se mudar.
+// Dados da empresa emissora (cabeçalho/rodapé de propostas, contratos, OS, pedidos).
+// FALLBACK: usado só quando a empresa ativa ainda não tem os dados preenchidos.
+// Os dados reais vêm da empresa ativa via useEmissora() (src/lib/useEmissora.ts).
 export const EMISSORA = {
   nome: "MSFORT SERVIÇOS",
   cnpj: "57.802.375/0001-92",
@@ -8,6 +9,7 @@ export const EMISSORA = {
   logo: "/fotos-proposta/logo.png",
   sistema: "SISTEMA NOVALUZ",
 };
+export type Emissora = typeof EMISSORA;
 
 // Fotos disponíveis para o portfólio / itens (arquivos em public/fotos-proposta).
 export const FOTOS_PORTFOLIO = [

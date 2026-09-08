@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { EMISSORA } from "@/lib/empresa";
+import { useEmissora } from "@/lib/useEmissora";
 import DocHeader from "@/components/DocHeader";
 import PrintButton from "@/components/PrintButton";
 
@@ -12,6 +12,7 @@ type Row = Record<string, any>;
 
 export default function ContratoDocumento({ id }: { id: string }) {
   const supabase = useMemo(() => createClient(), []);
+  const EMISSORA = useEmissora();
   const [ctr, setCtr] = useState<Row | null>(null);
   const [cliente, setCliente] = useState<Row | null>(null);
   const [carregando, setCarregando] = useState(true);
