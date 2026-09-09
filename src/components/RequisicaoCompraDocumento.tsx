@@ -35,6 +35,7 @@ export default function RequisicaoCompraDocumento({ id }: { id: string }) {
   const [categoriaId, setCategoriaId] = useState("");
   const [vencimento, setVencimento] = useState("");
   const [gerando, setGerando] = useState(false);
+  const [abrindoCotacao, setAbrindoCotacao] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   async function carregar() {
@@ -68,6 +69,15 @@ export default function RequisicaoCompraDocumento({ id }: { id: string }) {
     router.push(`/compras/pedido/${data}`);
   }
 
+  async function abrirCotacao() {
+    setErro(null);
+    setAbrindoCotacao(true);
+    const { data, error } = await supabase.rpc("gerar_cotacao_de_requisicao", { p_requisicao_id: id });
+    setAbrindoCotacao(false);
+    if (error) { setErro(error.message); return; }
+    router.push(`/compras/cotacao/${data}`);
+  }
+
   if (carregando) return <p className="text-gray-400">Carregando…</p>;
   if (!req) return <p className="text-gray-400">Requisição não encontrada. <Link href="/e/requisicoes_compra" className="text-brand-600">voltar</Link></p>;
 
@@ -84,7 +94,13 @@ export default function RequisicaoCompraDocumento({ id }: { id: string }) {
       {/* Painel de conversão — some na impressão */}
       {req.status === "aberta" ? (
         <div className="no-print mb-4 rounded-xl border border-brand-200 bg-brand-50 p-4">
-          <p className="mb-3 text-sm font-semibold text-brand-800">Gerar pedido de compra</p>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-brand-800">Cotar preços (opcional)</p>
+            <button className="btn-ghost text-sm" disabled={abrindoCotacao} onClick={abrirCotacao}>
+              {abrindoCotacao ? "Abrindo…" : "💱 Abrir cotação de preços →"}
+            </button>
+          </div>
+          <p className="mb-3 border-t border-brand-100 pt-3 text-sm font-semibold text-brand-800">Ou gerar pedido direto</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="text-sm">
               <span className="mb-1 block text-xs font-medium text-gray-600">Fornecedor *</span>

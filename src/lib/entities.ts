@@ -199,6 +199,11 @@ const STATUS_REQUISICAO: Option[] = [
   { value: "convertida", label: "Convertida em pedido", color: "green" },
   { value: "cancelada", label: "Cancelada", color: "gray" },
 ];
+const STATUS_COTACAO: Option[] = [
+  { value: "aberta", label: "Aberta", color: "blue" },
+  { value: "decidida", label: "Decidida (gerou pedido)", color: "green" },
+  { value: "cancelada", label: "Cancelada", color: "gray" },
+];
 
 const URGENCIA: Option[] = [
   { value: "baixa", label: "Baixa", color: "gray" },
@@ -534,6 +539,51 @@ export const ENTITIES: Record<string, EntityDef> = {
       refProduto,
       { key: "quantidade", label: "Quantidade", type: "number", required: true },
       { key: "custo_estimado", label: "Custo estimado (opcional)", type: "currency", placeholder: "sugestão — preço final vai no pedido" },
+    ],
+  },
+  cotacoes_compra: {
+    key: "cotacoes_compra", label: "Cotação de preços", labelPlural: "Cotações de preços", icon: "💱", group: "compras",
+    docRoute: "/compras/cotacao",
+    titleField: "numero", searchField: "numero", orderBy: { column: "data", ascending: false },
+    listColumns: ["numero", "requisicao_id", "data", "status", "fornecedor_vencedor_id"],
+    fields: [
+      { key: "numero", label: "Número", type: "text", placeholder: "deixe vazio p/ gerar automático (COT-…)" },
+      { key: "requisicao_id", label: "Requisição de origem (opcional)", type: "ref", ref: { table: "requisicoes_compra", labelField: "numero" } },
+      { key: "data", label: "Data", type: "date" },
+      { key: "status", label: "Status", type: "select", options: STATUS_COTACAO, hideInForm: true },
+      { key: "fornecedor_vencedor_id", label: "Fornecedor vencedor", type: "ref", ref: { table: "fornecedores", labelField: "nome" }, hideInForm: true },
+      { key: "pedido_id", label: "Pedido gerado", type: "ref", ref: { table: "pedidos_compra", labelField: "numero" }, hideInForm: true },
+      { key: "observacao", label: "Observação", type: "textarea" },
+    ],
+  },
+  itens_cotacao: {
+    key: "itens_cotacao", label: "Item de cotação", labelPlural: "Itens de cotação", icon: "➕", group: "compras", hideInNav: true,
+    titleField: "produto_id", orderBy: { column: "id", ascending: false },
+    listColumns: ["cotacao_id", "produto_id", "quantidade"],
+    fields: [
+      { key: "cotacao_id", label: "Cotação", type: "ref", required: true, ref: { table: "cotacoes_compra", labelField: "numero" } },
+      refProduto,
+      { key: "quantidade", label: "Quantidade", type: "number", required: true },
+    ],
+  },
+  cotacao_fornecedores: {
+    key: "cotacao_fornecedores", label: "Fornecedor da cotação", labelPlural: "Fornecedores da cotação", icon: "🏭", group: "compras", hideInNav: true,
+    titleField: "fornecedor_id", orderBy: { column: "id", ascending: false },
+    listColumns: ["cotacao_id", "fornecedor_id"],
+    fields: [
+      { key: "cotacao_id", label: "Cotação", type: "ref", required: true, ref: { table: "cotacoes_compra", labelField: "numero" } },
+      { key: "fornecedor_id", label: "Fornecedor", type: "ref", required: true, ref: { table: "fornecedores", labelField: "nome" } },
+    ],
+  },
+  cotacao_precos: {
+    key: "cotacao_precos", label: "Preço cotado", labelPlural: "Preços cotados", icon: "🏷️", group: "compras", hideInNav: true,
+    titleField: "produto_id", orderBy: { column: "id", ascending: false },
+    listColumns: ["cotacao_id", "produto_id", "fornecedor_id", "preco_unitario"],
+    fields: [
+      { key: "cotacao_id", label: "Cotação", type: "ref", required: true, ref: { table: "cotacoes_compra", labelField: "numero" } },
+      refProduto,
+      { key: "fornecedor_id", label: "Fornecedor", type: "ref", required: true, ref: { table: "fornecedores", labelField: "nome" } },
+      { key: "preco_unitario", label: "Preço unitário", type: "currency", required: true },
     ],
   },
   pedidos_compra: {
