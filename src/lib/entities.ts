@@ -516,7 +516,7 @@ export const ENTITIES: Record<string, EntityDef> = {
     titleField: "numero", searchField: "numero", orderBy: { column: "data", ascending: false },
     listColumns: ["numero", "solicitante", "fornecedor_sugerido_id", "data", "status"],
     fields: [
-      { key: "numero", label: "Número", type: "text" },
+      { key: "numero", label: "Número", type: "text", placeholder: "deixe vazio p/ gerar automático (RC-…)" },
       { key: "solicitante", label: "Solicitante (quem pediu)", type: "text" },
       { key: "fornecedor_sugerido_id", label: "Fornecedor sugerido (opcional)", type: "ref", ref: { table: "fornecedores", labelField: "nome" } },
       { key: "data", label: "Data", type: "date" },

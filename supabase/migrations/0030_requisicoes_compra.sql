@@ -82,10 +82,11 @@ begin
     raise exception 'Escolha um fornecedor para gerar o pedido';
   end if;
 
+  -- numero fica null: o trigger de pedidos_compra gera o PC-ANO-0001 próprio
   insert into pedidos_compra
     (empresa_consultora_id, numero, fornecedor_id, deposito_id, categoria_id, data, vencimento, status, observacao)
   values
-    (v_empresa, v_req.numero, p_fornecedor_id, p_deposito_id, p_categoria_id, current_date, p_vencimento, 'aberto',
+    (v_empresa, null, p_fornecedor_id, p_deposito_id, p_categoria_id, current_date, p_vencimento, 'aberto',
      'Gerado da requisição ' || coalesce(v_req.numero, v_req.id::text)
        || case when v_req.observacao is not null then ' — ' || v_req.observacao else '' end)
   returning id into v_pedido;
@@ -104,3 +105,8 @@ begin
 end $$;
 
 grant execute on function gerar_pedido_de_requisicao(uuid, uuid, uuid, uuid, date) to authenticated;
+
+-- numeração automática (RC-ANO-0001) via trigger genérico do 0025 -------------
+drop trigger if exists trg_num on requisicoes_compra;
+create trigger trg_num before insert on requisicoes_compra
+  for each row execute function set_numero_auto('RC', 'requisicao_compra');
