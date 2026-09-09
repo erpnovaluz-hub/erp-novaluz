@@ -194,6 +194,11 @@ const STATUS_PEDIDO: Option[] = [
   { value: "recebido", label: "Recebido", color: "green" },
   { value: "cancelado", label: "Cancelado", color: "gray" },
 ];
+const STATUS_REQUISICAO: Option[] = [
+  { value: "aberta", label: "Aberta", color: "blue" },
+  { value: "convertida", label: "Convertida em pedido", color: "green" },
+  { value: "cancelada", label: "Cancelada", color: "gray" },
+];
 
 const URGENCIA: Option[] = [
   { value: "baixa", label: "Baixa", color: "gray" },
@@ -505,6 +510,32 @@ export const ENTITIES: Record<string, EntityDef> = {
   },
 
   // =============================== COMPRAS ==================================
+  requisicoes_compra: {
+    key: "requisicoes_compra", label: "Requisição de compra", labelPlural: "Requisições de compra", icon: "📝", group: "compras",
+    docRoute: "/compras/requisicao",
+    titleField: "numero", searchField: "numero", orderBy: { column: "data", ascending: false },
+    listColumns: ["numero", "solicitante", "fornecedor_sugerido_id", "data", "status"],
+    fields: [
+      { key: "numero", label: "Número", type: "text" },
+      { key: "solicitante", label: "Solicitante (quem pediu)", type: "text" },
+      { key: "fornecedor_sugerido_id", label: "Fornecedor sugerido (opcional)", type: "ref", ref: { table: "fornecedores", labelField: "nome" } },
+      { key: "data", label: "Data", type: "date" },
+      { key: "status", label: "Status", type: "select", options: STATUS_REQUISICAO, hideInForm: true },
+      { key: "pedido_id", label: "Pedido gerado", type: "ref", ref: { table: "pedidos_compra", labelField: "numero" }, hideInForm: true },
+      { key: "observacao", label: "Observação", type: "textarea" },
+    ],
+  },
+  itens_requisicao_compra: {
+    key: "itens_requisicao_compra", label: "Item de requisição", labelPlural: "Itens de requisição", icon: "➕", group: "compras",
+    titleField: "produto_id", orderBy: { column: "id", ascending: false },
+    listColumns: ["requisicao_id", "produto_id", "quantidade", "custo_estimado"],
+    fields: [
+      { key: "requisicao_id", label: "Requisição", type: "ref", required: true, ref: { table: "requisicoes_compra", labelField: "numero" } },
+      refProduto,
+      { key: "quantidade", label: "Quantidade", type: "number", required: true },
+      { key: "custo_estimado", label: "Custo estimado (opcional)", type: "currency", placeholder: "sugestão — preço final vai no pedido" },
+    ],
+  },
   pedidos_compra: {
     key: "pedidos_compra", label: "Pedido de compra", labelPlural: "Pedidos de compra", icon: "🧾", group: "compras",
     docRoute: "/compras/pedido",
