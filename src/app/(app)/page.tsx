@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { coletarAlertas, type Alerta } from "@/lib/alertas";
+import { getEmpresaAtiva } from "@/lib/empresaAtiva";
 import { formatCurrency } from "@/lib/format";
 import Badge from "@/components/Badge";
 
@@ -68,12 +69,13 @@ export default async function Dashboard() {
   const valorProd = (prod ?? []).reduce((s: number, r: any) => s + Number(r.valor_total || 0), 0);
 
   const alertas = await coletarAlertas();
+  const empresa = await getEmpresaAtiva();
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-xl font-semibold text-gray-900">Painel</h1>
-        <p className="text-sm text-gray-500">Visão geral da MSFORT · dados ao vivo do Supabase</p>
+        <p className="text-sm text-gray-500">Visão geral da {empresa.nome} · dados ao vivo do Supabase</p>
       </div>
 
       {/* Alertas */}
