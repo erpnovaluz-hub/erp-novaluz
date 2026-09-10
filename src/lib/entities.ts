@@ -413,6 +413,7 @@ export const ENTITIES: Record<string, EntityDef> = {
       ] },
       { key: "descricao", label: "Descrição", type: "text", required: true },
       { key: "quantidade", label: "Quantidade", type: "number" },
+      { key: "unidade", label: "Unidade", type: "text", placeholder: "un, kg, m, h…" },
       { key: "custo_unitario", label: "Custo unitário", type: "currency" },
       { key: "custo_total", label: "Custo total", type: "currency", hideInForm: true },
     ],

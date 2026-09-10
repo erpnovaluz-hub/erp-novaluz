@@ -98,16 +98,17 @@ export default function PrecificadorItem({ params }: { params: { id: string } })
           <div className="card overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-                <tr><th className="px-4 py-2">Categoria</th><th className="px-4 py-2">Descrição</th><th className="px-4 py-2 text-right">Qtd</th><th className="px-4 py-2 text-right">Custo un.</th><th className="px-4 py-2 text-right">Total</th><th className="px-4 py-2 text-right">Ações</th></tr>
+                <tr><th className="px-4 py-2">Categoria</th><th className="px-4 py-2">Descrição</th><th className="px-4 py-2 text-right">Qtd</th><th className="px-4 py-2">Un.</th><th className="px-4 py-2 text-right">Custo un.</th><th className="px-4 py-2 text-right">Total</th><th className="px-4 py-2 text-right">Ações</th></tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {comp.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">Sem itens de custo.</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">Sem itens de custo.</td></tr>
                 ) : comp.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50">
                     <td className="px-4 py-2 text-gray-500">{CAT_LABEL[c.categoria] ?? c.categoria}</td>
                     <td className="px-4 py-2">{c.descricao}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{Number(c.quantidade)}</td>
+                    <td className="px-4 py-2 text-gray-500">{c.unidade ?? "—"}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(c.custo_unitario)}</td>
                     <td className="px-4 py-2 text-right font-medium tabular-nums">{formatCurrency(c.custo_total)}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-right">
@@ -118,7 +119,7 @@ export default function PrecificadorItem({ params }: { params: { id: string } })
                 ))}
               </tbody>
               <tfoot className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
-                <tr><td colSpan={4} className="px-4 py-2 text-right">Custo direto</td><td className="px-4 py-2 text-right tabular-nums">{formatCurrency(custoDireto)}</td><td /></tr>
+                <tr><td colSpan={5} className="px-4 py-2 text-right">Custo direto</td><td className="px-4 py-2 text-right tabular-nums">{formatCurrency(custoDireto)}</td><td /></tr>
               </tfoot>
             </table>
           </div>
