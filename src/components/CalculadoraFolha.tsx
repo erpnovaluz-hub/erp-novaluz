@@ -190,8 +190,12 @@ export default function CalculadoraFolha() {
     return novo?.id ?? null;
   }
 
-  async function gerarTitulos() {
-    if (!confirm(`Gerar/atualizar as 2 contas a pagar de ${colab?.nome} — ${MESES[+mes - 1]}/${ano}?\n• Adiantamento (vence dia 15)\n• Fechamento (vence no último dia do mês)`)) return;
+  async function gerarTitulos(quais: "ambos" | "adiantamento" | "fechamento" = "ambos") {
+    const descConfirma =
+      quais === "adiantamento" ? "a conta do Adiantamento (vence dia 15)"
+      : quais === "fechamento" ? "a conta do Fechamento (vence no último dia do mês)"
+      : "as 2 contas a pagar:\n• Adiantamento (vence dia 15)\n• Fechamento (vence no último dia do mês)";
+    if (!confirm(`Gerar/atualizar ${descConfirma}\nColaborador: ${colab?.nome} — ${MESES[+mes - 1]}/${ano}?`)) return;
     setGerando(true); setErro(null); setMsg(null);
     const ok = await salvar();
     if (!ok) { setGerando(false); return; }
@@ -201,27 +205,33 @@ export default function CalculadoraFolha() {
       const vencAdiant = `${ano}-${mes}-15`;
       const vencFech = ultimoDiaMes(competencia);
 
-      // adiantamento
-      await upsertTitulo({
-        atualId: tituloAdiantId,
-        setId: setTituloAdiantId,
-        campoLanc: "titulo_adiantamento_id",
-        descricao: `Adiantamento ${rotulo} — ${colab?.nome}`,
-        valor: calc.adiantamentoTotal,
-        vencimento: vencAdiant,
-        catId,
-      });
-      // fechamento
-      await upsertTitulo({
-        atualId: tituloFechId,
-        setId: setTituloFechId,
-        campoLanc: "titulo_fechamento_id",
-        descricao: `Folha (fechamento) ${rotulo} — ${colab?.nome}`,
-        valor: calc.fechamento,
-        vencimento: vencFech,
-        catId,
-      });
-      setMsg("Contas a pagar geradas: adiantamento (dia 15) e fechamento (último dia). Veja em Financeiro › Contas a Pagar.");
+      if (quais === "ambos" || quais === "adiantamento") {
+        await upsertTitulo({
+          atualId: tituloAdiantId,
+          setId: setTituloAdiantId,
+          campoLanc: "titulo_adiantamento_id",
+          descricao: `Adiantamento ${rotulo} — ${colab?.nome}`,
+          valor: calc.adiantamentoTotal,
+          vencimento: vencAdiant,
+          catId,
+        });
+      }
+      if (quais === "ambos" || quais === "fechamento") {
+        await upsertTitulo({
+          atualId: tituloFechId,
+          setId: setTituloFechId,
+          campoLanc: "titulo_fechamento_id",
+          descricao: `Folha (fechamento) ${rotulo} — ${colab?.nome}`,
+          valor: calc.fechamento,
+          vencimento: vencFech,
+          catId,
+        });
+      }
+      const oquefoi =
+        quais === "adiantamento" ? "Conta gerada: adiantamento (dia 15)."
+        : quais === "fechamento" ? "Conta gerada: fechamento (último dia)."
+        : "Contas a pagar geradas: adiantamento (dia 15) e fechamento (último dia).";
+      setMsg(`${oquefoi} Veja em Financeiro › Contas a Pagar.`);
     } catch (e: any) {
       setErro(e.message ?? "Erro ao gerar contas a pagar.");
     } finally { setGerando(false); }
@@ -378,11 +388,23 @@ export default function CalculadoraFolha() {
               <button className="btn-ghost" onClick={salvar} disabled={salvando || carregando || !colaboradorId}>
                 {salvando ? "Salvando…" : "💾 Salvar na folha"}
               </button>
-              <button className="btn-primary" onClick={gerarTitulos} disabled={gerando || carregando || !colaboradorId}>
+              <button className="btn-primary" onClick={() => gerarTitulos("ambos")} disabled={gerando || carregando || !colaboradorId}>
                 {gerando ? "Gerando…" : "➡️ Gerar 2 contas a pagar"}
               </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button className="btn-ghost text-sm" onClick={() => gerarTitulos("adiantamento")} disabled={gerando || carregando || !colaboradorId}
+                  title={`Gera só o adiantamento (${formatCurrency(calc.adiantamentoTotal)}, vence dia 15)`}>
+                  📅 Só dia 15{tituloAdiantId ? " ✓" : ""}
+                </button>
+                <button className="btn-ghost text-sm" onClick={() => gerarTitulos("fechamento")} disabled={gerando || carregando || !colaboradorId}
+                  title={`Gera só o fechamento (${formatCurrency(calc.fechamento)}, vence no último dia)`}>
+                  📅 Só dia 30{tituloFechId ? " ✓" : ""}
+                </button>
+              </div>
               {(tituloAdiantId || tituloFechId) && (
-                <p className="text-center text-xs text-green-600">✓ títulos já gerados para este mês</p>
+                <p className="text-center text-xs text-green-600">
+                  ✓ {tituloAdiantId && tituloFechId ? "adiantamento e fechamento já gerados" : tituloAdiantId ? "adiantamento (dia 15) já gerado" : "fechamento (dia 30) já gerado"} neste mês
+                </p>
               )}
               {colaboradorId && (
                 <a href={`/rh/demonstrativo?colab=${colaboradorId}&mes=${mes}&ano=${ano}`}
