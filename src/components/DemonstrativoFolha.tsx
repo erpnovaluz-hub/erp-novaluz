@@ -68,7 +68,7 @@ export default function DemonstrativoFolha() {
       salario: Number(l.salario_liquido), pctAdiantamento: Number(l.pct_adiantamento ?? 40),
       heUtilHoras: Number(l.he_util_horas), heUtilPct: Number(l.he_util_pct ?? 63), heDomingoHoras: Number(l.he_domingo_horas),
       faltas: Number(l.faltas ?? 0), descHoras: Number(l.desc_horas), descValor: Number(l.desc_valor),
-      bonificacao: Number(l.bonificacao), adicional: Number(l.adicional), abonoFamilia: Number(l.abono_familia),
+      bonificacao: Number(l.bonificacao), adicional: Number(l.adicional), adicionalDia15: Number(l.adicional_dia15 ?? 0), abonoFamilia: Number(l.abono_familia),
       beneficios: totalBeneficios,
       dsrDias,
     });
@@ -79,6 +79,7 @@ export default function DemonstrativoFolha() {
       { label: `Horas extras 100% (${Number(l.he_domingo_horas) || 0}h)`, valor: c.extraDomingo },
       { label: "Bonificação / produção", valor: Number(l.bonificacao) },
       { label: "Adicional", valor: Number(l.adicional) },
+      { label: "Adicional dia 15", valor: Number(l.adicional_dia15 ?? 0) },
       { label: "Abono família", valor: Number(l.abono_familia) },
       ...bens,
     ].filter((i) => i.valor !== 0);
@@ -179,7 +180,7 @@ export default function DemonstrativoFolha() {
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div className="rounded-lg bg-amber-50 p-3">
               <p className="text-xs text-amber-700">Adiantamento · vence 15/{mes}/{ano.slice(2)} (dia 15)</p>
-              <p className="text-lg font-bold tabular-nums text-amber-900">{formatCurrency(calc.adiantamento)}</p>
+              <p className="text-lg font-bold tabular-nums text-amber-900">{formatCurrency(calc.adiantamentoTotal)}</p>
             </div>
             <div className="rounded-lg bg-blue-50 p-3">
               <p className="text-xs text-blue-700">Fechamento · vence {ultimoDiaMes(competencia).slice(8)}/{mes}/{ano.slice(2)}</p>

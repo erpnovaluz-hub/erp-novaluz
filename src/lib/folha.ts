@@ -18,6 +18,7 @@ export type FolhaInput = {
   descValor: number;         // outros descontos (R$)
   bonificacao: number;
   adicional: number;
+  adicionalDia15?: number;   // valor extra pago junto do adiantamento (dia 15)
   abonoFamilia: number;
   beneficios: number;        // soma dos benefícios (VT/VR/...)
   dsrDias: number;           // nº de DSRs perdidos (1 por semana com falta injustificada)
@@ -34,7 +35,8 @@ export type FolhaCalc = {
   descontoDSR: number;    // reflexo da falta no DSR
   descontoHoras: number;
   totalDescontos: number;
-  adiantamento: number;   // dia 15 (líquido = % do salário)
+  adiantamento: number;      // parte do salário paga no dia 15 (= % do salário)
+  adiantamentoTotal: number; // o que efetivamente sai no dia 15 (adiantamento + adicional dia 15)
   // camadas do fechamento (fim do mês), acumuladas — para pagar em dias diferentes:
   salario60: number;              // parte do salário do fechamento (100% − adiantamento)
   fechSoSalario: number;          // 1) só saldo de salário: salario60 − descontos
@@ -125,8 +127,10 @@ export function calcularFolha(i: FolhaInput): FolhaCalc {
   const descontoHoras = r2(i.descHoras * valorHora);
   const totalDescontos = r2(descontoFaltas + descontoDSR + descontoHoras + i.descValor);
   const adiantamento = r2(i.salario * (i.pctAdiantamento || 0) / 100);
+  const adicionalDia15 = i.adicionalDia15 || 0;
+  const adiantamentoTotal = r2(adiantamento + adicionalDia15);
   const totalMes = r2(
-    i.salario + totalExtras + i.bonificacao + i.adicional + i.abonoFamilia + i.beneficios - totalDescontos
+    i.salario + totalExtras + i.bonificacao + i.adicional + adicionalDia15 + i.abonoFamilia + i.beneficios - totalDescontos
   );
   const cam = camadasFechamento({
     salario: i.salario, adiantamento, descontos: totalDescontos, horasExtras: totalExtras,
@@ -135,7 +139,7 @@ export function calcularFolha(i: FolhaInput): FolhaCalc {
   return {
     valorHora: r2(valorHora), valorDia: r2(valorDia), dsrDias: i.dsrDias || 0,
     extraUtil, extraDomingo, totalExtras, descontoFaltas, descontoDSR, descontoHoras, totalDescontos,
-    adiantamento, salario60: cam.salario60, fechSoSalario: cam.fechSoSalario,
+    adiantamento, adiantamentoTotal, salario60: cam.salario60, fechSoSalario: cam.fechSoSalario,
     fechSalarioExtras: cam.fechSalarioExtras, fechamento: cam.fechamento, totalMes,
   };
 }

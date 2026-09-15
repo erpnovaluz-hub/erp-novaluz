@@ -47,6 +47,7 @@ export default function CalculadoraFolha() {
   const [descValor, setDescValor] = useState("");
   const [bonificacao, setBonificacao] = useState("");
   const [adicional, setAdicional] = useState("");
+  const [adicionalDia15, setAdicionalDia15] = useState("");
   const [abono, setAbono] = useState("");
   const [observacao, setObservacao] = useState("");
 
@@ -110,6 +111,7 @@ export default function CalculadoraFolha() {
     setDescValor(l ? String(l.desc_valor ?? "") : "");
     setBonificacao(l ? String(l.bonificacao ?? "") : "");
     setAdicional(l ? String(l.adicional ?? "") : "");
+    setAdicionalDia15(l ? String(l.adicional_dia15 ?? "") : "");
     setAbono(l ? String(l.abono_familia ?? "") : "");
     setObservacao(l?.observacao ?? "");
     setBeneficios(bens);
@@ -127,7 +129,7 @@ export default function CalculadoraFolha() {
     salario: num(salario), pctAdiantamento: num(pct),
     heUtilHoras: num(heUtil), heUtilPct: num(heUtilPct), heDomingoHoras: num(heDomingo),
     faltas: cnt.faltas, descHoras: num(descHoras), descValor: num(descValor),
-    bonificacao: num(bonificacao), adicional: num(adicional), abonoFamilia: num(abono),
+    bonificacao: num(bonificacao), adicional: num(adicional), adicionalDia15: num(adicionalDia15), abonoFamilia: num(abono),
     beneficios: totalBeneficios,
     dsrDias,
   });
@@ -151,6 +153,7 @@ export default function CalculadoraFolha() {
         desc_valor: num(descValor),
         bonificacao: num(bonificacao),
         adicional: num(adicional),
+        adicional_dia15: num(adicionalDia15),
         abono_familia: num(abono),
         horas_extras: calc.totalExtras,   // R$ (para as views)
         descontos: calc.totalDescontos,   // R$ (para as views)
@@ -204,7 +207,7 @@ export default function CalculadoraFolha() {
         setId: setTituloAdiantId,
         campoLanc: "titulo_adiantamento_id",
         descricao: `Adiantamento ${rotulo} — ${colab?.nome}`,
-        valor: calc.adiantamento,
+        valor: calc.adiantamentoTotal,
         vencimento: vencAdiant,
         catId,
       });
@@ -273,6 +276,7 @@ export default function CalculadoraFolha() {
           <Secao titulo="Salário e adiantamento">
             <Campo label="Salário base (R$)"><Inp valor={salario} onChange={setSalario} /></Campo>
             <Campo label="Adiantamento (%)" dica="dia 15"><Inp valor={pct} onChange={setPct} /></Campo>
+            <Campo label="Adicional dia 15 (R$)" dica="pago junto da quinzena"><Inp valor={adicionalDia15} onChange={setAdicionalDia15} /></Campo>
           </Secao>
 
           {tipos.length > 0 && (
@@ -342,9 +346,16 @@ export default function CalculadoraFolha() {
             <div className="mb-2 rounded-lg bg-amber-50 p-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-amber-800">Adiantamento · dia 15</span>
-                <span className="text-lg font-bold tabular-nums text-amber-900">{formatCurrency(calc.adiantamento)}</span>
+                <span className="text-lg font-bold tabular-nums text-amber-900">{formatCurrency(calc.adiantamentoTotal)}</span>
               </div>
-              <p className="text-xs text-amber-700/80">{pct || 0}% do salário</p>
+              {num(adicionalDia15) > 0 ? (
+                <div className="mt-1 space-y-0.5 border-t border-amber-200/60 pt-1 text-xs text-amber-800/90">
+                  <div className="flex justify-between"><span>{pct || 0}% do salário</span><span className="tabular-nums">{formatCurrency(calc.adiantamento)}</span></div>
+                  <div className="flex justify-between"><span>+ adicional dia 15</span><span className="tabular-nums">{formatCurrency(num(adicionalDia15))}</span></div>
+                </div>
+              ) : (
+                <p className="text-xs text-amber-700/80">{pct || 0}% do salário</p>
+              )}
             </div>
             <div className="mb-3 rounded-lg bg-blue-50 p-3">
               <div className="mb-1.5 flex items-center justify-between">
