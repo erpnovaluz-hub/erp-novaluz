@@ -32,6 +32,7 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
   const [baseData, setBaseData] = useState<"competencia" | "vencimento">("competencia");
   const [ano, setAno] = useState("");
   const [mes, setMes] = useState("");
+  const [dia, setDia] = useState("");
   const [categoria, setCategoria] = useState("");
   const [subcategoria, setSubcategoria] = useState("");
   const [busca, setBusca] = useState("");
@@ -73,7 +74,13 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
     if (subcategoria) q = q.eq("subcategoria_id", subcategoria);
     if (buscaAtiva.trim()) q = q.ilike("descricao", `%${buscaAtiva.trim()}%`);
     if (ano) {
-      if (mes) {
+      if (mes && dia) {
+        const inicio = `${ano}-${mes}-${dia}`;
+        const d = new Date(`${inicio}T00:00:00`);
+        d.setDate(d.getDate() + 1);
+        const prox = d.toISOString().slice(0, 10);
+        q = q.gte(baseData, inicio).lt(baseData, prox);
+      } else if (mes) {
         const m = parseInt(mes), y = parseInt(ano);
         const prox = m === 12 ? `${y + 1}-01-01` : `${ano}-${String(m + 1).padStart(2, "0")}-01`;
         q = q.gte(baseData, `${ano}-${mes}-01`).lt(baseData, prox);
@@ -84,7 +91,7 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
     const { data, error } = await q.order(baseData, { ascending: false }).range(0, 4999);
     if (error) setErro(error.message);
     setRows(data ?? []); setCarregando(false);
-  }, [supabase, tipo, chip, categoria, subcategoria, buscaAtiva, ano, mes, hoje, baseData]);
+  }, [supabase, tipo, chip, categoria, subcategoria, buscaAtiva, ano, mes, dia, hoje, baseData]);
 
   useEffect(() => { carregarRefs(); }, [carregarRefs]);
   useEffect(() => { carregar(); }, [carregar]);
@@ -96,6 +103,8 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
   const titulo = tipo === "pagar" ? "Contas a Pagar" : "Contas a Receber";
   const icon = tipo === "pagar" ? "🔴" : "🟢";
   const anos = ["", "2025", "2026", String(anoAtual)].filter((v, i, a) => a.indexOf(v) === i);
+  const diasNoMes = ano && mes ? new Date(parseInt(ano), parseInt(mes), 0).getDate() : 31;
+  const dias = Array.from({ length: diasNoMes }, (_, i) => String(i + 1).padStart(2, "0"));
   const filtrando = chip !== "todos" || !!ano || !!categoria || !!subcategoria || !!buscaAtiva;
 
   return (
@@ -130,12 +139,16 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
           por {baseData === "competencia" ? "competência" : "vencimento"} ⇄
         </button>
         {/* período */}
-        <select className="inp !w-auto py-1.5" value={ano} onChange={(e) => { setAno(e.target.value); if (!e.target.value) setMes(""); }}>
+        <select className="inp !w-auto py-1.5" value={ano} onChange={(e) => { setAno(e.target.value); if (!e.target.value) { setMes(""); setDia(""); } }}>
           {anos.map((a) => <option key={a} value={a}>{a === "" ? "Qualquer ano" : a}</option>)}
         </select>
-        <select className="inp !w-auto py-1.5" value={mes} onChange={(e) => setMes(e.target.value)} disabled={!ano}>
+        <select className="inp !w-auto py-1.5" value={mes} onChange={(e) => { setMes(e.target.value); setDia(""); }} disabled={!ano}>
           <option value="">Ano todo</option>
           {MESES.map((m, i) => <option key={i} value={String(i + 1).padStart(2, "0")}>{m}</option>)}
+        </select>
+        <select className="inp !w-auto py-1.5" value={dia} onChange={(e) => setDia(e.target.value)} disabled={!mes}>
+          <option value="">Mês todo</option>
+          {dias.map((d) => <option key={d} value={d}>{parseInt(d)}</option>)}
         </select>
         {/* categoria */}
         <select className="inp !w-auto py-1.5" value={categoria} onChange={(e) => { setCategoria(e.target.value); setSubcategoria(""); }}>
@@ -153,7 +166,7 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
           <input className="inp !w-44 py-1.5" placeholder="Buscar descrição…" value={busca} onChange={(e) => setBusca(e.target.value)} />
         </form>
         {filtrando && (
-          <button className="text-sm text-gray-400 hover:text-gray-700" onClick={() => { setChip("todos"); setAno(""); setMes(""); setCategoria(""); setSubcategoria(""); setBusca(""); setBuscaAtiva(""); }}>
+          <button className="text-sm text-gray-400 hover:text-gray-700" onClick={() => { setChip("todos"); setAno(""); setMes(""); setDia(""); setCategoria(""); setSubcategoria(""); setBusca(""); setBuscaAtiva(""); }}>
             limpar filtros
           </button>
         )}
