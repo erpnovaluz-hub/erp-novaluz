@@ -28,6 +28,18 @@ export default function SimuladorCaixa() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
+  // montagem de lote
+  const [loteAberto, setLoteAberto] = useState(false);
+  const [orcamento, setOrcamento] = useState("");
+  const [estrategia, setEstrategia] = useState<"urgentes" | "quitar">("urgentes");
+
+  // cenários
+  const [cenarios, setCenarios] = useState<Row[]>([]);
+  const [nomeCenario, setNomeCenario] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [cenariosOff, setCenariosOff] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+
   const carregar = useCallback(async () => {
     setCarregando(true); setErro(null);
     const [t, cb, cli, forn] = await Promise.all([
@@ -103,6 +115,69 @@ export default function SimuladorCaixa() {
     setSel((prev) => { const n = new Set(prev); ids.forEach((id) => (on ? n.add(id) : n.delete(id))); return n; });
   const limparTudo = () => setSel(new Set());
 
+  // ---- montagem de lote inteligente ----
+  const saldoDisponivel = saldoInicial + totReceber;
+  const montarLote = () => {
+    const orc = orcamento.trim() === "" ? saldoDisponivel : Number(orcamento.replace(/\./g, "").replace(",", "."));
+    if (isNaN(orc)) { setAviso("Informe um valor válido de orçamento."); return; }
+    const fila = [...pagar].sort((a, b) =>
+      estrategia === "urgentes" ? dataDe(a).localeCompare(dataDe(b)) : Number(a.valor || 0) - Number(b.valor || 0)
+    );
+    let acc = 0;
+    const escolhidos: string[] = [];
+    for (const r of fila) {
+      const v = Number(r.valor || 0);
+      if (acc + v <= orc) { acc += v; escolhidos.push(r.id); }
+    }
+    // preserva os recebimentos marcados; substitui só a seleção de pagamentos
+    const idsPagar = new Set(pagar.map((r) => r.id));
+    setSel((prev) => {
+      const n = new Set(Array.from(prev).filter((id) => !idsPagar.has(id)));
+      escolhidos.forEach((id) => n.add(id));
+      return n;
+    });
+    const sobra = orc - acc;
+    setAviso(escolhidos.length === 0
+      ? `Nenhum título cabe em ${formatCurrency(orc)}.`
+      : `Lote montado: ${escolhidos.length} título(s), ${formatCurrency(acc)} — sobra ${formatCurrency(sobra)} do orçamento.`);
+  };
+
+  // ---- cenários ----
+  const carregarCenarios = useCallback(async () => {
+    const { data, error } = await supabase.from("simulacoes_caixa").select("*").order("criado_em", { ascending: false });
+    if (error) { setCenariosOff(true); return; }
+    setCenariosOff(false); setCenarios(data ?? []);
+  }, [supabase]);
+  useEffect(() => { carregarCenarios(); }, [carregarCenarios]);
+
+  const salvarCenario = async () => {
+    const nome = nomeCenario.trim();
+    if (!nome) { setAviso("Dê um nome ao cenário antes de salvar."); return; }
+    if (sel.size === 0) { setAviso("Marque ao menos um título para salvar o cenário."); return; }
+    setSalvando(true); setAviso(null);
+    const { error } = await supabase.from("simulacoes_caixa").insert({
+      nome, usar_saldo: usarSaldo, filtro_de: de || null, filtro_ate: ate || null,
+      titulo_ids: Array.from(sel),
+    });
+    setSalvando(false);
+    if (error) { setErro(error.message); return; }
+    setNomeCenario(""); setAviso(`Cenário "${nome}" salvo.`); carregarCenarios();
+  };
+
+  const aplicarCenario = (c: Row) => {
+    setUsarSaldo(!!c.usar_saldo);
+    setDe(c.filtro_de ?? ""); setAte(c.filtro_ate ?? "");
+    setSel(new Set((c.titulo_ids ?? []) as string[]));
+    setAviso(`Cenário "${c.nome}" carregado.`);
+  };
+
+  const excluirCenario = async (c: Row) => {
+    if (!confirm(`Excluir o cenário "${c.nome}"?`)) return;
+    const { error } = await supabase.from("simulacoes_caixa").delete().eq("id", c.id);
+    if (error) { setErro(error.message); return; }
+    carregarCenarios();
+  };
+
   const totalAbertoReceber = receber.reduce((s, r) => s + Number(r.valor || 0), 0);
   const totalAbertoPagar = pagar.reduce((s, r) => s + Number(r.valor || 0), 0);
 
@@ -130,6 +205,12 @@ export default function SimuladorCaixa() {
       </div>
 
       {erro && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
+      {aviso && (
+        <div className="flex items-center justify-between rounded-lg bg-brand-50 p-3 text-sm text-brand-700">
+          <span>{aviso}</span>
+          <button onClick={() => setAviso(null)} className="text-brand-400 hover:text-brand-700">✕</button>
+        </div>
+      )}
 
       {/* Filtro por intervalo de vencimento */}
       <div className="no-print flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 p-3 text-sm ring-1 ring-gray-100">
@@ -146,6 +227,75 @@ export default function SimuladorCaixa() {
             <span className="text-xs text-gray-400">{visiveis.length} de {rows.length} título(s) no intervalo</span>
             <button onClick={() => { setDe(""); setAte(""); }} className="text-xs text-gray-400 hover:text-gray-700">limpar intervalo</button>
           </>
+        )}
+      </div>
+
+      {/* Montagem de lote + Cenários */}
+      <div className="no-print flex flex-wrap items-start gap-3">
+        {/* Montar lote */}
+        <div className="flex-1 min-w-[280px]">
+          {!loteAberto ? (
+            <button onClick={() => setLoteAberto(true)} className="rounded-lg bg-white px-3 py-2 text-sm text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50">
+              🧠 Montar lote de pagamento
+            </button>
+          ) : (
+            <div className="rounded-lg bg-white p-3 ring-1 ring-gray-200">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">🧠 Montar lote — “o que dá pra pagar sem furar?”</span>
+                <button onClick={() => setLoteAberto(false)} className="text-gray-400 hover:text-gray-700">✕</button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-gray-500">Tenho</span>
+                <input
+                  inputMode="decimal" placeholder={formatCurrency(saldoDisponivel)}
+                  value={orcamento} onChange={(e) => setOrcamento(e.target.value)}
+                  className="inp !w-36 py-1.5"
+                />
+                <button onClick={() => setOrcamento(String(saldoDisponivel.toFixed(2)))} className="text-xs text-brand-600 hover:underline" title="Saldo inicial + recebimentos marcados">
+                  usar disponível
+                </button>
+                <select className="inp !w-auto py-1.5" value={estrategia} onChange={(e) => setEstrategia(e.target.value as any)}>
+                  <option value="urgentes">Mais urgentes primeiro</option>
+                  <option value="quitar">Quitar mais títulos</option>
+                </select>
+                <button onClick={montarLote} className="btn-primary py-1.5">Aplicar seleção</button>
+              </div>
+              <p className="mt-2 text-xs text-gray-400">
+                Marca automaticamente os pagamentos que cabem no valor, priorizando {estrategia === "urgentes" ? "vencimentos mais próximos/atrasados" : "os títulos de menor valor"}. Os recebimentos marcados são mantidos.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Cenários */}
+        {!cenariosOff && (
+          <div className="flex-1 min-w-[280px] rounded-lg bg-white p-3 ring-1 ring-gray-200">
+            <div className="mb-2 flex items-center gap-2">
+              <input
+                placeholder="Nome do cenário…" value={nomeCenario}
+                onChange={(e) => setNomeCenario(e.target.value)}
+                className="inp flex-1 py-1.5"
+              />
+              <button onClick={salvarCenario} disabled={salvando} className="btn-primary py-1.5 disabled:opacity-50">
+                {salvando ? "Salvando…" : "💾 Salvar"}
+              </button>
+            </div>
+            {cenarios.length === 0 ? (
+              <p className="text-xs text-gray-400">Nenhum cenário salvo ainda.</p>
+            ) : (
+              <ul className="max-h-32 space-y-1 overflow-y-auto">
+                {cenarios.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-2 rounded px-2 py-1 text-sm hover:bg-gray-50">
+                    <button onClick={() => aplicarCenario(c)} className="min-w-0 flex-1 truncate text-left text-gray-700 hover:text-brand-700" title="Carregar cenário">
+                      {c.nome}
+                      <span className="ml-2 text-xs text-gray-400">{(c.titulo_ids ?? []).length} título(s)</span>
+                    </button>
+                    <button onClick={() => excluirCenario(c)} className="text-xs text-gray-300 hover:text-red-600" title="Excluir">🗑</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </div>
 
