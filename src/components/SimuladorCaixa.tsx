@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
-import PrintButton from "@/components/PrintButton";
 
 type Row = Record<string, any>;
 type Tipo = "pagar" | "receber";
 
+const esc = (s: any) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const emDias = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); };
 const inicioMes = () => { const d = new Date(); return iso(new Date(d.getFullYear(), d.getMonth(), 1)); };
@@ -84,8 +84,6 @@ export default function SimuladorCaixa() {
     lista.filter((r) => sel.has(r.id)).reduce((s, r) => s + Number(r.valor || 0), 0);
   const totReceber = somaSel(receber);
   const totPagar = somaSel(pagar);
-  const selReceber = receber.filter((r) => sel.has(r.id));
-  const selPagar = pagar.filter((r) => sel.has(r.id));
   const liquido = totReceber - totPagar;
   const projetado = saldoInicial + liquido;
 
@@ -180,12 +178,63 @@ export default function SimuladorCaixa() {
     carregarCenarios();
   };
 
+  // ---- impressão do lote (janela própria) ----
+  const imprimirLote = () => {
+    const selPag = pagar.filter((r) => sel.has(r.id));
+    const selRec = receber.filter((r) => sel.has(r.id));
+    if (selPag.length === 0 && selRec.length === 0) { setAviso("Selecione ao menos uma despesa para imprimir."); return; }
+
+    const emitido = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+    const periodo = de || ate ? `${de ? formatDate(de) : "…"} a ${ate ? formatDate(ate) : "…"}` : "todos os vencimentos";
+    const linhas = (itens: Row[]) => itens.map((r) => `<tr><td>${esc(r.descricao)}</td><td>${esc(parte(r) || "—")}</td><td>${formatDate(r.vencimento)}</td><td class="r">${formatCurrency(r.valor)}</td></tr>`).join("");
+    const tabela = (titulo: string, itens: Row[], total: number) => itens.length ? `
+      <h2>${esc(titulo)} — ${itens.length} título(s)</h2>
+      <table>
+        <thead><tr><th>Descrição</th><th>Fornecedor / Cliente</th><th>Vencimento</th><th class="r">Valor</th></tr></thead>
+        <tbody>${linhas(itens)}</tbody>
+        <tfoot><tr><td colspan="3">Subtotal</td><td class="r">${formatCurrency(total)}</td></tr></tfoot>
+      </table>` : "";
+
+    const furo = timeline.furo;
+    const html = `<!doctype html><html lang="pt-br"><head><meta charset="utf-8"><title>Lote de Pagamento</title>
+      <style>
+        *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:24px;font-size:13px}
+        h1{font-size:18px;margin:0 0 2px} .sub{color:#666;font-size:11px;margin:0 0 16px}
+        h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;margin:18px 0 4px}
+        table{width:100%;border-collapse:collapse;margin-bottom:8px}
+        th,td{text-align:left;padding:4px 6px;border-bottom:1px solid #ddd}
+        th{font-size:10px;text-transform:uppercase;color:#666;border-bottom:2px solid #999}
+        tfoot td{font-weight:bold;border-top:2px solid #999;border-bottom:none}
+        .r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+        .resumo{width:280px} .resumo td{border:none;padding:2px 6px}
+        .resumo .tot td{font-weight:bold;border-top:2px solid #999}
+        .furo{margin-top:14px;font-weight:bold;color:#b91c1c}
+        @media print{body{margin:0}}
+      </style></head><body>
+      <h1>Lote de Pagamento · Simulador de Caixa</h1>
+      <p class="sub">Emitido em ${emitido} · Intervalo: ${esc(periodo)}</p>
+      ${tabela("A Pagar (despesas)", selPag, totPagar)}
+      ${tabela("Recebimentos considerados", selRec, totReceber)}
+      <table class="resumo">
+        <tr><td>Saldo inicial ${usarSaldo ? "(em contas)" : "(desligado)"}</td><td class="r">${formatCurrency(saldoInicial)}</td></tr>
+        <tr><td>+ Recebimentos</td><td class="r">${formatCurrency(totReceber)}</td></tr>
+        <tr><td>− Pagamentos</td><td class="r">${formatCurrency(totPagar)}</td></tr>
+        <tr class="tot"><td>= Saldo projetado</td><td class="r">${formatCurrency(projetado)}</td></tr>
+      </table>
+      ${furo ? `<p class="furo">⚠️ Com este lote o caixa fica negativo em ${formatDate(furo.data)} (${formatCurrency(furo.saldo)}).</p>` : ""}
+      <script>window.onload=function(){window.print();}</script>
+      </body></html>`;
+
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) { setAviso("Libere pop-ups deste site para imprimir o lote."); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+  };
+
   const totalAbertoReceber = receber.reduce((s, r) => s + Number(r.valor || 0), 0);
   const totalAbertoPagar = pagar.reduce((s, r) => s + Number(r.valor || 0), 0);
 
   return (
-    <div>
-      <div className="no-print space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">🎯 Simulador de Caixa</h1>
@@ -201,9 +250,11 @@ export default function SimuladorCaixa() {
             {usarSaldo ? "✓ " : ""}Considerar saldo em conta
           </button>
           {sel.size > 0 && (
-            <button className="no-print text-sm text-gray-400 hover:text-gray-700" onClick={limparTudo}>limpar seleção</button>
+            <button className="text-sm text-gray-400 hover:text-gray-700" onClick={limparTudo}>limpar seleção</button>
           )}
-          <PrintButton label="Imprimir lote" />
+          <button onClick={imprimirLote} className="btn-ghost text-sm ring-1 ring-gray-200" title="Abre a lista dos títulos selecionados para imprimir/salvar PDF">
+            🖨️ Imprimir lote
+          </button>
         </div>
       </div>
 
@@ -375,90 +426,6 @@ export default function SimuladorCaixa() {
             onToggle={toggle} onMarcar={marcar}
           />
         </div>
-      )}
-      </div>
-
-      {/* Documento de impressão — só a lista selecionada */}
-      <LoteDoc
-        selReceber={selReceber} selPagar={selPagar}
-        totReceber={totReceber} totPagar={totPagar}
-        saldoInicial={saldoInicial} projetado={projetado} usarSaldo={usarSaldo}
-        furo={timeline.furo} de={de} ate={ate} parte={parte}
-      />
-    </div>
-  );
-}
-
-// ---------- Documento de impressão do lote ----------
-function LoteDoc({
-  selReceber, selPagar, totReceber, totPagar, saldoInicial, projetado, usarSaldo, furo, de, ate, parte,
-}: {
-  selReceber: Row[]; selPagar: Row[]; totReceber: number; totPagar: number;
-  saldoInicial: number; projetado: number; usarSaldo: boolean;
-  furo: { data: string; saldo: number } | null; de: string; ate: string; parte: (r: Row) => string;
-}) {
-  const emitido = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
-  const periodo = de || ate ? `${de ? formatDate(de) : "…"} a ${ate ? formatDate(ate) : "…"}` : "todos os vencimentos";
-
-  const Tabela = ({ titulo, itens, total }: { titulo: string; itens: Row[]; total: number }) => (
-    <div className="doc mb-5">
-      <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-gray-700">{titulo} — {itens.length} título(s)</h2>
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b-2 border-gray-400 text-left text-xs uppercase text-gray-500">
-            <th className="py-1 pr-2">Descrição</th>
-            <th className="py-1 pr-2">Fornecedor / Cliente</th>
-            <th className="py-1 pr-2">Vencimento</th>
-            <th className="py-1 text-right">Valor</th>
-          </tr>
-        </thead>
-        <tbody>
-          {itens.map((r) => (
-            <tr key={r.id} className="border-b border-gray-200">
-              <td className="py-1 pr-2">{r.descricao}</td>
-              <td className="py-1 pr-2 text-gray-600">{parte(r) || "—"}</td>
-              <td className="py-1 pr-2">{formatDate(r.vencimento)}</td>
-              <td className="py-1 text-right tabular-nums">{formatCurrency(r.valor)}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr className="border-t-2 border-gray-400 font-bold">
-            <td className="py-1" colSpan={3}>Subtotal</td>
-            <td className="py-1 text-right tabular-nums">{formatCurrency(total)}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  );
-
-  return (
-    <div className="print-only doc">
-      <div className="mb-4 border-b border-gray-300 pb-2">
-        <h1 className="text-lg font-bold text-gray-900">Lote de Pagamento · Simulador de Caixa</h1>
-        <p className="text-xs text-gray-500">Emitido em {emitido} · Intervalo: {periodo}</p>
-      </div>
-
-      {selPagar.length === 0 && selReceber.length === 0 ? (
-        <p className="text-sm text-gray-500">Nenhum título selecionado.</p>
-      ) : (
-        <>
-          {selPagar.length > 0 && <Tabela titulo="A Pagar" itens={selPagar} total={totPagar} />}
-          {selReceber.length > 0 && <Tabela titulo="Recebimentos considerados" itens={selReceber} total={totReceber} />}
-
-          <table className="mt-2 w-full max-w-xs border-collapse text-sm">
-            <tbody>
-              <tr><td className="py-0.5 text-gray-600">Saldo inicial {usarSaldo ? "(em contas)" : "(desligado)"}</td><td className="py-0.5 text-right tabular-nums">{formatCurrency(saldoInicial)}</td></tr>
-              <tr><td className="py-0.5 text-gray-600">+ Recebimentos</td><td className="py-0.5 text-right tabular-nums">{formatCurrency(totReceber)}</td></tr>
-              <tr><td className="py-0.5 text-gray-600">− Pagamentos</td><td className="py-0.5 text-right tabular-nums">{formatCurrency(totPagar)}</td></tr>
-              <tr className="border-t-2 border-gray-400 font-bold"><td className="py-1">= Saldo projetado</td><td className="py-1 text-right tabular-nums">{formatCurrency(projetado)}</td></tr>
-            </tbody>
-          </table>
-
-          {furo && (
-            <p className="mt-3 text-sm font-semibold text-gray-800">⚠️ Atenção: com este lote o caixa fica negativo em {formatDate(furo.data)} ({formatCurrency(furo.saldo)}).</p>
-          )}
-        </>
       )}
     </div>
   );
