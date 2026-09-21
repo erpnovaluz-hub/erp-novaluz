@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
 import { camadasFechamento } from "@/lib/folha";
 import PrintButton from "@/components/PrintButton";
+import ReportPrintHeader from "@/components/ReportPrintHeader";
 
 type Tipo = { id: string; nome: string };
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -118,7 +119,8 @@ export default function FolhaRelatorio() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <ReportPrintHeader titulo="Relatório da folha" />
+      <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">📊 Relatório da folha</h1>
         <div className="no-print flex items-center gap-2">
           <select className="inp !w-auto py-1.5" value={mes} onChange={(e) => setMes(e.target.value)}>

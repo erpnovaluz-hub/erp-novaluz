@@ -37,13 +37,26 @@ body {
 @media print {
   .no-print { display: none !important; }
   .print-only { display: block !important; }
-  body { background: #fff; }
+  body { background: #fff; color: #111; font-family: Arial, Helvetica, sans-serif; }
   main { padding: 0 !important; max-width: none !important; }
-  .card { box-shadow: none !important; border-color: #e5e7eb !important; break-inside: avoid; }
+  .card { box-shadow: none !important; border: none !important; border-radius: 0 !important; break-inside: auto; }
   table { break-inside: auto; }
   tr { break-inside: avoid; }
   a { color: inherit !important; text-decoration: none !important; }
   .doc { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @page { margin: 1.2cm; }
+
+  /* Padrão de tabela dos relatórios (igual ao Lote de Pagamento) */
+  .card table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .card thead th {
+    text-transform: uppercase; letter-spacing: .04em; font-size: 10px;
+    color: #666 !important; background: transparent !important;
+    border-bottom: 2px solid #999 !important; padding: 4px 6px;
+  }
+  .card tbody td { border-bottom: 1px solid #ddd !important; padding: 4px 6px; }
+  .card tbody tr:hover { background: transparent !important; }
+  .card tfoot td, .card tfoot th {
+    font-weight: bold; border-top: 2px solid #999 !important; border-bottom: none !important; padding: 4px 6px;
+  }
 }
 .doc { -webkit-print-color-adjust: exact; print-color-adjust: exact; }

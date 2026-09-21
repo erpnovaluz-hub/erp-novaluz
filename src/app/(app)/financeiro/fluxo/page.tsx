@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency } from "@/lib/format";
 import PrintButton from "@/components/PrintButton";
+import ReportPrintHeader from "@/components/ReportPrintHeader";
 
 export const dynamic = "force-dynamic";
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -42,7 +43,8 @@ export default async function FluxoPage({ searchParams }: { searchParams: { ano?
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <ReportPrintHeader titulo={`Fluxo de caixa · ${ano}`} subtitulo="Realizado (pago) e previsto (em aberto), por mês" />
+      <div className="no-print flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">💵 Fluxo de caixa · {ano}</h1>
           <p className="text-sm text-gray-500">Realizado (pago) e previsto (em aberto), por mês</p>

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { tipoDaPeca } from "@/lib/pecas";
 import PrintButton from "@/components/PrintButton";
+import ReportPrintHeader from "@/components/ReportPrintHeader";
 
 type Row = Record<string, any>;
 type Regra = { minimo: number; fixo: number; por50: number };
@@ -137,7 +138,8 @@ export default function BonusPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-start justify-between">
+      <ReportPrintHeader titulo="Bônus de produção" subtitulo="Da produção nos serviços de bônus · fixo + R$/50 acima do mínimo, por dia" />
+      <div className="no-print mb-4 flex items-start justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">💸 Bônus de produção</h1>
           <p className="text-sm text-gray-500">Da produção nos serviços de bônus · fixo + R$/50 acima do mínimo, por dia</p>

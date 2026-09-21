@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import PrintButton from "@/components/PrintButton";
+import ReportPrintHeader from "@/components/ReportPrintHeader";
 
 type Row = Record<string, any>;
 const CAP = 200;
@@ -76,7 +77,8 @@ export default function RelatorioFinanceiro() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <ReportPrintHeader titulo="Relatório do setor financeiro" subtitulo="Despesas e receitas · pago × em aberto · por categoria e cliente" periodo={dataDe || dataAte ? `Período: ${dataDe ? formatDate(dataDe) : "…"} a ${dataAte ? formatDate(dataAte) : "…"}` : undefined} />
+      <div className="no-print flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">📊 Relatório do setor financeiro</h1>
           <p className="text-sm text-gray-500">Despesas e receitas · pago × em aberto · por categoria e cliente</p>

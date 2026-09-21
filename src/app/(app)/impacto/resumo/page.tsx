@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
 import PrintButton from "@/components/PrintButton";
+import ReportPrintHeader from "@/components/ReportPrintHeader";
 
 type Row = Record<string, any>;
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -80,7 +81,8 @@ export default function ResumoProducaoPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-start justify-between">
+      <ReportPrintHeader titulo="Resumo de produção (Impacto)" subtitulo="peso, valor e produtividade por colaborador" />
+      <div className="no-print mb-4 flex items-start justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">🏭 Resumo de produção (Impacto)</h1>
           <p className="text-sm text-gray-500">peso, valor e produtividade por colaborador</p>

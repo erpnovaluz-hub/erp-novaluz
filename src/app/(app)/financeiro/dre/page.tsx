@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency } from "@/lib/format";
 import PrintButton from "@/components/PrintButton";
+import ReportPrintHeader from "@/components/ReportPrintHeader";
 
 export const dynamic = "force-dynamic";
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -50,7 +51,8 @@ export default async function DrePage({ searchParams }: { searchParams: { ano?: 
 
   return (
     <div>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <ReportPrintHeader titulo={`DRE mensal · ${ano}`} subtitulo="Por competência · fonte: titulos_financeiros × categorias" />
+      <div className="no-print mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">📈 DRE mensal · {ano}</h1>
           <p className="text-sm text-gray-500">Por competência · fonte: titulos_financeiros × categorias</p>

@@ -1,20 +1,15 @@
 import PrintButton from "@/components/PrintButton";
+import ReportPrintHeader from "@/components/ReportPrintHeader";
 
-// Cabeçalho de relatório: título sempre visível + linha só de impressão com
-// a empresa e a data de geração.
+// Cabeçalho de relatório: título na tela + cabeçalho padrão só na impressão
+// (marca Novaluz, título, "Emitido em…"), seguindo o padrão do Lote.
 export default function ReportHeader({
-  titulo, subtitulo, empresa,
-}: { titulo: string; subtitulo?: string; empresa?: string }) {
-  const agora = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+  titulo, subtitulo, empresa, periodo,
+}: { titulo: string; subtitulo?: string; empresa?: string; periodo?: string }) {
   return (
     <div className="mb-5">
-      <div className="print-only mb-3 border-b border-gray-300 pb-2">
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <span className="font-semibold text-gray-800">⚡ ERP Novaluz{empresa ? ` · ${empresa}` : ""}</span>
-          <span>Gerado em {agora}</span>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <ReportPrintHeader titulo={titulo} subtitulo={subtitulo} periodo={periodo} empresa={empresa} />
+      <div className="no-print flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">{titulo}</h1>
           {subtitulo && <p className="text-sm text-gray-500">{subtitulo}</p>}

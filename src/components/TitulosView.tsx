@@ -6,6 +6,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import Badge from "@/components/Badge";
 import TituloDrawer from "@/components/TituloDrawer";
 import PrintButton from "@/components/PrintButton";
+import ReportPrintHeader from "@/components/ReportPrintHeader";
 
 type Row = Record<string, any>;
 type Tipo = "pagar" | "receber";
@@ -114,7 +115,8 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <ReportPrintHeader titulo={titulo} />
+      <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">{icon} {titulo}</h1>
         <div className="flex items-center gap-2">
           <PrintButton />
