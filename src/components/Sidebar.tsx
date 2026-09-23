@@ -36,6 +36,18 @@ export default function Sidebar({ empresaNome, email, isSuper, acesso }: { empre
     return null;
   }, [pathname]);
 
+  // não lidas da caixa de entrada: reconta ao navegar, a cada minuto e quando a caixa avisa
+  const [naoLidas, setNaoLidas] = useState(0);
+  useEffect(() => {
+    const supabase = createClient();
+    const contar = () => supabase.from("notificacoes").select("id", { count: "exact", head: true }).eq("lida", false)
+      .then(({ count }) => setNaoLidas(count ?? 0));
+    contar();
+    const h = setInterval(contar, 60000);
+    window.addEventListener("notificacoes", contar);
+    return () => { clearInterval(h); window.removeEventListener("notificacoes", contar); };
+  }, [pathname]);
+
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
   useEffect(() => { if (grupoAtivo) setAbertos((s) => new Set(s).add(grupoAtivo)); }, [grupoAtivo]);
   useEffect(() => { setMobile(false); }, [pathname]);
@@ -64,6 +76,10 @@ export default function Sidebar({ empresaNome, email, isSuper, acesso }: { empre
             🏢 Administração central
           </Link>
         )}
+        <Link href="/tarefas/caixa" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/tarefas/caixa" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
+          🔔 Caixa de entrada
+          {naoLidas > 0 && <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">{naoLidas > 99 ? "99+" : naoLidas}</span>}
+        </Link>
         <Link href="/tarefas" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/tarefas" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
           ✅ Minhas tarefas
         </Link>

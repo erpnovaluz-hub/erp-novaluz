@@ -11,6 +11,8 @@ import {
   type Projeto, type Secao, type Tarefa, type VinculoTipo,
 } from "@/lib/tarefas";
 import { Avatar, Check, useEquipe } from "@/components/tarefas/comum";
+import TarefaAnexos from "@/components/tarefas/TarefaAnexos";
+import TarefaComentarios from "@/components/tarefas/TarefaComentarios";
 
 // Painel lateral da tarefa: tudo salva na hora (sem botão "salvar").
 export default function TarefaDrawer({ tarefaId, onClose, onChange }: {
@@ -229,6 +231,12 @@ export default function TarefaDrawer({ tarefaId, onClose, onChange }: {
                 </ul>
               </div>
             )}
+
+            <TarefaAnexos tarefaId={t.id} porId={porId} />
+
+            <div className="border-t pt-4">
+              <TarefaComentarios tarefaId={t.id} pessoas={pessoas} porId={porId} />
+            </div>
 
             <p className="border-t pt-3 text-xs text-gray-400">
               Criada por {(t.criado_por && (porId[t.criado_por]?.nome || porId[t.criado_por]?.email)) || "—"} em {formatDateTime(t.criado_em)}

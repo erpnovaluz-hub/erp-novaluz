@@ -10,8 +10,9 @@ import { CORES, PRIORIDADES, corPrazo, rotuloPrazo, vinculoDef, type Projeto, ty
 import { Avatar, Check, useEquipe } from "@/components/tarefas/comum";
 import TarefaLinha from "@/components/tarefas/TarefaLinha";
 import TarefaDrawer from "@/components/tarefas/TarefaDrawer";
+import CalendarioTarefas from "@/components/tarefas/CalendarioTarefas";
 
-type Visao = "lista" | "quadro";
+type Visao = "lista" | "quadro" | "calendario";
 const SEM_SECAO = "__sem__";
 
 export default function ProjetoView({ projetoId }: { projetoId: string }) {
@@ -31,7 +32,7 @@ export default function ProjetoView({ projetoId }: { projetoId: string }) {
 
   // visão preferida fica no navegador
   useEffect(() => {
-    try { const v = localStorage.getItem("tarefas.visao"); if (v === "lista" || v === "quadro") setVisao(v); } catch {}
+    try { const v = localStorage.getItem("tarefas.visao"); if (v === "lista" || v === "quadro" || v === "calendario") setVisao(v); } catch {}
   }, []);
   function trocarVisao(v: Visao) { setVisao(v); try { localStorage.setItem("tarefas.visao", v); } catch {} }
 
@@ -83,6 +84,13 @@ export default function ProjetoView({ projetoId }: { projetoId: string }) {
     const destino = secaoId === SEM_SECAO ? null : secaoId;
     setTarefas((l) => l.map((x) => (x.id === tarefaId ? { ...x, secao_id: destino, ordem: Date.now() } : x)));
     const { error } = await supabase.from("tarefas").update({ secao_id: destino, ordem: Date.now() }).eq("id", tarefaId);
+    if (error) setErro(error.message);
+    carregar();
+  }
+
+  async function mudarPrazo(tarefaId: string, prazo: string | null) {
+    setTarefas((l) => l.map((x) => (x.id === tarefaId ? { ...x, prazo } : x)));
+    const { error } = await supabase.from("tarefas").update({ prazo }).eq("id", tarefaId);
     if (error) setErro(error.message);
     carregar();
   }
@@ -179,7 +187,7 @@ export default function ProjetoView({ projetoId }: { projetoId: string }) {
       {/* barra: visão + filtros */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-2">
         <div className="flex gap-1">
-          {([["lista", "☰ Lista"], ["quadro", "▦ Quadro"]] as [Visao, string][]).map(([k, l]) => (
+          {([["lista", "☰ Lista"], ["quadro", "▦ Quadro"], ["calendario", "📅 Calendário"]] as [Visao, string][]).map(([k, l]) => (
             <button key={k} onClick={() => trocarVisao(k)}
               className={`rounded-md px-3 py-1.5 text-sm ${visao === k ? "bg-brand-50 font-medium text-brand-700" : "text-gray-500 hover:bg-gray-100"}`}>{l}</button>
           ))}
@@ -217,6 +225,8 @@ export default function ProjetoView({ projetoId }: { projetoId: string }) {
             );
           })}
         </div>
+      ) : visao === "calendario" ? (
+        <CalendarioTarefas tarefas={visiveis} porId={porId} onAbrir={setAberta} onMudarPrazo={mudarPrazo} />
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-4">
           {colunas.map((c) => (

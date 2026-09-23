@@ -8,8 +8,9 @@ import { FAIXAS, faixaDoPrazo, hojeISO, type Projeto, type Tarefa } from "@/lib/
 import { useEquipe } from "@/components/tarefas/comum";
 import TarefaLinha from "@/components/tarefas/TarefaLinha";
 import TarefaDrawer from "@/components/tarefas/TarefaDrawer";
+import CalendarioTarefas from "@/components/tarefas/CalendarioTarefas";
 
-type Aba = "proximas" | "delegadas" | "concluidas";
+type Aba = "proximas" | "calendario" | "delegadas" | "concluidas";
 
 export default function MinhasTarefas() {
   const supabase = useMemo(() => createClient(), []);
@@ -63,6 +64,12 @@ export default function MinhasTarefas() {
     setNovo(""); setNovoPrazo(""); carregar();
   }
 
+  async function mudarPrazo(id: string, prazo: string | null) {
+    setTarefas((l) => l.map((x) => (x.id === id ? { ...x, prazo } : x)));
+    await supabase.from("tarefas").update({ prazo }).eq("id", id);
+    carregar();
+  }
+
   const grupos = useMemo(
     () => FAIXAS.map((f) => ({ ...f, itens: tarefas.filter((t) => faixaDoPrazo(t.prazo) === f.key) })).filter((g) => g.itens.length > 0),
     [tarefas],
@@ -76,7 +83,7 @@ export default function MinhasTarefas() {
   );
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
+    <div className={`mx-auto space-y-5 ${aba === "calendario" ? "max-w-6xl" : "max-w-4xl"}`}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">✅ Minhas tarefas</h1>
@@ -88,7 +95,7 @@ export default function MinhasTarefas() {
       </div>
 
       <div className="flex gap-1 border-b">
-        {([["proximas", `Próximas (${tarefas.length})`], ["delegadas", `Delegadas (${delegadas.length})`], ["concluidas", "Concluídas"]] as [Aba, string][]).map(([k, l]) => (
+        {([["proximas", `Próximas (${tarefas.length})`], ["calendario", "📅 Calendário"], ["delegadas", `Delegadas (${delegadas.length})`], ["concluidas", "Concluídas"]] as [Aba, string][]).map(([k, l]) => (
           <button key={k} onClick={() => setAba(k)}
             className={`-mb-px border-b-2 px-3 py-2 text-sm ${aba === k ? "border-brand-600 font-medium text-brand-700" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
             {l}
@@ -118,6 +125,10 @@ export default function MinhasTarefas() {
             </section>
           ))}
         </>
+      )}
+
+      {aba === "calendario" && (
+        <CalendarioTarefas tarefas={[...tarefas, ...concluidas]} porId={porId} onAbrir={setAberta} onMudarPrazo={mudarPrazo} />
       )}
 
       {aba === "delegadas" && (
