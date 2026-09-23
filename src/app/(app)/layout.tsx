@@ -18,10 +18,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const isSuper = (perfil as any)?.papel === "super";
   let empresaNome = perfil ? "Sem empresa vinculada" : "⚠ Perfil não configurado";
   let modoSuporte = false;
+  let empresaId: string | null = (perfil as any)?.empresa_consultora_id ?? null;
 
   if (perfil) {
     // empresa em uso: a ativa (modo suporte) tem prioridade, senão a do perfil
-    let empresaId = (perfil as any).empresa_consultora_id;
     if (isSuper) {
       const { data: pa } = await supabase.from("perfis").select("empresa_ativa").eq("id", user.id).maybeSingle();
       if ((pa as any)?.empresa_ativa) { empresaId = (pa as any).empresa_ativa; modoSuporte = true; }
@@ -54,7 +54,7 @@ values ('${user.id}', '<ID_DA_EMPRESA>', 'Fernando', 'admin');`}
             Seu usuário está <b>desativado</b>. Fale com a gerência.
           </div>
         )}
-        <main className="min-w-0 flex-1 p-4 md:p-6"><AcessoProvider acesso={acesso}>{children}</AcessoProvider></main>
+        <main className="min-w-0 flex-1 p-4 md:p-6"><AcessoProvider acesso={{ ...acesso, userId: user.id, empresaId }}>{children}</AcessoProvider></main>
       </div>
     </div>
   );

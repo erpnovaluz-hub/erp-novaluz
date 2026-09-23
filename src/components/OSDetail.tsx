@@ -8,6 +8,8 @@ import { getEntity } from "@/lib/entities";
 import { formatCurrency, formatDate } from "@/lib/format";
 import Badge from "@/components/Badge";
 import EntityForm from "@/components/EntityForm";
+import TarefasVinculadas from "@/components/tarefas/TarefasVinculadas";
+import { useAcesso } from "@/components/AcessoProvider";
 
 type Row = Record<string, any>;
 const STATUS_OS = getEntity("ordens_servico")!.fields.find((f) => f.key === "status")!.options!;
@@ -17,6 +19,7 @@ const STATUS_ATIV = getEntity("atividades_os")!.fields.find((f) => f.key === "st
 export default function OSDetail({ osId }: { osId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const verValores = useAcesso().gerencia;   // custos: só gerência
   const [os, setOs] = useState<Row | null>(null);
   const [atividades, setAtividades] = useState<Row[]>([]);
   const [insumos, setInsumos] = useState<Row[]>([]);
@@ -108,8 +111,8 @@ export default function OSDetail({ osId }: { osId: string }) {
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-sm">
           <Info rot="Responsável" val={os.responsavel} />
           <Info rot="Prazo" val={formatDate(os.prazo)} />
-          <Info rot="Custo estimado" val={formatCurrency(os.custo_estimado)} />
-          <Info rot="Custo de insumos" val={formatCurrency(custoInsumos)} />
+          {verValores && <Info rot="Custo estimado" val={formatCurrency(os.custo_estimado)} />}
+          {verValores && <Info rot="Custo de insumos" val={formatCurrency(custoInsumos)} />}
         </div>
         {(os.motivo || os.como_sera_feito) && (
           <div className="mt-4 grid gap-4 sm:grid-cols-2 text-sm">
@@ -150,11 +153,11 @@ export default function OSDetail({ osId }: { osId: string }) {
       </Secao>
 
       {/* insumos */}
-      <Secao titulo={`Insumos · ${formatCurrency(custoInsumos)}`} onAdd={() => setDrawer({ tipo: "insumo", registro: null })}>
+      <Secao titulo={verValores ? `Insumos · ${formatCurrency(custoInsumos)}` : "Insumos"} onAdd={() => setDrawer({ tipo: "insumo", registro: null })}>
         {insumos.length === 0 ? <Vazio texto="Nenhum insumo." /> : (
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-              <tr><th className="px-4 py-2">Insumo</th><th className="px-4 py-2">Produto</th><th className="px-4 py-2 text-right">Qtd</th><th className="px-4 py-2 text-right">Custo un.</th><th className="px-4 py-2 text-right">Total</th><th className="px-4 py-2 text-right">Ações</th></tr>
+              <tr><th className="px-4 py-2">Insumo</th><th className="px-4 py-2">Produto</th><th className="px-4 py-2 text-right">Qtd</th>{verValores && <><th className="px-4 py-2 text-right">Custo un.</th><th className="px-4 py-2 text-right">Total</th></>}<th className="px-4 py-2 text-right">Ações</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {insumos.map((i) => (
@@ -162,8 +165,8 @@ export default function OSDetail({ osId }: { osId: string }) {
                   <td className="px-4 py-2">{i.descricao}</td>
                   <td className="px-4 py-2 text-gray-600">{prodNome[i.produto_id] ?? "—"}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{Number(i.quantidade)}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(i.custo_unitario)}</td>
-                  <td className="px-4 py-2 text-right font-medium tabular-nums">{formatCurrency(i.custo_total)}</td>
+                  {verValores && <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(i.custo_unitario)}</td>}
+                  {verValores && <td className="px-4 py-2 text-right font-medium tabular-nums">{formatCurrency(i.custo_total)}</td>}
                   <td className="whitespace-nowrap px-4 py-2 text-right">
                     <button className="text-brand-600 hover:underline" onClick={() => setDrawer({ tipo: "insumo", registro: i })}>Editar</button>
                     <button className="ml-3 text-red-500 hover:underline" onClick={() => excluir("insumos_os", i.id)}>Excluir</button>
@@ -174,6 +177,8 @@ export default function OSDetail({ osId }: { osId: string }) {
           </table>
         )}
       </Secao>
+
+      <TarefasVinculadas tipo="os" id={osId} rotulo={[os.numero, os.titulo].filter(Boolean).join(" · ")} />
 
       <button className="text-sm text-red-500 hover:underline" onClick={excluirOS}>Excluir esta OS</button>
 

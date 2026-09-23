@@ -56,6 +56,8 @@ export type Acesso = {
   papel: Papel | null;
   gerencia: boolean;
   niveis: Record<Modulo, Nivel>;
+  userId?: string;
+  empresaId?: string | null;   // empresa em uso (modo suporte do super incluso)
 };
 
 export function montarAcesso(papel: string | null, overrides: { modulo: string; nivel: string }[] = []): Acesso {

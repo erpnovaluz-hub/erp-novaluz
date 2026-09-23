@@ -79,6 +79,15 @@ export default async function Dashboard() {
   const verOs = podeArea(acesso, "os");
 
   const alertas = ger ? await coletarAlertas() : [];
+
+  // minhas tarefas (todos os perfis)
+  const { data: { user } } = await supabase.auth.getUser();
+  const hoje = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}-${String(agora.getDate()).padStart(2, "0")}`;
+  const { data: minhas } = await supabase.from("tarefas").select("prazo")
+    .eq("responsavel_id", user?.id ?? "").eq("concluida", false);
+  const tAbertas = (minhas ?? []).length;
+  const tAtrasadas = (minhas ?? []).filter((t: any) => t.prazo && t.prazo < hoje).length;
+  const tHoje = (minhas ?? []).filter((t: any) => t.prazo === hoje).length;
   const empresa = await getEmpresaAtiva();
 
   return (
@@ -87,6 +96,16 @@ export default async function Dashboard() {
         <h1 className="text-xl font-semibold text-gray-900">Painel</h1>
         <p className="text-sm text-gray-500">Visão geral da {empresa.nome} · dados ao vivo do Supabase</p>
       </div>
+
+      {/* Minhas tarefas */}
+      <section>
+        <SectionTitle icon="✅" texto="Minhas tarefas" href="/tarefas" />
+        <div className="grid grid-cols-3 gap-4">
+          <Kpi titulo="Abertas comigo" valor={String(tAbertas)} fonte="tarefas" />
+          <Kpi titulo="Para hoje" valor={String(tHoje)} fonte="tarefas" cor={tHoje > 0 ? "text-amber-600" : "text-gray-900"} />
+          <Kpi titulo="Atrasadas" valor={String(tAtrasadas)} fonte="tarefas" cor={tAtrasadas > 0 ? "text-red-600" : "text-gray-900"} />
+        </div>
+      </section>
 
       {/* Alertas (comerciais/financeiros: gerência) */}
       {ger && <section>

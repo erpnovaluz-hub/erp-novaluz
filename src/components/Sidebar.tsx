@@ -64,6 +64,12 @@ export default function Sidebar({ empresaNome, email, isSuper, acesso }: { empre
             🏢 Administração central
           </Link>
         )}
+        <Link href="/tarefas" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/tarefas" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
+          ✅ Minhas tarefas
+        </Link>
+        <Link href="/tarefas/projetos" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname.startsWith("/tarefas/projetos") ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
+          📁 Projetos
+        </Link>
         {acesso.gerencia && (
           <Link href="/equipe" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/equipe" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
             🔐 Usuários e acessos
