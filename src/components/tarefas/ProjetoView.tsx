@@ -11,8 +11,9 @@ import { Avatar, Check, useEquipe } from "@/components/tarefas/comum";
 import TarefaLinha from "@/components/tarefas/TarefaLinha";
 import TarefaDrawer from "@/components/tarefas/TarefaDrawer";
 import CalendarioTarefas from "@/components/tarefas/CalendarioTarefas";
+import TimelineTarefas from "@/components/tarefas/TimelineTarefas";
 
-type Visao = "lista" | "quadro" | "calendario";
+type Visao = "lista" | "quadro" | "calendario" | "timeline";
 const SEM_SECAO = "__sem__";
 
 export default function ProjetoView({ projetoId }: { projetoId: string }) {
@@ -32,7 +33,7 @@ export default function ProjetoView({ projetoId }: { projetoId: string }) {
 
   // visão preferida fica no navegador
   useEffect(() => {
-    try { const v = localStorage.getItem("tarefas.visao"); if (v === "lista" || v === "quadro" || v === "calendario") setVisao(v); } catch {}
+    try { const v = localStorage.getItem("tarefas.visao"); if (v === "lista" || v === "quadro" || v === "calendario" || v === "timeline") setVisao(v); } catch {}
   }, []);
   function trocarVisao(v: Visao) { setVisao(v); try { localStorage.setItem("tarefas.visao", v); } catch {} }
 
@@ -91,6 +92,13 @@ export default function ProjetoView({ projetoId }: { projetoId: string }) {
   async function mudarPrazo(tarefaId: string, prazo: string | null) {
     setTarefas((l) => l.map((x) => (x.id === tarefaId ? { ...x, prazo } : x)));
     const { error } = await supabase.from("tarefas").update({ prazo }).eq("id", tarefaId);
+    if (error) setErro(error.message);
+    carregar();
+  }
+
+  async function mudarDatas(tarefaId: string, inicio: string | null, prazo: string | null) {
+    setTarefas((l) => l.map((x) => (x.id === tarefaId ? { ...x, inicio, prazo } : x)));
+    const { error } = await supabase.from("tarefas").update({ inicio, prazo }).eq("id", tarefaId);
     if (error) setErro(error.message);
     carregar();
   }
@@ -197,7 +205,7 @@ export default function ProjetoView({ projetoId }: { projetoId: string }) {
       {/* barra: visão + filtros */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-2">
         <div className="flex gap-1">
-          {([["lista", "☰ Lista"], ["quadro", "▦ Quadro"], ["calendario", "📅 Calendário"]] as [Visao, string][]).map(([k, l]) => (
+          {([["lista", "☰ Lista"], ["quadro", "▦ Quadro"], ["calendario", "📅 Calendário"], ["timeline", "▤ Timeline"]] as [Visao, string][]).map(([k, l]) => (
             <button key={k} onClick={() => trocarVisao(k)}
               className={`rounded-md px-3 py-1.5 text-sm ${visao === k ? "bg-brand-50 font-medium text-brand-700" : "text-gray-500 hover:bg-gray-100"}`}>{l}</button>
           ))}
@@ -235,6 +243,8 @@ export default function ProjetoView({ projetoId }: { projetoId: string }) {
             );
           })}
         </div>
+      ) : visao === "timeline" ? (
+        <TimelineTarefas tarefas={visiveis} secoes={colunas} porId={porId} onAbrir={setAberta} onDatas={mudarDatas} />
       ) : visao === "calendario" ? (
         <CalendarioTarefas tarefas={visiveis} porId={porId} onAbrir={setAberta} onMudarPrazo={mudarPrazo} />
       ) : (

@@ -87,6 +87,11 @@ export default function Sidebar({ empresaNome, email, isSuper, acesso }: { empre
           📁 Projetos
         </Link>
         {acesso.gerencia && (
+          <Link href="/tarefas/painel" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/tarefas/painel" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
+            📊 Painel do time
+          </Link>
+        )}
+        {acesso.gerencia && (
           <Link href="/equipe" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/equipe" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
             🔐 Usuários e acessos
           </Link>

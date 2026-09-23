@@ -18,6 +18,7 @@ export type Tarefa = {
   ordem: number; vinculo_tipo: VinculoTipo | null; vinculo_id: string | null; vinculo_rotulo: string | null;
   criado_em: string; n_sub?: number; n_sub_ok?: number;
   origem?: "automacao" | "followup_crm" | "modelo" | null;
+  inicio?: string | null;
 };
 export type Pessoa = { id: string; nome: string | null; email: string | null };
 

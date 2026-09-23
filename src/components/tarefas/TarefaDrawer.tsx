@@ -147,9 +147,13 @@ export default function TarefaDrawer({ tarefaId, onClose, onChange }: {
                 </select>
               </div>
 
+              <span className="text-gray-500">Início</span>
+              <input type="date" className="inp w-44 py-1" value={t.inicio ?? ""} max={t.prazo ?? undefined}
+                onChange={(e) => salvar({ inicio: e.target.value || null })} />
+
               <span className="text-gray-500">Prazo</span>
               <div className="flex items-center gap-2">
-                <input type="date" className="inp py-1" value={t.prazo ?? ""} onChange={(e) => salvar({ prazo: e.target.value || null })} />
+                <input type="date" className="inp py-1" value={t.prazo ?? ""} min={t.inicio ?? undefined} onChange={(e) => salvar({ prazo: e.target.value || null })} />
                 {t.prazo && <span className={`text-xs ${corPrazo(t.prazo, t.concluida)}`}>{rotuloPrazo(t.prazo)}</span>}
               </div>
 
