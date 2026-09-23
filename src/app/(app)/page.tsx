@@ -25,6 +25,8 @@ const NIVEL_STYLE: Record<Alerta["nivel"], string> = {
 
 export default async function Dashboard() {
   const supabase = createClient();
+  // rotinas de automação (títulos, propostas, estoque): no máx. 1x por dia por empresa
+  await supabase.rpc("rodar_automacoes", { p_forcar: false }).then(() => null, () => null);
   const agora = new Date();
   const mesAtual = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
   const mesNome = agora.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
@@ -36,7 +38,8 @@ export default async function Dashboard() {
   ] = await Promise.all([
     supabase.from("clientes").select("*", { count: "exact", head: true }).eq("status", "ativo"),
     supabase.from("oportunidades").select("etapa, valor_estimado"),
-    supabase.from("tarefas_followup").select("*", { count: "exact", head: true }).in("status", ["aberta", "em_andamento"]),
+    supabase.from("tarefas").select("*", { count: "exact", head: true }).eq("concluida", false)
+      .in("vinculo_tipo", ["cliente", "oportunidade", "proposta"]),
     supabase.from("contas_bancarias").select("saldo_atual").eq("ativo", true),
     supabase.from("vw_titulos_resumo").select("tipo, total").eq("status", "aberto"),
     supabase.from("vw_dre").select("competencia, tipo, total"),
@@ -160,7 +163,7 @@ export default async function Dashboard() {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
           <Kpi titulo="Clientes ativos" valor={String(nClientes ?? 0)} fonte="clientes" />
           <Kpi titulo="Pipeline aberto" valor={formatCurrency(pipelineAberto)} fonte="oportunidades" />
-          <Kpi titulo="Follow-ups abertos" valor={String(nTarefas ?? 0)} fonte="tarefas_followup" />
+          <Kpi titulo="Follow-ups abertos" valor={String(nTarefas ?? 0)} fonte="tarefas (vínculo comercial)" />
         </div>
         {temOport && (
           <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">

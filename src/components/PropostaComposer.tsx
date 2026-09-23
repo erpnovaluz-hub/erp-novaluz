@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import TarefasVinculadas from "@/components/tarefas/TarefasVinculadas";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -152,6 +153,9 @@ export default function PropostaComposer({ id }: { id: string }) {
           onSaved={() => { setDrawer(null); carregar(); }}
         />
       )}
+
+      <TarefasVinculadas tipo="proposta" id={id}
+        rotulo={[prop.numero, cliNome[prop.cliente_id]].filter(Boolean).join(" · ")} />
     </div>
   );
 }

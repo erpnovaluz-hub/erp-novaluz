@@ -131,7 +131,7 @@ export default function CaixaEntrada() {
                   <Avatar pessoa={ator} size={30} />
                   <div className="min-w-0 flex-1">
                     <p className="text-gray-700">
-                      <b>{ator?.nome || ator?.email || "Alguém"}</b> {ACAO[n.tipo]}{" "}
+                      <b>{ator?.nome || ator?.email || (n.ator_id ? "Alguém" : "🤖 Automação")}</b> {ACAO[n.tipo]}{" "}
                       <b className="text-gray-900">{n.tarefas?.titulo ?? "uma tarefa"}</b>
                     </p>
                     {(n.tipo === "mencao" || n.tipo === "comentario") && n.texto && (

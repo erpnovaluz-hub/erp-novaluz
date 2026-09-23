@@ -17,6 +17,7 @@ export type Tarefa = {
   prazo: string | null; prioridade: Prioridade; concluida: boolean; concluida_em: string | null;
   ordem: number; vinculo_tipo: VinculoTipo | null; vinculo_id: string | null; vinculo_rotulo: string | null;
   criado_em: string; n_sub?: number; n_sub_ok?: number;
+  origem?: "automacao" | "followup_crm" | "modelo" | null;
 };
 export type Pessoa = { id: string; nome: string | null; email: string | null };
 
@@ -124,3 +125,24 @@ export function iniciais(p?: Pessoa | null): string {
   const partes = n.split(/\s+/);
   return ((partes[0]?.[0] ?? "") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase();
 }
+
+// ---- automações (migration 0043) -------------------------------------------------
+export type Gatilho = "requisicao_aberta" | "pedido_emitido" | "os_aberta" | "titulo_vencendo" | "proposta_sem_retorno" | "estoque_minimo";
+
+export const AUTOMACOES: {
+  gatilho: Gatilho; icon: string; titulo: string; quando: string; cria: string;
+  tipo: "evento" | "rotina"; parametro?: string; usaModelo?: boolean;
+}[] = [
+  { gatilho: "requisicao_aberta", icon: "📝", tipo: "evento", titulo: "Requisição aberta",
+    quando: "Alguém abre uma requisição de compra", cria: "“Cotar RC-…” — conclui sozinha quando vira pedido" },
+  { gatilho: "pedido_emitido", icon: "🛒", tipo: "evento", titulo: "Pedido emitido",
+    quando: "Um pedido de compra é gerado", cria: "“Receber e conferir PED-…” — conclui sozinha quando o pedido é recebido" },
+  { gatilho: "os_aberta", icon: "🧷", tipo: "evento", titulo: "OS aberta", usaModelo: true,
+    quando: "Uma ordem de serviço é criada", cria: "“Executar OS-…” com o checklist do modelo como subtarefas" },
+  { gatilho: "titulo_vencendo", icon: "💰", tipo: "rotina", titulo: "Título vencendo", parametro: "dias antes do vencimento",
+    quando: "Conta a pagar ou a receber perto de vencer (ou vencida)", cria: "“Pagar: …” / “Receber: …” com prazo no vencimento" },
+  { gatilho: "proposta_sem_retorno", icon: "📑", tipo: "rotina", titulo: "Proposta sem retorno", parametro: "dias depois da data da proposta",
+    quando: "Proposta com status Enviada há X dias", cria: "“Follow-up da proposta …” (uma por proposta)" },
+  { gatilho: "estoque_minimo", icon: "📦", tipo: "rotina", titulo: "Estoque abaixo do mínimo",
+    quando: "Saldo somado dos depósitos fica abaixo do mínimo do produto", cria: "“Repor estoque: …” (nova só depois de concluir a anterior)" },
+];

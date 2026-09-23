@@ -100,7 +100,7 @@ const ROTAS: [string, Area][] = [
   ["/os", "os"], ["/obras", "os"],
   ["/impacto", "producao"],
   ["/producao/custos", "gerencia"], ["/gerencial", "gerencia"], ["/relatorios", "gerencia"],
-  ["/equipe", "gerencia"],
+  ["/equipe", "gerencia"], ["/tarefas/automacoes", "gerencia"],
 ];
 
 export function areaDaRota(pathname: string): Area | null {

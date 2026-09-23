@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CORES, type Projeto } from "@/lib/tarefas";
 import { Avatar, useEquipe } from "@/components/tarefas/comum";
+import { useAcesso } from "@/components/AcessoProvider";
+import { hojeISO } from "@/lib/tarefas";
 
 type Contagem = Record<string, { abertas: number; total: number; atrasadas: number }>;
 
@@ -13,6 +15,10 @@ export default function ProjetosLista() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const { porId } = useEquipe();
+  const { gerencia } = useAcesso();
+  const [modelos, setModelos] = useState<{ id: string; nome: string }[]>([]);
+  const [modeloId, setModeloId] = useState("");
+  const [dataBase, setDataBase] = useState(hojeISO());
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [cont, setCont] = useState<Contagem>({});
   const [verArquivados, setVerArquivados] = useState(false);
@@ -41,9 +47,20 @@ export default function ProjetosLista() {
   }, [supabase]);
 
   useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    supabase.from("modelos_projeto").select("id, nome").order("nome").then(({ data }) => setModelos(data ?? []));
+  }, [supabase]);
 
   async function criar(e: React.FormEvent) {
     e.preventDefault();
+    if (modeloId) {
+      const { data, error } = await supabase.rpc("criar_projeto_de_modelo", {
+        p_modelo: modeloId, p_nome: nome.trim(), p_privado: privado, p_data_base: dataBase || hojeISO(), p_cor: cor,
+      });
+      if (error) { setErro(error.message); return; }
+      router.push(`/tarefas/projetos/${data}`);
+      return;
+    }
     const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase.from("projetos")
       .insert({ nome: nome.trim(), descricao: descricao.trim() || null, cor, privado, dono_id: user?.id })
@@ -63,6 +80,8 @@ export default function ProjetosLista() {
         </div>
         <div className="flex items-center gap-2">
           <Link href="/tarefas" className="btn-ghost text-sm ring-1 ring-gray-200">✅ Minhas tarefas</Link>
+          <Link href="/tarefas/modelos" className="btn-ghost text-sm ring-1 ring-gray-200">🧩 Modelos</Link>
+          {gerencia && <Link href="/tarefas/automacoes" className="btn-ghost text-sm ring-1 ring-gray-200">⚙️ Automações</Link>}
           <button className="btn-primary text-sm" onClick={() => setCriando(true)}>+ Novo projeto</button>
         </div>
       </div>
@@ -75,6 +94,19 @@ export default function ProjetosLista() {
             <input autoFocus required className="inp" placeholder="Nome do projeto (ex.: Mobilização obra Vale)" value={nome} onChange={(e) => setNome(e.target.value)} />
             <input className="inp" placeholder="Descrição (opcional)" value={descricao} onChange={(e) => setDescricao(e.target.value)} />
           </div>
+          {modelos.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <select className="inp w-64 py-1" value={modeloId} onChange={(e) => setModeloId(e.target.value)}>
+                <option value="">Projeto em branco</option>
+                {modelos.map((m) => <option key={m.id} value={m.id}>🧩 {m.nome}</option>)}
+              </select>
+              {modeloId && (
+                <label className="flex items-center gap-2 text-gray-600">
+                  início <input type="date" className="inp py-1" value={dataBase} onChange={(e) => setDataBase(e.target.value)} />
+                </label>
+              )}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-4 text-sm">
             <div className="flex items-center gap-1.5">
               {Object.entries(CORES).map(([k, hex]) => (

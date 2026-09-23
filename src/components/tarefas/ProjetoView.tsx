@@ -130,6 +130,15 @@ export default function ProjetoView({ projetoId }: { projetoId: string }) {
     if (nome?.trim() && nome !== projeto.nome) atualizarProjeto({ nome: nome.trim() });
   }
 
+  async function salvarComoModelo() {
+    if (!projeto) return;
+    const nome = window.prompt("Nome do modelo:", projeto.nome);
+    if (!nome?.trim()) return;
+    const { error } = await supabase.rpc("salvar_projeto_como_modelo", { p_projeto: projetoId, p_nome: nome.trim() });
+    if (error) { setErro(error.message); return; }
+    if (confirm("Modelo salvo. Abrir a lista de modelos?")) router.push("/tarefas/modelos");
+  }
+
   async function excluirProjeto() {
     if (!projeto || !confirm(`Excluir o projeto "${projeto.nome}" e TODAS as suas tarefas? Isso não pode ser desfeito. (Prefira arquivar.)`)) return;
     const { error } = await supabase.from("projetos").delete().eq("id", projetoId);
@@ -170,6 +179,7 @@ export default function ProjetoView({ projetoId }: { projetoId: string }) {
             {projeto.descricao && <> · {projeto.descricao}</>}
           </p>
         </div>
+        <button className="btn-ghost text-sm" onClick={salvarComoModelo} title="Copia seções e tarefas para reutilizar">🧩 Salvar como modelo</button>
         {podeGerir && (
           <div className="flex flex-wrap items-center gap-1 text-sm">
             <button className="btn-ghost" onClick={renomearProjeto}>Renomear</button>

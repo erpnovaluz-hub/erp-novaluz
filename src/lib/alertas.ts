@@ -104,19 +104,19 @@ export async function coletarAlertas(): Promise<Alerta[]> {
     });
   }
 
-  // 4. Follow-ups vencidos ----------------------------------------------------
+  // 4. Follow-ups vencidos (tarefas ligadas a cliente/oportunidade/proposta) ---
   const { data: tarefas } = await supabase
-    .from("tarefas_followup")
-    .select("descricao, prazo, status")
-    .in("status", ["aberta", "em_andamento"])
+    .from("tarefas")
+    .select("id")
+    .eq("concluida", false)
+    .in("vinculo_tipo", ["cliente", "oportunidade", "proposta"])
     .lt("prazo", hoje);
   if (tarefas && tarefas.length) {
     alertas.push({
       nivel: "alto",
       titulo: "Follow-ups vencidos",
-      detalhe: `${tarefas.length} tarefa(s) com prazo vencido e ainda em aberto.`,
-      fonte: "tarefas_followup",
-      entidade: "tarefas_followup",
+      detalhe: `${tarefas.length} tarefa(s) comercial(is) com prazo vencido e ainda em aberto.`,
+      fonte: "tarefas",
     });
   }
 

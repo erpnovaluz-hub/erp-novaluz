@@ -362,7 +362,8 @@ export const ENTITIES: Record<string, EntityDef> = {
     ],
   },
   tarefas_followup: {
-    key: "tarefas_followup", label: "Tarefa", labelPlural: "Tarefas / Follow-up", icon: "✅", group: "comercial",
+    key: "tarefas_followup", label: "Tarefa", labelPlural: "Tarefas / Follow-up (antigo)", icon: "✅", group: "comercial",
+    hideInNav: true,   // migrado para o módulo de Tarefas (0043) — projeto "Follow-ups comerciais"
     titleField: "descricao", orderBy: { column: "prazo", ascending: true },
     listColumns: ["descricao", "cliente_id", "responsavel", "prazo", "origem", "status"],
     fields: [

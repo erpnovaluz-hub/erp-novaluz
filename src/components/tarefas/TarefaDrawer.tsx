@@ -239,7 +239,8 @@ export default function TarefaDrawer({ tarefaId, onClose, onChange }: {
             </div>
 
             <p className="border-t pt-3 text-xs text-gray-400">
-              Criada por {(t.criado_por && (porId[t.criado_por]?.nome || porId[t.criado_por]?.email)) || "—"} em {formatDateTime(t.criado_em)}
+              Criada por {(t.criado_por && (porId[t.criado_por]?.nome || porId[t.criado_por]?.email))
+                || (t.origem === "automacao" ? "🤖 Automação" : t.origem === "followup_crm" ? "CRM (follow-up migrado)" : "—")} em {formatDateTime(t.criado_em)}
               {t.concluida_em && <> · concluída em {formatDateTime(t.concluida_em)}</>}
             </p>
           </div>
