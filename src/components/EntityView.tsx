@@ -7,6 +7,8 @@ import { getEntity, type FieldDef } from "@/lib/entities";
 import { formatCurrency, formatDate, formatDateTime, formatPercent } from "@/lib/format";
 import Badge from "@/components/Badge";
 import EntityForm from "@/components/EntityForm";
+import { useAcesso } from "@/components/AcessoProvider";
+import { areaDaRota, podeArea } from "@/lib/permissoes";
 
 type Row = Record<string, any>;
 type RefMap = Record<string, { value: string; label: string }[]>;
@@ -14,6 +16,9 @@ type RefMap = Record<string, { value: string; label: string }[]>;
 export default function EntityView({ entityKey }: { entityKey: string }) {
   const entity = getEntity(entityKey)!;
   const supabase = useMemo(() => createClient(), []);
+  const acesso = useAcesso();
+  const podeEditar = podeArea(acesso, areaDaRota(`/e/${entityKey}`), "editar");
+  const verValores = acesso.gerencia;   // valores em R$ (custos, preços, salários): só gerência
   const PAGE_SIZE = 50;
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
@@ -100,7 +105,8 @@ export default function EntityView({ entityKey }: { entityKey: string }) {
 
   const colFields = entity.listColumns
     .map((c) => entity.fields.find((f) => f.key === c))
-    .filter(Boolean) as FieldDef[];
+    .filter(Boolean)
+    .filter((f) => verValores || f!.type !== "currency") as FieldDef[];
 
   return (
     <div>
@@ -125,7 +131,7 @@ export default function EntityView({ entityKey }: { entityKey: string }) {
               )}
             </form>
           )}
-          <button className="btn-primary" onClick={() => setEditando(null)}>+ Novo</button>
+          {podeEditar && <button className="btn-primary" onClick={() => setEditando(null)}>+ Novo</button>}
         </div>
       </div>
 
@@ -149,7 +155,7 @@ export default function EntityView({ entityKey }: { entityKey: string }) {
                 <tr><td colSpan={colFields.length + 1} className="px-4 py-10 text-center text-gray-400">Nenhum registro.</td></tr>
               ) : (
                 filtradas.map((row) => (
-                  <tr key={row.id} className="cursor-pointer hover:bg-gray-50" onClick={() => setEditando(row)}>
+                  <tr key={row.id} className={podeEditar ? "cursor-pointer hover:bg-gray-50" : "hover:bg-gray-50"} onClick={() => podeEditar && setEditando(row)}>
                     {colFields.map((f) => (
                       <td key={f.key} className="whitespace-nowrap px-4 py-3">{renderCell(f, row)}</td>
                     ))}
@@ -157,7 +163,7 @@ export default function EntityView({ entityKey }: { entityKey: string }) {
                       {entity.docRoute && (
                         <Link href={`${entity.docRoute}/${row.id}`} className="mr-3 text-brand-600 hover:underline" onClick={(e) => e.stopPropagation()}>🖨️ documento</Link>
                       )}
-                      <button className="text-red-500 hover:underline" onClick={(e) => { e.stopPropagation(); excluir(row); }}>Excluir</button>
+                      {podeEditar && <button className="text-red-500 hover:underline" onClick={(e) => { e.stopPropagation(); excluir(row); }}>Excluir</button>}
                     </td>
                   </tr>
                 ))

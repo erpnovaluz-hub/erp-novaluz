@@ -4,6 +4,8 @@ import { coletarAlertas, type Alerta } from "@/lib/alertas";
 import { getEmpresaAtiva } from "@/lib/empresaAtiva";
 import { formatCurrency } from "@/lib/format";
 import Badge from "@/components/Badge";
+import { carregarAcesso } from "@/lib/acessoServidor";
+import { podeArea } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +70,15 @@ export default async function Dashboard() {
   const abaixoMin = (saldosEst ?? []).filter((r: any) => Number(r.produtos?.estoque_minimo ?? 0) > 0 && Number(r.quantidade) < Number(r.produtos.estoque_minimo)).length;
   const valorProd = (prod ?? []).reduce((s: number, r: any) => s + Number(r.valor_total || 0), 0);
 
-  const alertas = await coletarAlertas();
+  // cada seção só aparece para quem tem o módulo (o RLS já zera o resto)
+  const acesso = await carregarAcesso();
+  const ger = acesso.gerencia;
+  const verFin = podeArea(acesso, "financeiro");
+  const verCom = podeArea(acesso, "comercial");
+  const verEst = podeArea(acesso, "estoque");
+  const verOs = podeArea(acesso, "os");
+
+  const alertas = ger ? await coletarAlertas() : [];
   const empresa = await getEmpresaAtiva();
 
   return (
@@ -78,8 +88,8 @@ export default async function Dashboard() {
         <p className="text-sm text-gray-500">Visão geral da {empresa.nome} · dados ao vivo do Supabase</p>
       </div>
 
-      {/* Alertas */}
-      <section>
+      {/* Alertas (comerciais/financeiros: gerência) */}
+      {ger && <section>
         <SectionTitle icon="🔔" texto={`Alertas proativos (${alertas.length})`} />
         {alertas.length === 0 ? (
           <div className="card p-6 text-center text-sm text-gray-400">Nenhum alerta no momento. 🎉</div>
@@ -97,10 +107,10 @@ export default async function Dashboard() {
             ))}
           </div>
         )}
-      </section>
+      </section>}
 
       {/* Financeiro */}
-      <section>
+      {verFin && <section>
         <SectionTitle icon="💰" texto={`Financeiro · ${mesNome}`} href="/financeiro/fluxo" />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Kpi titulo="Saldo em contas" valor={formatCurrency(saldoContas)} fonte="contas_bancarias" />
@@ -112,21 +122,21 @@ export default async function Dashboard() {
           <span>Receitas do mês: <b className="text-green-600">{formatCurrency(receitasMes)}</b></span>
           <span>Despesas do mês: <b className="text-red-600">{formatCurrency(despesasMes)}</b></span>
         </div>
-      </section>
+      </section>}
 
       {/* Operação */}
-      <section>
-        <SectionTitle icon="📦" texto="Operação" href="/estoque/saldos" />
+      {(verEst || verOs) && <section>
+        <SectionTitle icon="📦" texto="Operação" href={verEst ? "/estoque/saldos" : "/os"} />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <Kpi titulo="Valor em estoque" valor={formatCurrency(valorEstoque)} fonte="saldos_estoque" />
-          <Kpi titulo="Itens abaixo do mínimo" valor={String(abaixoMin)} fonte="saldos_estoque" cor={abaixoMin > 0 ? "text-red-600" : "text-gray-900"} />
-          <Kpi titulo="OS abertas" valor={String(nOsAbertas ?? 0)} fonte="ordens_servico" />
-          <Kpi titulo="Produção (valor)" valor={formatCurrency(valorProd)} fonte="producao" />
+          {ger && <Kpi titulo="Valor em estoque" valor={formatCurrency(valorEstoque)} fonte="saldos_estoque" />}
+          {verEst && <Kpi titulo="Itens abaixo do mínimo" valor={String(abaixoMin)} fonte="saldos_estoque" cor={abaixoMin > 0 ? "text-red-600" : "text-gray-900"} />}
+          {verOs && <Kpi titulo="OS abertas" valor={String(nOsAbertas ?? 0)} fonte="ordens_servico" />}
+          {ger && <Kpi titulo="Produção (valor)" valor={formatCurrency(valorProd)} fonte="producao" />}
         </div>
-      </section>
+      </section>}
 
       {/* Comercial */}
-      <section>
+      {verCom && <section>
         <SectionTitle icon="🤝" texto="Comercial (CRM)" href="/e/clientes" />
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
           <Kpi titulo="Clientes ativos" valor={String(nClientes ?? 0)} fonte="clientes" />
@@ -144,7 +154,7 @@ export default async function Dashboard() {
             ))}
           </div>
         )}
-      </section>
+      </section>}
     </div>
   );
 }

@@ -49,7 +49,7 @@ export default function RelatorioProducaoPage() {
 
   useEffect(() => {
     supabase.from("clientes").select("id, nome, relatorio_token").order("nome").range(0, 4999).then(({ data }) => setClientes(data ?? []));
-    supabase.from("colaboradores").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setColaboradores(data ?? []));
+    supabase.from("vw_equipe").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setColaboradores(data ?? []));
     supabase.from("servicos").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setServicos(data ?? []));
   }, [supabase]);
 

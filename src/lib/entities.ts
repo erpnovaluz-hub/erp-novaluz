@@ -661,7 +661,7 @@ export const ENTITIES: Record<string, EntityDef> = {
     listColumns: ["data", "obra_id", "colaborador_id", "funcao", "horas_trabalhadas"],
     fields: [
       { key: "obra_id", label: "Obra", type: "ref", required: true, ref: { table: "obras_servicos", labelField: "local" } },
-      { key: "colaborador_id", label: "Colaborador", type: "ref", required: true, ref: { table: "colaboradores", labelField: "nome" } },
+      { key: "colaborador_id", label: "Colaborador", type: "ref", required: true, ref: { table: "vw_equipe", labelField: "nome" } },
       { key: "funcao", label: "Função", type: "text" },
       { key: "data", label: "Data", type: "date", required: true },
       { key: "horas_trabalhadas", label: "Horas trabalhadas", type: "number" },
@@ -740,7 +740,7 @@ export const ENTITIES: Record<string, EntityDef> = {
     listColumns: ["data", "colaborador_id", "ld", "lp", "lpp", "na"],
     fields: [
       { key: "data", label: "Data", type: "date", required: true },
-      { key: "colaborador_id", label: "Funcionário", type: "ref", required: true, ref: { table: "colaboradores", labelField: "nome" } },
+      { key: "colaborador_id", label: "Funcionário", type: "ref", required: true, ref: { table: "vw_equipe", labelField: "nome" } },
       { key: "ld", label: "LD (peças)", type: "number" },
       { key: "lp", label: "LP (peças)", type: "number" },
       { key: "lpp", label: "LPP (peças)", type: "number" },
@@ -779,7 +779,7 @@ export const ENTITIES: Record<string, EntityDef> = {
     fields: [
       { key: "data", label: "Data", type: "date", required: true },
       { key: "cliente_id", label: "Cliente", type: "ref", ref: { table: "clientes", labelField: "nome" } },
-      { key: "colaborador_id", label: "Colaborador", type: "ref", ref: { table: "colaboradores", labelField: "nome" } },
+      { key: "colaborador_id", label: "Colaborador", type: "ref", ref: { table: "vw_equipe", labelField: "nome" } },
       { key: "peca_id", label: "Peça (cadastro)", type: "ref", ref: { table: "pecas", labelField: "nome" } },
       { key: "peca_nome", label: "Peça (nome)", type: "text" },
       { key: "servico_id", label: "Serviço", type: "ref", ref: { table: "servicos", labelField: "nome" } },
@@ -826,7 +826,7 @@ export const ENTITIES: Record<string, EntityDef> = {
     fields: [
       { key: "os_id", label: "OS", type: "ref", required: true, ref: { table: "ordens_servico", labelField: "titulo" } },
       { key: "descricao", label: "Descrição", type: "textarea", required: true },
-      { key: "colaborador_id", label: "Responsável", type: "ref", ref: { table: "colaboradores", labelField: "nome" } },
+      { key: "colaborador_id", label: "Responsável", type: "ref", ref: { table: "vw_equipe", labelField: "nome" } },
       { key: "setor", label: "Setor", type: "text" },
       { key: "data_inicio", label: "Início", type: "date" },
       { key: "data_fim", label: "Fim", type: "date" },

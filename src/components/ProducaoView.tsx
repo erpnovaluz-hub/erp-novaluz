@@ -36,7 +36,7 @@ export default function ProducaoView() {
       supabase.from("pecas").select("id, nome, peso, tipo").order("nome").range(0, 4999),
       supabase.from("servicos").select("id, nome, valor, unidade").order("nome").range(0, 4999),
       supabase.from("clientes").select("id, nome").order("nome").range(0, 4999),
-      supabase.from("colaboradores").select("id, nome").order("nome").range(0, 4999),
+      supabase.from("vw_equipe").select("id, nome").order("nome").range(0, 4999),
     ]);
     setPecas(p.data ?? []); setServicos(s.data ?? []); setClientes(c.data ?? []); setColaboradores(col.data ?? []);
   }, [supabase]);

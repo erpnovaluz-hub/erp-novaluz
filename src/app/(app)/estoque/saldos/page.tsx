@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency } from "@/lib/format";
+import { carregarAcesso } from "@/lib/acessoServidor";
 
 export const dynamic = "force-dynamic";
 
 export default async function SaldosPage() {
   const supabase = createClient();
+  const { gerencia: verValores } = await carregarAcesso();   // custos: só gerência
   const { data, error } = await supabase
     .from("saldos_estoque")
     .select("quantidade, produtos(nome, unidade, custo_medio, estoque_minimo), depositos(nome)")
@@ -18,12 +20,14 @@ export default async function SaldosPage() {
       <div className="mb-5 flex items-end justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">📊 Saldos de estoque</h1>
-          <p className="text-sm text-gray-500">fonte: saldos_estoque · custo médio: produtos</p>
+          <p className="text-sm text-gray-500">fonte: saldos_estoque{verValores && " · custo médio: produtos"}</p>
         </div>
-        <div className="card px-4 py-2 text-right">
-          <p className="text-xs text-gray-500">Valor total em estoque</p>
-          <p className="text-lg font-semibold text-gray-900">{formatCurrency(valorTotal)}</p>
-        </div>
+        {verValores && (
+          <div className="card px-4 py-2 text-right">
+            <p className="text-xs text-gray-500">Valor total em estoque</p>
+            <p className="text-lg font-semibold text-gray-900">{formatCurrency(valorTotal)}</p>
+          </div>
+        )}
       </div>
 
       {error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error.message}</div>}
@@ -35,13 +39,13 @@ export default async function SaldosPage() {
               <th className="px-4 py-3">Produto</th>
               <th className="px-4 py-3">Depósito</th>
               <th className="px-4 py-3 text-right">Saldo</th>
-              <th className="px-4 py-3 text-right">Custo médio</th>
-              <th className="px-4 py-3 text-right">Valor</th>
+              {verValores && <th className="px-4 py-3 text-right">Custo médio</th>}
+              {verValores && <th className="px-4 py-3 text-right">Valor</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {rows.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400">Sem saldos ainda.</td></tr>
+              <tr><td colSpan={verValores ? 5 : 3} className="px-4 py-10 text-center text-gray-400">Sem saldos ainda.</td></tr>
             ) : (
               rows.map((r, i) => {
                 const abaixoMin = Number(r.quantidade) < Number(r.produtos?.estoque_minimo ?? 0);
@@ -53,10 +57,12 @@ export default async function SaldosPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-600">{r.depositos?.nome ?? "—"}</td>
                     <td className="px-4 py-3 text-right">{Number(r.quantidade)} {r.produtos?.unidade ?? ""}</td>
-                    <td className="px-4 py-3 text-right">{formatCurrency(r.produtos?.custo_medio)}</td>
-                    <td className="px-4 py-3 text-right font-medium">
-                      {formatCurrency(Number(r.quantidade) * Number(r.produtos?.custo_medio ?? 0))}
-                    </td>
+                    {verValores && <td className="px-4 py-3 text-right">{formatCurrency(r.produtos?.custo_medio)}</td>}
+                    {verValores && (
+                      <td className="px-4 py-3 text-right font-medium">
+                        {formatCurrency(Number(r.quantidade) * Number(r.produtos?.custo_medio ?? 0))}
+                      </td>
+                    )}
                   </tr>
                 );
               })

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { GROUPS, entitiesByGroup, type GroupKey } from "@/lib/entities";
 import { createClient } from "@/lib/supabase/client";
+import { podeRota, papelLabel, type Acesso } from "@/lib/permissoes";
 
 type LinkItem = { href: string; icon: string; label: string };
 
@@ -14,8 +15,13 @@ function itensDoGrupo(key: GroupKey): LinkItem[] {
   return [...ents, ...(g.extras ?? [])];
 }
 
-export default function Sidebar({ empresaNome, email, isSuper }: { empresaNome: string; email: string; isSuper?: boolean }) {
+export default function Sidebar({ empresaNome, email, isSuper, acesso }: { empresaNome: string; email: string; isSuper?: boolean; acesso: Acesso }) {
   const pathname = usePathname();
+  // menu só com o que o perfil alcança
+  const grupos = useMemo(
+    () => GROUPS.map((g) => ({ g, itens: itensDoGrupo(g.key).filter((i) => podeRota(acesso, i.href)) })).filter((x) => x.itens.length > 0),
+    [acesso],
+  );
   const router = useRouter();
   const [mobile, setMobile] = useState(false);
 
@@ -58,8 +64,12 @@ export default function Sidebar({ empresaNome, email, isSuper }: { empresaNome: 
             🏢 Administração central
           </Link>
         )}
-        {GROUPS.map((g) => {
-          const itens = itensDoGrupo(g.key);
+        {acesso.gerencia && (
+          <Link href="/equipe" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/equipe" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
+            🔐 Usuários e acessos
+          </Link>
+        )}
+        {grupos.map(({ g, itens }) => {
           const aberto = abertos.has(g.key);
           return (
             <div key={g.key}>
@@ -89,6 +99,7 @@ export default function Sidebar({ empresaNome, email, isSuper }: { empresaNome: 
 
       <div className="border-t p-3 text-xs">
         <p className="truncate text-gray-400">{email}</p>
+        {acesso.papel && <p className="text-[10px] uppercase tracking-wide text-gray-400">{papelLabel(acesso.papel)}</p>}
         <button onClick={sair} className="mt-1 text-gray-500 hover:text-gray-800">Sair</button>
       </div>
     </div>

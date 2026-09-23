@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Sidebar from "@/components/Sidebar";
 import SupportBanner from "@/components/SupportBanner";
+import AcessoProvider from "@/components/AcessoProvider";
+import { carregarAcesso } from "@/lib/acessoServidor";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -11,11 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!user) redirect("/login");
 
-  const { data: perfil } = await supabase
-    .from("perfis")
-    .select("nome, papel, empresa_consultora_id")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { perfil, ...acesso } = await carregarAcesso();
 
   const isSuper = (perfil as any)?.papel === "super";
   let empresaNome = perfil ? "Sem empresa vinculada" : "⚠ Perfil não configurado";
@@ -36,7 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <Sidebar empresaNome={empresaNome} email={user.email ?? ""} isSuper={isSuper} />
+      <Sidebar empresaNome={empresaNome} email={user.email ?? ""} isSuper={isSuper} acesso={acesso} />
       <div className="flex min-w-0 flex-1 flex-col">
         {modoSuporte && <SupportBanner empresaNome={empresaNome} />}
         {!perfil && (
@@ -51,7 +49,12 @@ values ('${user.id}', '<ID_DA_EMPRESA>', 'Fernando', 'admin');`}
             </div>
           </div>
         )}
-        <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
+        {perfil && (perfil as any).ativo === false && (
+          <div className="m-4 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+            Seu usuário está <b>desativado</b>. Fale com a gerência.
+          </div>
+        )}
+        <main className="min-w-0 flex-1 p-4 md:p-6"><AcessoProvider acesso={acesso}>{children}</AcessoProvider></main>
       </div>
     </div>
   );

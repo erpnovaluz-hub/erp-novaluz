@@ -203,8 +203,9 @@ export default function AdminPanel() {
                 {empresas.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
               </select>
               <select className="inp" value={uPapel} onChange={(e) => setUPapel(e.target.value)}>
-                <option value="admin">Admin da empresa</option>
-                <option value="membro">Membro</option>
+                <option value="admin">Gerência (acesso total)</option>
+                <option value="almoxarifado">Almoxarifado</option>
+                <option value="logistica">Logística</option>
                 <option value="super">Super (admin central)</option>
               </select>
             </div>

@@ -31,7 +31,7 @@ export default function OSDocumento({ id }: { id: string }) {
       const i = await supabase.from("insumos_os").select("*").eq("os_id", id);
       setOs(o.data); setAtividades(a.data ?? []); setInsumos(i.data ?? []);
       if (o.data?.cliente_id) setCliente((await supabase.from("clientes").select("*").eq("id", o.data.cliente_id).maybeSingle()).data);
-      const col = await supabase.from("colaboradores").select("id, nome").range(0, 4999);
+      const col = await supabase.from("vw_equipe").select("id, nome").range(0, 4999);
       setColNome(Object.fromEntries((col.data ?? []).map((x: any) => [x.id, x.nome])));
       const pr = await supabase.from("produtos").select("id, nome").range(0, 4999);
       setProdNome(Object.fromEntries((pr.data ?? []).map((x: any) => [x.id, x.nome])));

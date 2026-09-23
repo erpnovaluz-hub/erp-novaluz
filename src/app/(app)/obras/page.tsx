@@ -27,7 +27,7 @@ export default function PainelObras() {
       setAtivs(a ?? []);
     } else setAtivs([]);
     const [c, cl] = await Promise.all([
-      supabase.from("colaboradores").select("id, nome").range(0, 4999),
+      supabase.from("vw_equipe").select("id, nome").range(0, 4999),
       supabase.from("clientes").select("id, nome").range(0, 4999),
     ]);
     setColNome(Object.fromEntries((c.data ?? []).map((x: any) => [x.id, x.nome])));

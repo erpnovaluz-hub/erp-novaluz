@@ -27,7 +27,7 @@ export default function ResumoProducaoPage() {
 
   useEffect(() => {
     supabase.from("clientes").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setClientes(data ?? []));
-    supabase.from("colaboradores").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setColaboradores(data ?? []));
+    supabase.from("vw_equipe").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setColaboradores(data ?? []));
     supabase.from("servicos").select("id, nome").range(0, 4999).then(({ data }) =>
       setServMap(Object.fromEntries((data ?? []).map((s: any) => [s.id, s.nome]))));
   }, [supabase]);

@@ -47,7 +47,7 @@ export default function OSDetail({ osId }: { osId: string }) {
 
   useEffect(() => {
     supabase.from("clientes").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setClientes(data ?? []));
-    supabase.from("colaboradores").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setColaboradores(data ?? []));
+    supabase.from("vw_equipe").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setColaboradores(data ?? []));
     supabase.from("produtos").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setProdutos(data ?? []));
     supabase.from("contratos").select("id, numero").order("data_inicio", { ascending: false }).range(0, 4999).then(({ data }) => setContratos(data ?? []));
     supabase.from("propostas").select("id, numero").order("data", { ascending: false }).range(0, 4999).then(({ data }) => setPropostas(data ?? []));
