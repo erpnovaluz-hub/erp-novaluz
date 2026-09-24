@@ -58,7 +58,10 @@ export const GROUPS: GroupDef[] = [
     { href: "/precificador", label: "Precificador", icon: "🧮" },
   ] },
   { key: "cadastros", label: "Cadastros", icon: "🗂️" },
-  { key: "estoque", label: "Estoque", icon: "📦", extras: [{ href: "/estoque/saldos", label: "Saldos", icon: "📊" }] },
+  { key: "estoque", label: "Estoque", icon: "📦", extras: [
+    { href: "/estoque/saldos", label: "Saldos", icon: "📊" },
+    { href: "/estoque/inventario", label: "Inventário / Saldo inicial", icon: "📋" },
+  ] },
   { key: "compras", label: "Compras", icon: "🛒" },
   { key: "financeiro", label: "Financeiro", icon: "💰", extras: [
     { href: "/financeiro/pagar", label: "Contas a Pagar", icon: "🔴" },
@@ -175,7 +178,7 @@ const TIPO_CONTA: Option[] = [{ value: "banco", label: "Banco" }, { value: "caix
 const TIPO_MOV_ESTOQUE: Option[] = [
   { value: "entrada", label: "Entrada", color: "green" },
   { value: "saida", label: "Saída", color: "red" },
-  { value: "ajuste", label: "Ajuste", color: "amber" },
+  { value: "ajuste", label: "Ajuste (+ soma / − baixa)", color: "amber" },
 ];
 const ORIGEM_MOV: Option[] = [
   { value: "manual", label: "Manual" }, { value: "compra", label: "Compra" },
@@ -509,7 +512,7 @@ export const ENTITIES: Record<string, EntityDef> = {
       refProduto,
       refDeposito,
       { key: "tipo", label: "Tipo", type: "select", options: TIPO_MOV_ESTOQUE, required: true },
-      { key: "quantidade", label: "Quantidade", type: "number", required: true },
+      { key: "quantidade", label: "Quantidade (no ajuste, negativo baixa)", type: "number", required: true },
       { key: "custo_unitario", label: "Custo unitário (na entrada)", type: "currency", placeholder: "obrigatório na entrada" },
       { key: "origem", label: "Origem", type: "select", options: ORIGEM_MOV },
       { key: "data", label: "Data", type: "datetime" },
