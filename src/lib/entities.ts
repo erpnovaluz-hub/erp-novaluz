@@ -59,6 +59,8 @@ export const GROUPS: GroupDef[] = [
   ] },
   { key: "cadastros", label: "Cadastros", icon: "🗂️" },
   { key: "estoque", label: "Estoque", icon: "📦", extras: [
+    { href: "/estoque/balcao", label: "Balcão (entradas e saídas)", icon: "🏪" },
+    { href: "/estoque/diario", label: "Diário do almoxarifado", icon: "📒" },
     { href: "/estoque/saldos", label: "Saldos", icon: "📊" },
     { href: "/estoque/inventario", label: "Inventário / Saldo inicial", icon: "📋" },
   ] },
@@ -499,6 +501,16 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "data_admissao", label: "Admissão", type: "date" },
       { key: "salario_base", label: "Salário base", type: "currency" },
       { key: "custo_hora", label: "Custo/hora", type: "currency" },
+      { key: "ativo", label: "Ativo", type: "boolean" },
+    ],
+  },
+
+  centros_custo: {
+    key: "centros_custo", label: "Setor", labelPlural: "Setores (centro de custo)", icon: "🏷️", group: "estoque",
+    titleField: "nome", searchField: "nome", orderBy: { column: "nome", ascending: true },
+    listColumns: ["nome", "ativo"],
+    fields: [
+      { key: "nome", label: "Nome do setor", type: "text", required: true, placeholder: "Manutenção, Produção, Administrativo…" },
       { key: "ativo", label: "Ativo", type: "boolean" },
     ],
   },
