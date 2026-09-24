@@ -64,7 +64,9 @@ export const GROUPS: GroupDef[] = [
     { href: "/estoque/saldos", label: "Saldos", icon: "📊" },
     { href: "/estoque/inventario", label: "Inventário / Saldo inicial", icon: "📋" },
   ] },
-  { key: "compras", label: "Compras", icon: "🛒" },
+  { key: "compras", label: "Compras", icon: "🛒", extras: [
+    { href: "/compras/requisicao/nova", label: "Nova requisição", icon: "➕" },
+  ] },
   { key: "financeiro", label: "Financeiro", icon: "💰", extras: [
     { href: "/financeiro/pagar", label: "Contas a Pagar", icon: "🔴" },
     { href: "/financeiro/receber", label: "Contas a Receber", icon: "🟢" },
@@ -197,11 +199,14 @@ const STATUS_TITULO: Option[] = [
 ];
 const STATUS_PEDIDO: Option[] = [
   { value: "aberto", label: "Aberto", color: "blue" },
+  { value: "parcial", label: "Recebido em parte", color: "amber" },
   { value: "recebido", label: "Recebido", color: "green" },
   { value: "cancelado", label: "Cancelado", color: "gray" },
 ];
 const STATUS_REQUISICAO: Option[] = [
   { value: "aberta", label: "Aberta", color: "blue" },
+  { value: "atendida_parcial", label: "Atendida em parte", color: "amber" },
+  { value: "atendida", label: "Atendida pelo estoque", color: "green" },
   { value: "convertida", label: "Convertida em pedido", color: "green" },
   { value: "cancelada", label: "Cancelada", color: "gray" },
 ];
@@ -617,7 +622,7 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "data", label: "Data", type: "date" },
       { key: "vencimento", label: "Vencimento (a pagar)", type: "date" },
       { key: "valor_total", label: "Valor total", type: "currency", hideInForm: true },
-      { key: "status", label: "Status (mude p/ 'recebido' para dar entrada)", type: "select", options: STATUS_PEDIDO },
+      { key: "status", label: "Status (para receber use a tela do pedido 🖨️ → Receber material)", type: "select", options: STATUS_PEDIDO },
       { key: "observacao", label: "Observação", type: "textarea" },
     ],
   },
