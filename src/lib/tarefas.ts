@@ -128,7 +128,8 @@ export function iniciais(p?: Pessoa | null): string {
 }
 
 // ---- automações (migration 0043) -------------------------------------------------
-export type Gatilho = "requisicao_aberta" | "pedido_emitido" | "os_aberta" | "titulo_vencendo" | "proposta_sem_retorno" | "estoque_minimo";
+export type Gatilho = "requisicao_aberta" | "pedido_emitido" | "os_aberta" | "titulo_vencendo" | "proposta_sem_retorno" | "estoque_minimo"
+  | "ferramenta_atrasada" | "manutencao_ferramenta";
 
 export const AUTOMACOES: {
   gatilho: Gatilho; icon: string; titulo: string; quando: string; cria: string;
@@ -146,4 +147,8 @@ export const AUTOMACOES: {
     quando: "Proposta com status Enviada há X dias", cria: "“Follow-up da proposta …” (uma por proposta)" },
   { gatilho: "estoque_minimo", icon: "📦", tipo: "rotina", titulo: "Estoque abaixo do mínimo",
     quando: "Saldo somado dos depósitos fica abaixo do mínimo do produto", cria: "“Repor estoque: …” (nova só depois de concluir a anterior)" },
+  { gatilho: "ferramenta_atrasada", icon: "🔧", tipo: "rotina", titulo: "Ferramenta não devolvida", parametro: "dias antes da data de devolução",
+    quando: "Cautela com devolução vencendo (ou vencida) e ferramentas ainda com o colaborador", cria: "“Cobrar devolução: CT-… — Fulano”" },
+  { gatilho: "manutencao_ferramenta", icon: "🛠️", tipo: "rotina", titulo: "Manutenção de ferramenta", parametro: "dias antes da data",
+    quando: "Ferramenta/equipamento com manutenção ou calibração chegando", cria: "“Manutenção: FER-… — descrição”" },
 ];

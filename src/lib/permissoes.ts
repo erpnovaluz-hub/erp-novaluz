@@ -83,6 +83,7 @@ const TABELA_MODULO: Record<string, Area> = {
   produtos: "estoque", depositos: "estoque", fornecedores: "estoque",
   movimentacoes_estoque: "estoque", consumo_producao: "estoque", centros_custo: "estoque",
   inventarios: "estoque", inventario_itens: "estoque", vales_almox: "estoque", vale_itens: "estoque",
+  ferramentas: "estoque", cautelas: "estoque", cautela_itens: "estoque",
   requisicoes_compra: "requisicoes", itens_requisicao_compra: "requisicoes",
   cotacoes_compra: "compras", itens_cotacao: "compras", cotacao_fornecedores: "compras",
   cotacao_precos: "compras", pedidos_compra: "compras", itens_pedido_compra: "compras",

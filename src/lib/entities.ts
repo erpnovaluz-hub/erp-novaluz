@@ -63,6 +63,8 @@ export const GROUPS: GroupDef[] = [
     { href: "/estoque/diario", label: "Diário do almoxarifado", icon: "📒" },
     { href: "/estoque/saldos", label: "Saldos", icon: "📊" },
     { href: "/estoque/inventario", label: "Inventário / Saldo inicial", icon: "📋" },
+    { href: "/estoque/ferramentas", label: "Ferramentas e equipamentos", icon: "🔧" },
+    { href: "/estoque/cautela", label: "Cautelas", icon: "📤" },
   ] },
   { key: "compras", label: "Compras", icon: "🛒", extras: [
     { href: "/compras/requisicao/nova", label: "Nova requisição", icon: "➕" },
@@ -447,6 +449,7 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "unidade", label: "Unidade", type: "text", placeholder: "un, kg, m…" },
       { key: "custo_medio", label: "Custo médio", type: "currency", hideInForm: true },
       { key: "estoque_minimo", label: "Estoque mínimo", type: "number" },
+      { key: "controla_patrimonio", label: "É patrimônio (ferramenta/equipamento: cada unidade recebida vira item com etiqueta)", type: "boolean" },
       { key: "ativo", label: "Ativo", type: "boolean" },
     ],
   },
