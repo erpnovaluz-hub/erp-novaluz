@@ -60,8 +60,8 @@ export default function ContratosView() {
           <ul className="divide-y divide-gray-100">
             {rows.map((r) => (
               <li key={r.id}>
-                <Link href={`/contratos/${r.id}`} className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50">
-                  <div className="min-w-0 flex-1">
+                <Link href={`/contratos/${r.id}`} className="linha-lista flex items-center gap-4 px-4 py-3 hover:bg-gray-50">
+                  <div className="linha-principal min-w-0 flex-1">
                     <p className="truncate font-medium text-gray-900">{r.numero || "(sem número)"} · {cliNome[r.cliente_id] ?? "—"}</p>
                     <p className="truncate text-xs text-gray-400">{r.objeto || "sem objeto"}</p>
                   </div>

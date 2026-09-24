@@ -137,7 +137,43 @@ export default function EntityView({ entityKey }: { entityKey: string }) {
 
       {erro && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
 
-      <div className="card overflow-hidden">
+      {/* celular: cartões (título em destaque + demais colunas em pares rótulo/valor) */}
+      <div className="card divide-y divide-gray-100 overflow-hidden sm:hidden print:hidden">
+        {carregando ? (
+          <p className="px-4 py-10 text-center text-sm text-gray-400">Carregando…</p>
+        ) : filtradas.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-gray-400">Nenhum registro.</p>
+        ) : filtradas.map((row) => {
+          const tituloF = colFields.find((f) => f.key === entity.titleField) ?? colFields[0];
+          const resto = colFields.filter((f) => f !== tituloF);
+          return (
+            <div key={row.id} className={`px-4 py-3 ${podeEditar ? "active:bg-gray-50" : ""}`} onClick={() => podeEditar && setEditando(row)}>
+              <p className="font-medium text-gray-900">{tituloF ? renderCell(tituloF, row) : "—"}</p>
+              {resto.length > 0 && (
+                <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  {resto.map((f) => (
+                    <div key={f.key} className="min-w-0">
+                      <dt className="text-gray-400">{f.label}</dt>
+                      <dd className="truncate text-gray-700">{renderCell(f, row)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              {(entity.docRoute || podeEditar) && (
+                <div className="mt-2 flex gap-4 text-xs">
+                  {entity.docRoute && (
+                    <Link href={`${entity.docRoute}/${row.id}`} className="text-brand-600" onClick={(e) => e.stopPropagation()}>🖨️ documento</Link>
+                  )}
+                  {podeEditar && <button className="ml-auto text-red-500" onClick={(e) => { e.stopPropagation(); excluir(row); }}>Excluir</button>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* computador: tabela */}
+      <div className="card hidden overflow-hidden sm:block print:block">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">

@@ -208,8 +208,8 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
               const vencido = r.status === "aberto" && r.vencimento && r.vencimento < hoje;
               return (
                 <li key={r.id}>
-                  <button onClick={() => setEditando(r)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-gray-50">
-                    <div className="min-w-0 flex-1">
+                  <button onClick={() => setEditando(r)} className="linha-lista flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-gray-50">
+                    <div className="linha-principal min-w-0 flex-1">
                       <p className="truncate font-medium text-gray-900">{r.descricao}</p>
                       <p className="truncate text-xs text-gray-400">
                         {catNome[r.categoria_id] ?? "sem categoria"}

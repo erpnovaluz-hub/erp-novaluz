@@ -87,7 +87,7 @@ export default function PwaProvider({ children }: { children: React.ReactNode })
 
       {/* nova versão publicada */}
       {novaVersao && (
-        <div className="fixed inset-x-3 top-3 z-[70] mx-auto flex max-w-md items-center gap-3 rounded-xl bg-gray-900 px-4 py-3 text-sm text-white shadow-xl"
+        <div className="no-print fixed inset-x-3 top-3 z-[70] mx-auto flex max-w-md items-center gap-3 rounded-xl bg-gray-900 px-4 py-3 text-sm text-white shadow-xl"
           style={{ marginTop: "env(safe-area-inset-top)" }}>
           <span className="flex-1">Nova versão do app disponível.</span>
           <button className="rounded-lg bg-white px-3 py-1.5 font-medium text-gray-900" onClick={() => novaVersao.postMessage("SKIP_WAITING")}>Atualizar</button>
@@ -96,7 +96,7 @@ export default function PwaProvider({ children }: { children: React.ReactNode })
 
       {/* convite para instalar (celular) */}
       {banner && podeInstalar && !ajudaIos && (
-        <div className="fixed inset-x-3 z-[60] mx-auto flex max-w-md items-center gap-3 rounded-xl border bg-white p-3 text-sm shadow-xl md:hidden"
+        <div className="no-print fixed inset-x-3 z-[60] mx-auto flex max-w-md items-center gap-3 rounded-xl border bg-white p-3 text-sm shadow-xl md:hidden"
           style={{ bottom: "calc(72px + env(safe-area-inset-bottom))" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon-192.png" alt="" className="h-10 w-10 rounded-lg" />
@@ -111,7 +111,7 @@ export default function PwaProvider({ children }: { children: React.ReactNode })
 
       {/* iPhone não tem botão de instalar: explica o caminho */}
       {ajudaIos && (
-        <div className="fixed inset-0 z-[80] flex items-end bg-black/40" onClick={() => { setAjudaIos(false); dispensar(); }}>
+        <div className="no-print fixed inset-0 z-[80] flex items-end bg-black/40" onClick={() => { setAjudaIos(false); dispensar(); }}>
           <div className="w-full rounded-t-2xl bg-white p-5 text-sm" style={{ paddingBottom: "calc(20px + env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
             <p className="text-base font-semibold text-gray-900">Instalar no iPhone</p>
             <ol className="mt-3 space-y-2 text-gray-700">

@@ -117,9 +117,9 @@ export default function ProducaoView() {
           <ul className="divide-y divide-gray-100">
             {visiveis.map((r) => (
               <li key={r.id}>
-                <button onClick={() => setEditando(r)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-gray-50">
+                <button onClick={() => setEditando(r)} className="linha-lista flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-gray-50">
                   <div className="w-20 shrink-0 text-xs text-gray-400">{formatDate(r.data)}</div>
-                  <div className="min-w-0 flex-1">
+                  <div className="linha-principal min-w-0 flex-1">
                     <p className="truncate font-medium text-gray-900">{r.peca_nome || "—"} <span className="text-xs font-normal text-gray-400">× {Number(r.quantidade)}</span></p>
                     <p className="truncate text-xs text-gray-400">{servNome[r.servico_id] ?? "sem serviço"} · {cliNome[r.cliente_id] ?? "—"}</p>
                   </div>

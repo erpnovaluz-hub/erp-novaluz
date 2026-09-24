@@ -91,8 +91,8 @@ export default function OSView() {
               const prog = res ? Number(res.progresso_pct || 0) : 0;
               return (
                 <li key={r.id}>
-                  <Link href={`/os/${r.id}`} className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50">
-                    <div className="min-w-0 flex-1">
+                  <Link href={`/os/${r.id}`} className="linha-lista flex items-center gap-4 px-4 py-3 hover:bg-gray-50">
+                    <div className="linha-principal min-w-0 flex-1">
                       <p className="truncate font-medium text-gray-900">{r.titulo}</p>
                       <p className="truncate text-xs text-gray-400">
                         {cliNome[r.cliente_id] ?? "—"}{r.responsavel ? ` · ${r.responsavel}` : ""}

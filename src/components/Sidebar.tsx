@@ -142,14 +142,14 @@ export default function Sidebar({ empresaNome, email, isSuper, acesso }: { empre
         <button className="btn-ghost" onClick={() => setMobile(true)}>☰</button>
       </div>
       {mobile && (
-        <div className="fixed inset-0 z-50 md:hidden" onClick={() => setMobile(false)}>
+        <div className="no-print fixed inset-0 z-50 md:hidden" onClick={() => setMobile(false)}>
           <div className="absolute inset-0 bg-black/30" />
           <aside className="absolute left-0 top-0 h-full w-[85vw] max-w-xs bg-white shadow-xl" onClick={(e) => e.stopPropagation()}
             style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>{conteudo}</aside>
         </div>
       )}
       {/* desktop */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r bg-white md:block">{conteudo}</aside>
+      <aside className="no-print sticky top-0 hidden h-screen w-64 shrink-0 border-r bg-white md:block">{conteudo}</aside>
     </>
   );
 }
