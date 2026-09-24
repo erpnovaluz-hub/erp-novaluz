@@ -41,7 +41,7 @@ export function Check({ feito, onClick, size = 18 }: { feito: boolean; onClick: 
   return (
     <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }}
       aria-label={feito ? "Reabrir tarefa" : "Concluir tarefa"}
-      className={`inline-flex shrink-0 items-center justify-center rounded-full border transition ${feito ? "border-green-600 bg-green-600 text-white" : "border-gray-300 text-transparent hover:border-green-600 hover:text-green-600"}`}
+      className={`alvo-toque inline-flex shrink-0 items-center justify-center rounded-full border transition ${feito ? "border-green-600 bg-green-600 text-white" : "border-gray-300 text-transparent hover:border-green-600 hover:text-green-600"}`}
       style={{ width: size, height: size, fontSize: size * 0.6 }}>
       ✓
     </button>

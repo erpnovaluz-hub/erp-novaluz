@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { hojeISO, type Pessoa, type Secao, type Tarefa } from "@/lib/tarefas";
 import { Avatar } from "@/components/tarefas/comum";
 
@@ -27,6 +27,14 @@ export default function TimelineTarefas({ tarefas, secoes, porId, onAbrir, onDat
     return toISO(d);
   });
   const [arrasto, setArrasto] = useState<Arrasto | null>(null);
+  // coluna de nomes mais estreita no celular
+  const [col, setCol] = useState(240);
+  useEffect(() => {
+    const m = window.matchMedia("(max-width: 639px)");
+    const f = () => setCol(m.matches ? 130 : 240);
+    f(); m.addEventListener("change", f);
+    return () => m.removeEventListener("change", f);
+  }, []);
   const arrastou = useRef(false);
 
   const dias = useMemo(() => Array.from({ length: SEMANAS * 7 }, (_, i) => somar(inicioJanela, i)), [inicioJanela]);
@@ -86,10 +94,10 @@ export default function TimelineTarefas({ tarefas, secoes, porId, onAbrir, onDat
       </div>
 
       <div className="card overflow-x-auto">
-        <div className="relative" style={{ width: 240 + dias.length * DIA_PX }}>
+        <div className="relative" style={{ width: col + dias.length * DIA_PX }}>
           {/* cabeçalho de dias */}
           <div className="sticky top-0 z-10 flex border-b bg-gray-50 text-[10px] text-gray-500">
-            <div className="sticky left-0 z-20 w-[240px] shrink-0 border-r bg-gray-50 px-3 py-1 font-medium uppercase">Tarefa</div>
+            <div className="sticky left-0 z-20 shrink-0 border-r bg-gray-50 px-3 py-1 font-medium uppercase" style={{ width: col }}>Tarefa</div>
             {dias.map((d) => {
               const dt = deISO(d);
               const fds = dt.getDay() === 0 || dt.getDay() === 6;
@@ -108,7 +116,7 @@ export default function TimelineTarefas({ tarefas, secoes, porId, onAbrir, onDat
           )}
           {grupos.map((g) => (
             <div key={g.id}>
-              <div className="sticky left-0 w-[240px] bg-white px-3 pb-1 pt-3 text-xs font-semibold text-gray-600">{g.nome}</div>
+              <div className="sticky left-0 truncate bg-white px-3 pb-1 pt-3 text-xs font-semibold text-gray-600" style={{ width: col }}>{g.nome}</div>
               {g.itens.map((t) => {
                 const [ini, fim] = datas(t);
                 const x = diff(ini, inicioJanela), w = diff(fim, ini) + 1;
@@ -117,8 +125,8 @@ export default function TimelineTarefas({ tarefas, secoes, porId, onAbrir, onDat
                 const cor = t.concluida ? "bg-gray-300 text-gray-600" : atrasada ? "bg-red-500 text-white" : "bg-brand-600 text-white";
                 return (
                   <div key={t.id} className="relative flex border-b border-gray-50" style={{ height: LINHA_PX }}>
-                    <button onClick={() => onAbrir(t.id)}
-                      className="sticky left-0 z-10 flex w-[240px] shrink-0 items-center gap-2 border-r bg-white px-3 text-left text-sm hover:bg-gray-50">
+                    <button onClick={() => onAbrir(t.id)} style={{ width: col }}
+                      className="sticky left-0 z-10 flex shrink-0 items-center gap-2 border-r bg-white px-2 text-left text-sm hover:bg-gray-50 sm:px-3">
                       <Avatar pessoa={t.responsavel_id ? porId[t.responsavel_id] : null} size={18} />
                       <span className={`truncate ${t.concluida ? "text-gray-400 line-through" : "text-gray-800"}`}>{t.titulo}</span>
                     </button>
@@ -127,7 +135,7 @@ export default function TimelineTarefas({ tarefas, secoes, porId, onAbrir, onDat
                       const dd = deISO(d).getDay();
                       return (dd === 0 || dd === 6 || d === hoje) ? (
                         <div key={d} className={`absolute top-0 h-full ${d === hoje ? "border-l-2 border-brand-400" : "bg-gray-50"}`}
-                          style={{ left: 240 + i * DIA_PX, width: d === hoje ? 0 : DIA_PX }} />
+                          style={{ left: col + i * DIA_PX, width: d === hoje ? 0 : DIA_PX }} />
                       ) : null;
                     })}
                     {visivel && (
@@ -136,7 +144,7 @@ export default function TimelineTarefas({ tarefas, secoes, porId, onAbrir, onDat
                         onClick={() => { if (!arrastou.current) onAbrir(t.id); }}
                         title={`${t.titulo}\n${deISO(ini).toLocaleDateString("pt-BR")} → ${deISO(fim).toLocaleDateString("pt-BR")}`}
                         className={`group absolute top-1.5 flex cursor-grab items-center overflow-hidden rounded px-2 text-[11px] shadow-sm active:cursor-grabbing ${cor}`}
-                        style={{ left: 240 + Math.max(0, x) * DIA_PX + 2, width: Math.max(1, Math.min(w + Math.min(0, x), dias.length - Math.max(0, x))) * DIA_PX - 4, height: LINHA_PX - 12 }}>
+                        style={{ touchAction: "none", left: col + Math.max(0, x) * DIA_PX + 2, width: Math.max(1, Math.min(w + Math.min(0, x), dias.length - Math.max(0, x))) * DIA_PX - 4, height: LINHA_PX - 12 }}>
                         <span className="pointer-events-none truncate">{w > 2 ? t.titulo : ""}</span>
                         <span onPointerDown={(e) => comecar(e, t, "inicio")} onPointerMove={mover} onPointerUp={() => soltar(t)}
                           className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize opacity-0 group-hover:bg-black/20 group-hover:opacity-100" />

@@ -73,7 +73,8 @@ export default function EntityForm({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+      <div className="relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
+        style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="flex items-center justify-between border-b px-5 py-4">
           <h2 className="font-semibold text-gray-900">
             {editando ? "Editar" : "Novo"} {entity.label.toLowerCase()}

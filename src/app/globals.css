@@ -10,6 +10,33 @@ body {
   @apply bg-gray-50 text-gray-800 antialiased;
 }
 
+/* ---- Celular / PWA ------------------------------------------------------- */
+html { -webkit-tap-highlight-color: transparent; }
+body { overscroll-behavior-y: none; }          /* sem "puxar e recarregar" acidental no app instalado */
+
+/* iPhone dá zoom em campo com fonte < 16px: no celular os campos usam 16px */
+@media (max-width: 767px) {
+  .inp, input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
+}
+
+/* telas de toque não têm "hover": ações escondidas até passar o mouse ficam sempre visíveis */
+@media (hover: none) {
+  .group .group-hover\:opacity-100 { opacity: 1; }
+  .group .group-hover\:flex { display: flex; }
+  .group .group-hover\:bg-black\/20 { background-color: rgb(0 0 0 / 0.2); }
+}
+
+/* alvo de toque maior sem mudar o desenho (ex.: bolinha de concluir tarefa) */
+@media (pointer: coarse) {
+  .alvo-toque { position: relative; }
+  .alvo-toque::after { content: ""; position: absolute; inset: -10px; }
+}
+
+/* abas que não cabem na largura do celular rolam de lado, sem barra visível */
+.abas-rolaveis { overflow-x: auto; scrollbar-width: none; }
+.abas-rolaveis::-webkit-scrollbar { display: none; }
+.abas-rolaveis > * { white-space: nowrap; flex-shrink: 0; }
+
 /* inputs padrão do app */
 .inp {
   @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none

@@ -204,7 +204,7 @@ export default function ProjetoView({ projetoId }: { projetoId: string }) {
 
       {/* barra: visão + filtros */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-2">
-        <div className="flex gap-1">
+        <div className="abas-rolaveis -mx-1 flex max-w-full gap-1 px-1">
           {([["lista", "☰ Lista"], ["quadro", "▦ Quadro"], ["calendario", "📅 Calendário"], ["timeline", "▤ Timeline"]] as [Visao, string][]).map(([k, l]) => (
             <button key={k} onClick={() => trocarVisao(k)}
               className={`rounded-md px-3 py-1.5 text-sm ${visao === k ? "bg-brand-50 font-medium text-brand-700" : "text-gray-500 hover:bg-gray-100"}`}>{l}</button>
@@ -248,7 +248,7 @@ export default function ProjetoView({ projetoId }: { projetoId: string }) {
       ) : visao === "calendario" ? (
         <CalendarioTarefas tarefas={visiveis} porId={porId} onAbrir={setAberta} onMudarPrazo={mudarPrazo} />
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-4">
+        <div className="-mx-3 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-4 sm:mx-0 sm:snap-none sm:px-0">
           {colunas.map((c) => (
             <ColunaQuadro key={c.id} colId={c.id} nome={c.nome} secao={c.secao} itens={daColuna(c.id)}
               porId={porId} onAbrir={setAberta} onToggle={toggle} onMover={mover}
@@ -301,7 +301,7 @@ function ColunaQuadro({ colId, nome, secao, itens, porId, onAbrir, onToggle, onM
       onDragOver={(e) => { e.preventDefault(); setSobre(true); }}
       onDragLeave={() => setSobre(false)}
       onDrop={(e) => { e.preventDefault(); setSobre(false); const id = e.dataTransfer.getData("text/tarefa"); if (id) onMover(id, colId); }}
-      className={`flex w-72 shrink-0 flex-col rounded-xl p-2 transition ${sobre ? "bg-brand-50 ring-2 ring-brand-300" : "bg-gray-100"}`}>
+      className={`flex w-[85vw] max-w-[18rem] shrink-0 snap-start flex-col rounded-xl p-2 transition sm:w-72 ${sobre ? "bg-brand-50 ring-2 ring-brand-300" : "bg-gray-100"}`}>
       <div className="px-1 pb-2"><CabecalhoSecao nome={nome} qtd={itens.length} secao={secao} onRenomear={onRenomear} onExcluir={onExcluir} /></div>
       <div className="flex flex-col gap-2">
         {itens.map((t) => {

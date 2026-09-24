@@ -112,7 +112,8 @@ export default function TarefaDrawer({ tarefaId, onClose, onChange }: {
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-xl flex-col bg-white shadow-2xl">
+      <div className="relative flex h-full w-full max-w-xl flex-col bg-white shadow-2xl"
+        style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="flex items-center justify-between border-b px-5 py-3">
           {t ? (
             <button className={`btn-ghost text-sm ring-1 ${t.concluida ? "bg-green-50 text-green-700 ring-green-200" : "ring-gray-200"}`}

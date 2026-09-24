@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { GROUPS, entitiesByGroup, type GroupKey } from "@/lib/entities";
 import { createClient } from "@/lib/supabase/client";
 import { podeRota, papelLabel, type Acesso } from "@/lib/permissoes";
+import { useNaoLidas } from "@/components/useNaoLidas";
+import { usePwa } from "@/components/pwa/PwaProvider";
 
 type LinkItem = { href: string; icon: string; label: string };
 
@@ -36,17 +38,14 @@ export default function Sidebar({ empresaNome, email, isSuper, acesso }: { empre
     return null;
   }, [pathname]);
 
-  // não lidas da caixa de entrada: reconta ao navegar, a cada minuto e quando a caixa avisa
-  const [naoLidas, setNaoLidas] = useState(0);
+  const naoLidas = useNaoLidas();
+  const { podeInstalar, instalar } = usePwa();
+  // a barra de abas do celular abre este menu
   useEffect(() => {
-    const supabase = createClient();
-    const contar = () => supabase.from("notificacoes").select("id", { count: "exact", head: true }).eq("lida", false)
-      .then(({ count }) => setNaoLidas(count ?? 0));
-    contar();
-    const h = setInterval(contar, 60000);
-    window.addEventListener("notificacoes", contar);
-    return () => { clearInterval(h); window.removeEventListener("notificacoes", contar); };
-  }, [pathname]);
+    const abrir = () => setMobile(true);
+    window.addEventListener("abrir-menu", abrir);
+    return () => window.removeEventListener("abrir-menu", abrir);
+  }, []);
 
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
   useEffect(() => { if (grupoAtivo) setAbertos((s) => new Set(s).add(grupoAtivo)); }, [grupoAtivo]);
@@ -127,6 +126,7 @@ export default function Sidebar({ empresaNome, email, isSuper, acesso }: { empre
       <div className="border-t p-3 text-xs">
         <p className="truncate text-gray-400">{email}</p>
         {acesso.papel && <p className="text-[10px] uppercase tracking-wide text-gray-400">{papelLabel(acesso.papel)}</p>}
+        {podeInstalar && <button onClick={instalar} className="mt-1 block text-brand-600 hover:underline">📲 Instalar app</button>}
         <button onClick={sair} className="mt-1 text-gray-500 hover:text-gray-800">Sair</button>
       </div>
     </div>
@@ -135,7 +135,8 @@ export default function Sidebar({ empresaNome, email, isSuper, acesso }: { empre
   return (
     <>
       {/* barra mobile */}
-      <div className="flex items-center justify-between border-b bg-white px-4 py-2 md:hidden">
+      <div className="no-print sticky top-0 z-30 flex items-center justify-between border-b bg-white px-4 py-2 md:hidden"
+        style={{ paddingTop: "calc(0.5rem + env(safe-area-inset-top))" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-novaluz.png" alt="Novaluz" className="h-8 w-auto" />
         <button className="btn-ghost" onClick={() => setMobile(true)}>☰</button>
@@ -143,7 +144,8 @@ export default function Sidebar({ empresaNome, email, isSuper, acesso }: { empre
       {mobile && (
         <div className="fixed inset-0 z-50 md:hidden" onClick={() => setMobile(false)}>
           <div className="absolute inset-0 bg-black/30" />
-          <aside className="absolute left-0 top-0 h-full w-72 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>{conteudo}</aside>
+          <aside className="absolute left-0 top-0 h-full w-[85vw] max-w-xs bg-white shadow-xl" onClick={(e) => e.stopPropagation()}
+            style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>{conteudo}</aside>
         </div>
       )}
       {/* desktop */}

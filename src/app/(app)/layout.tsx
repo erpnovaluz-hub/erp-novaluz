@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import Sidebar from "@/components/Sidebar";
 import SupportBanner from "@/components/SupportBanner";
 import AcessoProvider from "@/components/AcessoProvider";
+import BottomNav from "@/components/BottomNav";
 import { carregarAcesso } from "@/lib/acessoServidor";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -54,8 +55,9 @@ values ('${user.id}', '<ID_DA_EMPRESA>', 'Fernando', 'admin');`}
             Seu usuário está <b>desativado</b>. Fale com a gerência.
           </div>
         )}
-        <main className="min-w-0 flex-1 p-4 md:p-6"><AcessoProvider acesso={{ ...acesso, userId: user.id, empresaId }}>{children}</AcessoProvider></main>
+        <main className="min-w-0 flex-1 p-3 pb-24 sm:p-4 sm:pb-24 md:p-6"><AcessoProvider acesso={{ ...acesso, userId: user.id, empresaId }}>{children}</AcessoProvider></main>
       </div>
+      <BottomNav />
     </div>
   );
 }
