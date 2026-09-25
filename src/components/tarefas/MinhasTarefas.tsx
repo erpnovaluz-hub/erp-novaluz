@@ -10,7 +10,7 @@ import TarefaLinha from "@/components/tarefas/TarefaLinha";
 import TarefaDrawer from "@/components/tarefas/TarefaDrawer";
 import CalendarioTarefas from "@/components/tarefas/CalendarioTarefas";
 
-type Aba = "proximas" | "calendario" | "delegadas" | "concluidas";
+type Aba = "proximas" | "calendario" | "delegadas" | "acompanhando" | "concluidas";
 
 export default function MinhasTarefas() {
   const supabase = useMemo(() => createClient(), []);
@@ -19,6 +19,7 @@ export default function MinhasTarefas() {
   const [aba, setAba] = useState<Aba>("proximas");
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [delegadas, setDelegadas] = useState<Tarefa[]>([]);
+  const [acompanhando, setAcompanhando] = useState<Tarefa[]>([]);
   const [concluidas, setConcluidas] = useState<Tarefa[]>([]);
   const [projetos, setProjetos] = useState<Record<string, Projeto>>({});
   const [aberta, setAberta] = useState<string | null>(null);
@@ -43,13 +44,18 @@ export default function MinhasTarefas() {
     setDelegadas((b.data ?? []) as Tarefa[]);
     setConcluidas((c.data ?? []) as Tarefa[]);
     setProjetos(Object.fromEntries(((p.data ?? []) as Projeto[]).map((x) => [x.id, x])));
+    // tarefas que eu acompanho (abertas)
+    const ac = await supabase.from("tarefa_acompanhantes").select("tarefa_id").eq("perfil_id", userId);
+    const ids = ((ac.data ?? []) as any[]).map((r) => r.tarefa_id);
+    setAcompanhando(ids.length ? (((await supabase.from("vw_tarefas").select("*").in("id", ids).eq("concluida", false)
+      .order("prazo", { ascending: true, nullsFirst: false })).data ?? []) as Tarefa[]) : []);
   }, [supabase, userId]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
   async function toggle(t: Tarefa) {
     const lista = (l: Tarefa[]) => l.map((x) => (x.id === t.id ? { ...x, concluida: !x.concluida } : x));
-    setTarefas(lista); setDelegadas(lista); setConcluidas(lista);   // resposta imediata
+    setTarefas(lista); setDelegadas(lista); setConcluidas(lista); setAcompanhando(lista);   // resposta imediata
     await supabase.from("tarefas").update({ concluida: !t.concluida }).eq("id", t.id);
     setTimeout(carregar, 600);
   }
@@ -95,7 +101,7 @@ export default function MinhasTarefas() {
       </div>
 
       <div className="abas-rolaveis flex gap-1 border-b">
-        {([["proximas", `Próximas (${tarefas.length})`], ["calendario", "📅 Calendário"], ["delegadas", `Delegadas (${delegadas.length})`], ["concluidas", "Concluídas"]] as [Aba, string][]).map(([k, l]) => (
+        {([["proximas", `Próximas (${tarefas.length})`], ["calendario", "📅 Calendário"], ["delegadas", `Delegadas (${delegadas.length})`], ["acompanhando", `Acompanhando (${acompanhando.length})`], ["concluidas", "Concluídas"]] as [Aba, string][]).map(([k, l]) => (
           <button key={k} onClick={() => setAba(k)}
             className={`-mb-px border-b-2 px-3 py-2 text-sm ${aba === k ? "border-brand-600 font-medium text-brand-700" : "border-transparent text-gray-500 hover:text-gray-800"}`}>
             {l}
@@ -135,6 +141,12 @@ export default function MinhasTarefas() {
         delegadas.length === 0
           ? <div className="card p-10 text-center text-sm text-gray-400">Nenhuma tarefa que você criou para outra pessoa está aberta.</div>
           : <div className="card overflow-hidden">{delegadas.map(linha)}</div>
+      )}
+
+      {aba === "acompanhando" && (
+        acompanhando.length === 0
+          ? <div className="card p-10 text-center text-sm text-gray-400">Você não está acompanhando nenhuma tarefa aberta.</div>
+          : <div className="card overflow-hidden">{acompanhando.map(linha)}</div>
       )}
 
       {aba === "concluidas" && (

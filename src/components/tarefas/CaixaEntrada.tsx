@@ -9,7 +9,7 @@ import { Avatar, useEquipe } from "@/components/tarefas/comum";
 import TarefaDrawer from "@/components/tarefas/TarefaDrawer";
 
 type Notificacao = {
-  id: string; ator_id: string | null; tipo: "atribuida" | "mencao" | "comentario" | "concluida";
+  id: string; ator_id: string | null; tipo: "atribuida" | "mencao" | "comentario" | "concluida" | "acompanhar";
   tarefa_id: string | null; texto: string | null; lida: boolean; criado_em: string;
   tarefas: { titulo: string } | null;
 };
@@ -19,6 +19,7 @@ const ACAO: Record<Notificacao["tipo"], string> = {
   mencao: "mencionou você em",
   comentario: "comentou em",
   concluida: "concluiu",
+  acompanhar: "incluiu você como acompanhante de",
 };
 
 // avisa o menu para recontar as não lidas
