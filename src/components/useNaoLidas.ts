@@ -12,7 +12,11 @@ export function useNaoLidas(): number {
   useEffect(() => {
     const supabase = createClient();
     const contar = () => supabase.from("notificacoes").select("id", { count: "exact", head: true }).eq("lida", false)
-      .then(({ count }) => setN(count ?? 0));
+      .then(({ count }) => {
+        setN(count ?? 0);
+        const nav = navigator as any;
+        try { if (count) nav.setAppBadge?.(count); else nav.clearAppBadge?.(); } catch {}
+      });
     const aoVoltar = () => { if (document.visibilityState === "visible") contar(); };
     contar();
     const h = setInterval(contar, 60000);

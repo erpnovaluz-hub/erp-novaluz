@@ -9,6 +9,7 @@ import { useEquipe } from "@/components/tarefas/comum";
 import TarefaLinha from "@/components/tarefas/TarefaLinha";
 import TarefaDrawer from "@/components/tarefas/TarefaDrawer";
 import CalendarioTarefas from "@/components/tarefas/CalendarioTarefas";
+import AtivarNotificacoes from "@/components/pwa/AtivarNotificacoes";
 
 type Aba = "proximas" | "calendario" | "delegadas" | "acompanhando" | "concluidas";
 
@@ -110,6 +111,7 @@ export default function MinhasTarefas() {
       </div>
 
       {erro && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
+      <AtivarNotificacoes compacto />
 
       {aba === "proximas" && (
         <>

@@ -7,6 +7,7 @@ import { formatDateTime } from "@/lib/format";
 import { corPrazo, hojeISO, rotuloPrazo, type Tarefa } from "@/lib/tarefas";
 import { Avatar, useEquipe } from "@/components/tarefas/comum";
 import TarefaDrawer from "@/components/tarefas/TarefaDrawer";
+import AtivarNotificacoes from "@/components/pwa/AtivarNotificacoes";
 
 type Notificacao = {
   id: string; ator_id: string | null; tipo: "atribuida" | "mencao" | "comentario" | "concluida" | "acompanhar";
@@ -60,6 +61,16 @@ export default function CaixaEntrada() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  // veio de uma notificação no celular (/tarefas/caixa?tarefa=ID): abre a tarefa e marca os avisos dela como lidos
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tarefa");
+    if (!t) return;
+    setAberta(t);
+    supabase.from("notificacoes").update({ lida: true }).eq("tarefa_id", t).eq("lida", false).then(() => { avisarMenu(); carregar(); });
+    window.history.replaceState(null, "", "/tarefas/caixa");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function abrir(n: Notificacao) {
     if (!n.lida) {
       setItens((l) => l.map((x) => (x.id === n.id ? { ...x, lida: true } : x)));
@@ -95,6 +106,8 @@ export default function CaixaEntrada() {
           {!soNaoLidas && <button className="btn-ghost text-gray-500" onClick={limparLidas}>Limpar lidas</button>}
         </div>
       </div>
+
+      <AtivarNotificacoes />
 
       {prazos.length > 0 && (
         <section>
