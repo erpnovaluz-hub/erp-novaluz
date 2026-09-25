@@ -13,8 +13,9 @@ const ACAO: Record<string, string> = {
 };
 
 export async function POST(req: Request) {
-  const segredo = process.env.PUSH_WEBHOOK_SECRET;
-  if (!segredo || req.headers.get("x-push-secret") !== segredo) {
+  // trim: espaço/quebra de linha colados junto (na Vercel ou no config_sistema) não podem travar o envio
+  const segredo = process.env.PUSH_WEBHOOK_SECRET?.trim();
+  if (!segredo || req.headers.get("x-push-secret")?.trim() !== segredo) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
   let body: any;
