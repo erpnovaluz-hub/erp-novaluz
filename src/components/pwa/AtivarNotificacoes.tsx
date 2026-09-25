@@ -86,7 +86,15 @@ export default function AtivarNotificacoes({ compacto = false }: { compacto?: bo
     setMsg(r.ok ? `Teste enviado para ${j.enviados} aparelho(s). Deve chegar em alguns segundos.` : j.error ?? "Falha no teste.");
   }
 
-  if (estado === "carregando" || estado === "sem_chave") return null;
+  if (estado === "carregando") return null;
+  if (estado === "sem_chave") {
+    // app publicado sem NEXT_PUBLIC_VAPID_PUBLIC_KEY (a chave entra no build): avisa em vez de sumir
+    return compacto ? null : (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        🔕 Notificações no celular ainda não configuradas no servidor (falta a chave pública na Vercel ou um novo deploy depois de cadastrá-la).
+      </div>
+    );
+  }
   if (compacto && estado === "ligado") return null;
 
   return (
