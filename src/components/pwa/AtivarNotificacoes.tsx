@@ -93,7 +93,10 @@ export default function AtivarNotificacoes({ compacto = false }: { compacto?: bo
     const r = await fetch("/api/push/teste", { method: "POST" });
     const j = await r.json().catch(() => ({}));
     setOcupado(false);
-    setMsg(r.ok ? `Teste enviado para ${j.enviados} aparelho(s). Deve chegar em alguns segundos.` : j.error ?? "Falha no teste.");
+    if (!r.ok) { setMsg(j.error ?? "Falha no teste."); return; }
+    const falhas = (j.falhas ?? []) as { aparelho: string; status: number | null; motivo: string }[];
+    setMsg(`Teste enviado para ${j.enviados} de ${j.aparelhos} aparelho(s).`
+      + (falhas.length ? ` Recusado: ${falhas.map((f) => `${f.aparelho} (${f.status ?? "erro"}: ${f.motivo})`).join(" · ")}` : " Deve chegar em alguns segundos."));
   }
 
   if (estado === "carregando") return null;

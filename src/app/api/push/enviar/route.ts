@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       body: `${titulo}${trecho}`,
       url: n.tarefa_id ? `/tarefas/caixa?tarefa=${n.tarefa_id}` : "/tarefas/caixa",
       tag: n.tarefa_id ?? n.id,
-    });
+    }, new URL(req.url).origin);
     return NextResponse.json({ ok: true, ...r });
   } catch (e: any) {
     return NextResponse.json({ error: e.message ?? String(e) }, { status: 500 });
