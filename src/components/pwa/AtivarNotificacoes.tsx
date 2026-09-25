@@ -26,10 +26,20 @@ export default function AtivarNotificacoes({ compacto = false }: { compacto?: bo
   const [estado, setEstado] = useState<Estado>("carregando");
   const [msg, setMsg] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
-  const chave = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  // chave pública buscada no servidor em tempo de execução (não depende do build)
+  const [chave, setChave] = useState<string | null>(null);
+  const [faltando, setFaltando] = useState<string[]>([]);
 
   const avaliar = useCallback(async () => {
-    if (!chave) { setEstado("sem_chave"); return; }
+    let k: string | null = null;
+    try {
+      const r = await fetch("/api/push/config", { cache: "no-store" });
+      const j = await r.json();
+      k = j.publicKey ?? null;
+      setChave(k);
+      setFaltando(j.faltando ?? []);
+    } catch { /* sem rede */ }
+    if (!k) { setEstado("sem_chave"); return; }
     if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
       setEstado(ios && !instalado ? "ios_instalar" : "sem_suporte"); return;
     }
@@ -37,7 +47,7 @@ export default function AtivarNotificacoes({ compacto = false }: { compacto?: bo
     const reg = await navigator.serviceWorker.getRegistration();
     const sub = await reg?.pushManager.getSubscription();
     setEstado(sub && Notification.permission === "granted" ? "ligado" : "desligado");
-  }, [chave, ios, instalado]);
+  }, [ios, instalado]);
 
   useEffect(() => { avaliar(); }, [avaliar]);
 
@@ -91,7 +101,8 @@ export default function AtivarNotificacoes({ compacto = false }: { compacto?: bo
     // app publicado sem NEXT_PUBLIC_VAPID_PUBLIC_KEY (a chave entra no build): avisa em vez de sumir
     return compacto ? null : (
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-        🔕 Notificações no celular ainda não configuradas no servidor (falta a chave pública na Vercel ou um novo deploy depois de cadastrá-la).
+        🔕 Notificações no celular ainda não configuradas no servidor.
+        {faltando.length > 0 && <> Faltando na Vercel (Production): <b>{faltando.join(", ")}</b>.</>}
       </div>
     );
   }

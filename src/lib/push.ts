@@ -12,8 +12,9 @@ export type PushPayload = { title: string; body: string; url: string; tag?: stri
 let configurado = false;
 function configurar() {
   if (configurado) return;
-  const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const priv = process.env.VAPID_PRIVATE_KEY;
+  // por nome: "process.env.NEXT_PUBLIC_X" literal é fixado no build
+  const pub = (process.env["NEXT_PUBLIC_" + "VAPID_PUBLIC_KEY"] || process.env["VAPID_PUBLIC_KEY"] || "").trim();
+  const priv = (process.env["VAPID_PRIVATE_KEY"] || "").trim();
   if (!pub || !priv) throw new Error("Chaves VAPID não configuradas (NEXT_PUBLIC_VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY).");
   webpush.setVapidDetails(process.env.VAPID_SUBJECT || "https://localhost", pub, priv);
   configurado = true;
