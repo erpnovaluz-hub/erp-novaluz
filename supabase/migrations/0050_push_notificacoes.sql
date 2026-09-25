@@ -47,10 +47,12 @@ revoke all on config_sistema from anon, authenticated;
 
 create or replace function _push_notificacao()
 returns trigger language plpgsql security definer set search_path = public, extensions as $$
-declare v_url text; v_seg text;
+declare
+  -- atribuição direta (e não "select ... into"): o SQL Editor do Supabase confunde
+  -- "select ... into variável" com criação de tabela e injeta ALTER TABLE no código
+  v_url text := (select valor from config_sistema where chave = 'push_url');
+  v_seg text := (select valor from config_sistema where chave = 'push_segredo');
 begin
-  select valor into v_url from config_sistema where chave = 'push_url';
-  select valor into v_seg from config_sistema where chave = 'push_segredo';
   if v_url is null or v_seg is null then return new; end if;
   if not exists (select 1 from push_inscricoes where perfil_id = new.destinatario_id) then return new; end if;
   begin
