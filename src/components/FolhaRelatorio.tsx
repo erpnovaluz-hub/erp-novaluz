@@ -21,6 +21,7 @@ export default function FolhaRelatorio() {
   const [lancs, setLancs] = useState<any[]>([]);
   const [bens, setBens] = useState<any[]>([]);
   const [colabNome, setColabNome] = useState<Record<string, string>>({});
+  const [colabInativo, setColabInativo] = useState<Record<string, boolean>>({});
   const [carregando, setCarregando] = useState(true);
 
   const anos = useMemo(() => Array.from({ length: 6 }, (_, i) => String(anoAtual - 3 + i)), [anoAtual]);
@@ -30,12 +31,16 @@ export default function FolhaRelatorio() {
     const ini = `${ano}-01-01`, fim = `${+ano + 1}-01-01`;
     const [tpRes, colRes, lRes] = await Promise.all([
       supabase.from("folha_tipos_beneficio").select("id, nome").order("ordem").range(0, 999),
-      supabase.from("colaboradores").select("id, nome").range(0, 4999),
+      supabase.from("colaboradores").select("id, nome, ativo").range(0, 4999),
       supabase.from("vw_folha_lancamento").select("*").gte("competencia", ini).lt("competencia", fim).range(0, 9999),
     ]);
     setTipos(tpRes.data ?? []);
     setColabNome(Object.fromEntries((colRes.data ?? []).map((c: any) => [c.id, c.nome])));
-    const rows = lRes.data ?? [];
+    const inativo = Object.fromEntries((colRes.data ?? []).map((c: any) => [c.id, c.ativo === false]));
+    setColabInativo(inativo);
+    // desligado conta no custo do mês em que recebeu; lançamento vazio de desligado não aparece
+    const rows = (lRes.data ?? []).filter((r: any) => !inativo[r.colaborador_id]
+      || num(r.custo_total) !== 0 || num(r.salario_liquido) !== 0 || num(r.adiantamento) !== 0);
     setLancs(rows);
     const ids = rows.map((r: any) => r.id);
     if (ids.length) {
@@ -106,9 +111,9 @@ export default function FolhaRelatorio() {
       map[k].adiant += num(l.adiantamento); map[k].fech += num(l.fechamento);
     }
     return Object.entries(map)
-      .map(([id, v]) => ({ id, nome: colabNome[id] ?? "—", ...v }))
+      .map(([id, v]) => ({ id, nome: colabNome[id] ?? "—", inativo: !!colabInativo[id], ...v }))
       .sort((a, b) => b.custo - a.custo);
-  }, [lancsF, colabNome]);
+  }, [lancsF, colabNome, colabInativo]);
 
   // por tipo de benefício (escopo)
   const porBeneficio = useMemo(() => {
@@ -213,7 +218,10 @@ export default function FolhaRelatorio() {
                 <tbody className="divide-y divide-gray-50">
                   {porColab.map((c) => (
                     <tr key={c.id}>
-                      <td className="py-2 font-medium text-gray-900">{c.nome}</td>
+                      <td className="py-2 font-medium text-gray-900">
+                        {c.nome}
+                        {c.inativo && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-800" title="Inativo no cadastro — aparece porque recebeu neste período">desligado</span>}
+                      </td>
                       <td className={`py-2 text-right tabular-nums ${c.faltas > 0 ? "text-red-600" : "text-gray-400"}`}>{c.faltas || "—"}</td>
                       <td className="py-2 text-right tabular-nums text-amber-700">{formatCurrency(c.adiant)}</td>
                       <td className="py-2 text-right tabular-nums text-blue-700">{formatCurrency(c.fech)}</td>

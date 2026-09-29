@@ -69,10 +69,13 @@ export default function CalculadoraFolha() {
   useEffect(() => {
     (async () => {
       const [c, t] = await Promise.all([
-        supabase.from("colaboradores").select("id, nome, cargo, salario_base").eq("ativo", true).order("nome").range(0, 4999),
+        supabase.from("colaboradores").select("id, nome, cargo, salario_base, ativo").order("nome").range(0, 4999),
         supabase.from("folha_tipos_beneficio").select("id, nome, modo").eq("ativo", true).order("ordem").range(0, 999),
       ]);
-      setColabs(c.data ?? []);
+      // ativos + o desligado aberto pelo 🧮 da Folha do mês (para corrigir o lançamento dele)
+      setColabs(((c.data ?? []) as any[])
+        .filter((x) => x.ativo !== false || x.id === colaboradorId)
+        .map((x) => (x.ativo === false ? { ...x, nome: `${x.nome} (desligado)` } : x)));
       setTipos(t.data ?? []);
       if (!colaboradorId && c.data && c.data.length) setColaboradorId(c.data[0].id);
     })();
