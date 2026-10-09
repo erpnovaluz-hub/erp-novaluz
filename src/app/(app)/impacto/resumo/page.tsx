@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
 import PrintButton from "@/components/PrintButton";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import { buscarTodos } from "@/lib/supabase/buscarTodos";
 
 type Row = Record<string, any>;
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -46,7 +47,7 @@ export default function ResumoProducaoPage() {
         q = q.gte("data", `${ano}-01-01`).lt("data", `${parseInt(ano) + 1}-01-01`);
       }
     }
-    const { data } = await q.range(0, 9999);
+    const { data } = await buscarTodos(q);
     setRows(data ?? []);
     setCarregando(false);
   }, [supabase, cliente, colaborador, ano, mes]);

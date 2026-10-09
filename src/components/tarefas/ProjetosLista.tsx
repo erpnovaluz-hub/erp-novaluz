@@ -8,6 +8,7 @@ import { CORES, type Projeto } from "@/lib/tarefas";
 import { Avatar, useEquipe } from "@/components/tarefas/comum";
 import { useAcesso } from "@/components/AcessoProvider";
 import { hojeISO } from "@/lib/tarefas";
+import { buscarTodos } from "@/lib/supabase/buscarTodos";
 
 type Contagem = Record<string, { abertas: number; total: number; atrasadas: number }>;
 
@@ -33,7 +34,7 @@ export default function ProjetosLista() {
     const hoje = new Date().toISOString().slice(0, 10);
     const [p, t] = await Promise.all([
       supabase.from("projetos").select("*").order("nome"),
-      supabase.from("tarefas").select("projeto_id, concluida, prazo").not("projeto_id", "is", null).is("parent_id", null).range(0, 9999),
+      buscarTodos(supabase.from("tarefas").select("projeto_id, concluida, prazo").not("projeto_id", "is", null).is("parent_id", null)),
     ]);
     if (p.error) setErro(p.error.message);
     setProjetos((p.data ?? []) as Projeto[]);

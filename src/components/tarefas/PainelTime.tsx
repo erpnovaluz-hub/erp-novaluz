@@ -7,6 +7,7 @@ import { CORES, hojeISO, rotuloPrazo, type Pessoa, type Projeto, type Tarefa } f
 import { Avatar, useEquipe } from "@/components/tarefas/comum";
 import TarefaLinha from "@/components/tarefas/TarefaLinha";
 import TarefaDrawer from "@/components/tarefas/TarefaDrawer";
+import { buscarTodos } from "@/lib/supabase/buscarTodos";
 
 type Aba = "produtividade" | "carga" | "portfolio";
 const BRAND = "#1d4ed8";   // brand-600
@@ -33,8 +34,8 @@ export default function PainelTime() {
 
   const carregar = useCallback(async () => {
     const [t, p] = await Promise.all([
-      supabase.from("tarefas").select("*").is("parent_id", null)
-        .or(`concluida.eq.false,concluida_em.gte.${desde}`).range(0, 9999),
+      buscarTodos(supabase.from("tarefas").select("*").is("parent_id", null)
+        .or(`concluida.eq.false,concluida_em.gte.${desde}`)),
       supabase.from("projetos").select("*").eq("arquivado", false).order("nome"),
     ]);
     if (t.error) setErro(t.error.message);
@@ -324,7 +325,7 @@ function Portfolio({ tarefas, projetos, porId, hoje }: {
   const supabase = useMemo(() => createClient(), []);
   const [todas, setTodas] = useState<{ projeto_id: string; concluida: boolean }[]>([]);
   useEffect(() => {
-    supabase.from("tarefas").select("projeto_id, concluida").is("parent_id", null).not("projeto_id", "is", null).range(0, 19999)
+    buscarTodos(supabase.from("tarefas").select("projeto_id, concluida").is("parent_id", null).not("projeto_id", "is", null))
       .then(({ data }) => setTodas((data ?? []) as any));
   }, [supabase]);
 

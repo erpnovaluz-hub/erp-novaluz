@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/format";
 import { camadasFechamento } from "@/lib/folha";
 import PrintButton from "@/components/PrintButton";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import { buscarTodos } from "@/lib/supabase/buscarTodos";
 
 type Tipo = { id: string; nome: string };
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -32,7 +33,7 @@ export default function FolhaRelatorio() {
     const [tpRes, colRes, lRes] = await Promise.all([
       supabase.from("folha_tipos_beneficio").select("id, nome").order("ordem").range(0, 999),
       supabase.from("colaboradores").select("id, nome, ativo").range(0, 4999),
-      supabase.from("vw_folha_lancamento").select("*").gte("competencia", ini).lt("competencia", fim).range(0, 9999),
+      buscarTodos(supabase.from("vw_folha_lancamento").select("*").gte("competencia", ini).lt("competencia", fim)),
     ]);
     setTipos(tpRes.data ?? []);
     setColabNome(Object.fromEntries((colRes.data ?? []).map((c: any) => [c.id, c.nome])));

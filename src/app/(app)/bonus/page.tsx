@@ -7,6 +7,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { tipoDaPeca } from "@/lib/pecas";
 import PrintButton from "@/components/PrintButton";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import { buscarTodos } from "@/lib/supabase/buscarTodos";
 
 type Row = Record<string, any>;
 type Regra = { minimo: number; fixo: number; por50: number };
@@ -81,7 +82,7 @@ export default function BonusPage() {
     if (dataDe) q = q.gte("data", dataDe);
     if (dataAte) q = q.lte("data", dataAte);
     if (colaborador) q = q.eq("colaborador_id", colaborador);
-    const { data } = await q.range(0, 9999);
+    const { data } = await buscarTodos(q);
     setRows(data ?? []);
     setCarregando(false);
   }, [supabase, dataDe, dataAte, colaborador, servicosBonus]);

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { buscarTodos } from "@/lib/supabase/buscarTodos";
 
 type Row = Record<string, any>;
 type Tipo = "pagar" | "receber";
@@ -43,7 +44,7 @@ export default function SimuladorCaixa() {
   const carregar = useCallback(async () => {
     setCarregando(true); setErro(null);
     const [t, cb, cli, forn] = await Promise.all([
-      supabase.from("titulos_financeiros").select("*").eq("status", "aberto").range(0, 9999),
+      buscarTodos(supabase.from("titulos_financeiros").select("*").eq("status", "aberto")),
       supabase.from("contas_bancarias").select("id, nome, saldo_atual").eq("ativo", true).order("nome"),
       supabase.from("clientes").select("id, nome").range(0, 9999),
       supabase.from("fornecedores").select("id, nome").range(0, 9999),
