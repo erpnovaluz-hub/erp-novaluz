@@ -17,6 +17,7 @@ import OSFotos from "@/components/os/OSFotos";
 import OSChecklist from "@/components/os/OSChecklist";
 import OSMateriais from "@/components/os/OSMateriais";
 import OSFaturar from "@/components/os/OSFaturar";
+import StatusOSPicker from "@/components/os/StatusOSPicker";
 import { STATUS_OS as STATUS_OS_LIB } from "@/lib/os";
 import { useEquipe } from "@/components/tarefas/comum";
 
@@ -117,7 +118,6 @@ export default function OSDetail({ osId }: { osId: string }) {
           </div>
           <div className="flex items-center gap-2">
             <Badge value={os.urgencia} options={URGENCIA} />
-            <Badge value={os.status} options={STATUS_OS} />
             <Link href={`/os/${osId}/documento`} className="btn-ghost text-sm ring-1 ring-gray-200">🖨️ Imprimir OS</Link>
             <Link href={`/os/${osId}/relatorio`} className="btn-ghost text-sm ring-1 ring-gray-200">📄 Relatório de execução</Link>
             <button className="btn-ghost text-sm" onClick={() => setDrawer({ tipo: "os", registro: os })}>Editar</button>
@@ -141,6 +141,8 @@ export default function OSDetail({ osId }: { osId: string }) {
           <div className="mt-1 h-2 w-full rounded-full bg-gray-100"><div className="h-2 rounded-full bg-brand-500" style={{ width: `${progresso}%` }} /></div>
         </div>
       </div>
+
+      <StatusOSPicker os={os as any} variante="barra" onChange={carregar} />
 
       <OSControle os={os} onChange={carregar} />
 

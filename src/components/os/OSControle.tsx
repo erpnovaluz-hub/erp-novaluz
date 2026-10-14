@@ -4,13 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAcesso, usePode } from "@/components/AcessoProvider";
 import { formatDateTime } from "@/lib/format";
-import { STATUS_OS, motivoPausaLabel, statusOSLabel } from "@/lib/os";
+import { motivoPausaLabel, statusOSLabel } from "@/lib/os";
 import { Avatar, useEquipe } from "@/components/tarefas/comum";
-import PausaModal from "@/components/os/PausaModal";
 
 type Hist = { id: string; de: string | null; para: string; motivo: string | null; obs: string | null; usuario_id: string | null; data: string };
 
-// Status (com pausa e motivo), responsável, acompanhantes e histórico da OS.
+// Pausa (faixa + retomar), responsável, acompanhantes e histórico. A troca de status fica no StatusOSPicker.
 export default function OSControle({ os, onChange }: { os: Record<string, any>; onChange: () => void }) {
   const supabase = useMemo(() => createClient(), []);
   const { userId } = useAcesso();
@@ -19,7 +18,6 @@ export default function OSControle({ os, onChange }: { os: Record<string, any>; 
   const [acomp, setAcomp] = useState<string[]>([]);
   const [hist, setHist] = useState<Hist[]>([]);
   const [verHist, setVerHist] = useState(false);
-  const [pausar, setPausar] = useState(false);
   const [add, setAdd] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -40,13 +38,7 @@ export default function OSControle({ os, onChange }: { os: Record<string, any>; 
     onChange();
   }
 
-  function trocarStatus(s: string) {
-    if (s === os.status) return;
-    if (s === "pausada") { setPausar(true); return; }
-    if (s === "faturada") { setErro("Para faturar, conclua a OS e use o painel 💵 Faturar (gera os títulos a receber)."); return; }
-    if (s === "cancelado" && !confirm("Cancelar esta OS?")) return;
-    salvar({ status: s });
-  }
+
 
   async function incluir(id: string) {
     setAdd(false);
@@ -74,13 +66,7 @@ export default function OSControle({ os, onChange }: { os: Record<string, any>; 
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <label className="block">
-          <span className="lbl">Status</span>
-          <select className="inp" value={os.status} disabled={!podeEditar} onChange={(e) => trocarStatus(e.target.value)}>
-            {STATUS_OS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-        </label>
+      <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="lbl">Responsável</span>
           <div className="flex items-center gap-2">
@@ -131,11 +117,6 @@ export default function OSControle({ os, onChange }: { os: Record<string, any>; 
           </ol>
         )}
       </div>
-
-      {pausar && (
-        <PausaModal titulo={`${os.numero ?? ""} ${os.titulo}`} onCancelar={() => setPausar(false)}
-          onConfirmar={(m, o) => { setPausar(false); salvar({ status: "pausada", motivo_pausa: m, pausa_obs: o || null }); }} />
-      )}
     </div>
   );
 }

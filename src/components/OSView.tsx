@@ -13,6 +13,7 @@ import { Avatar, useEquipe } from "@/components/tarefas/comum";
 import Badge from "@/components/Badge";
 import EntityForm from "@/components/EntityForm";
 import PausaModal from "@/components/os/PausaModal";
+import StatusOSPicker from "@/components/os/StatusOSPicker";
 
 type Row = Record<string, any>;
 type Visao = "lista" | "quadro";
@@ -143,7 +144,7 @@ export default function OSView() {
       {carregando ? (
         <div className="card px-4 py-12 text-center text-gray-400">Carregando…</div>
       ) : visao === "lista" ? (
-        <div className="card overflow-hidden">
+        <div className="card">
           {visiveis.length === 0 ? <div className="px-4 py-12 text-center text-gray-400">Nenhuma OS.</div> : (
             <ul className="divide-y divide-gray-100">
               {visiveis.map((r) => {
@@ -168,7 +169,7 @@ export default function OSView() {
                       </div>
                       <div className={`w-24 shrink-0 text-right text-xs ${atrasada ? "font-medium text-red-600" : "text-gray-500"}`}>{formatDate(r.prazo)}{atrasada ? " ⚠" : ""}</div>
                       <div className="w-20 shrink-0 text-right"><Badge value={r.urgencia} options={URGENCIA} /></div>
-                      <div className="w-32 shrink-0 text-right"><Badge value={r.status} options={STATUS_OS} /></div>
+                      <div className="w-36 shrink-0 text-right"><StatusOSPicker os={r as any} variante="menu" onChange={carregar} /></div>
                     </Link>
                   </li>
                 );
@@ -207,6 +208,9 @@ export default function OSView() {
                           {r.urgencia === "alta" && <Badge value="alta" options={URGENCIA} />}
                           <span className={`ml-auto text-[11px] ${atrasada ? "font-medium text-red-600" : "text-gray-500"}`}>{formatDate(r.prazo)}{atrasada ? " ⚠" : ""}</span>
                           <Avatar pessoa={r.responsavel_id ? porId[r.responsavel_id] : null} size={20} />
+                        </div>
+                        <div className="mt-2 border-t pt-2 text-right">
+                          <StatusOSPicker os={r as any} variante="menu" onChange={carregar} />
                         </div>
                       </div>
                     );
