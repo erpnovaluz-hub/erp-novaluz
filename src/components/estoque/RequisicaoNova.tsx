@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAcesso } from "@/components/AcessoProvider";
@@ -22,8 +22,9 @@ export default function RequisicaoNova() {
   const [obras, setObras] = useState<Opcao[]>([]);
   const [setores, setSetores] = useState<Opcao[]>([]);
   const [solicitante, setSolicitante] = useState("");
-  const [destTipo, setDestTipo] = useState<DestinoTipo | "">("");
-  const [destId, setDestId] = useState("");
+  const params = useSearchParams();
+  const [destTipo, setDestTipo] = useState<DestinoTipo | "">(() => (params.get("os") ? "os" : ""));
+  const [destId, setDestId] = useState(() => params.get("os") ?? "");
   const [obs, setObs] = useState("");
   const [linhas, setLinhas] = useState<{ produto: Produto; qtd: string }[]>([]);
   const [busca, setBusca] = useState("");

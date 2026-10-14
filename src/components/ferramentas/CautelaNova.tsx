@@ -22,8 +22,8 @@ export default function CautelaNova() {
   const [equipe, setEquipe] = useState<Opcao[]>([]);
   const [destinos, setDestinos] = useState<Record<DestinoTipo, Opcao[]>>({ os: [], obra: [], setor: [] });
   const [colab, setColab] = useState("");
-  const [destTipo, setDestTipo] = useState<DestinoTipo | "">("");
-  const [destId, setDestId] = useState("");
+  const [destTipo, setDestTipo] = useState<DestinoTipo | "">(() => (params.get("os") ? "os" : ""));
+  const [destId, setDestId] = useState(() => params.get("os") ?? "");
   const [previsao, setPrevisao] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); });
   const [obs, setObs] = useState("");
   const [busca, setBusca] = useState("");

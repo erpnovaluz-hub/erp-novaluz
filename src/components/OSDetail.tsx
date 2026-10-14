@@ -13,6 +13,9 @@ import { useAcesso } from "@/components/AcessoProvider";
 import OSControle from "@/components/os/OSControle";
 import OSResultado from "@/components/os/OSResultado";
 import OSApontamentos from "@/components/os/OSApontamentos";
+import OSFotos from "@/components/os/OSFotos";
+import OSChecklist from "@/components/os/OSChecklist";
+import OSMateriais from "@/components/os/OSMateriais";
 import { STATUS_OS as STATUS_OS_LIB } from "@/lib/os";
 import { useEquipe } from "@/components/tarefas/comum";
 
@@ -113,6 +116,7 @@ export default function OSDetail({ osId }: { osId: string }) {
             <Badge value={os.urgencia} options={URGENCIA} />
             <Badge value={os.status} options={STATUS_OS} />
             <Link href={`/os/${osId}/documento`} className="btn-ghost text-sm ring-1 ring-gray-200">🖨️ Imprimir OS</Link>
+            <Link href={`/os/${osId}/relatorio`} className="btn-ghost text-sm ring-1 ring-gray-200">📄 Relatório de execução</Link>
             <button className="btn-ghost text-sm" onClick={() => setDrawer({ tipo: "os", registro: os })}>Editar</button>
           </div>
         </div>
@@ -192,6 +196,12 @@ export default function OSDetail({ osId }: { osId: string }) {
       </Secao>
 
       <OSApontamentos osId={osId} atividades={atividades as any} onChange={carregar} />
+
+      <OSChecklist osId={osId} />
+
+      <OSFotos osId={osId} />
+
+      <OSMateriais osId={osId} />
 
       <TarefasVinculadas tipo="os" id={osId} rotulo={[os.numero, os.titulo].filter(Boolean).join(" · ")} />
 
