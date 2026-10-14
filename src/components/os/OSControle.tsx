@@ -43,6 +43,7 @@ export default function OSControle({ os, onChange }: { os: Record<string, any>; 
   function trocarStatus(s: string) {
     if (s === os.status) return;
     if (s === "pausada") { setPausar(true); return; }
+    if (s === "faturada") { setErro("Para faturar, conclua a OS e use o painel 💵 Faturar (gera os títulos a receber)."); return; }
     if (s === "cancelado" && !confirm("Cancelar esta OS?")) return;
     salvar({ status: s });
   }

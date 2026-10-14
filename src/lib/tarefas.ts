@@ -129,7 +129,7 @@ export function iniciais(p?: Pessoa | null): string {
 
 // ---- automações (migration 0043) -------------------------------------------------
 export type Gatilho = "requisicao_aberta" | "pedido_emitido" | "os_aberta" | "titulo_vencendo" | "proposta_sem_retorno" | "estoque_minimo"
-  | "ferramenta_atrasada" | "manutencao_ferramenta";
+  | "ferramenta_atrasada" | "manutencao_ferramenta" | "os_concluida" | "manutencao_os";
 
 export const AUTOMACOES: {
   gatilho: Gatilho; icon: string; titulo: string; quando: string; cria: string;
@@ -149,6 +149,10 @@ export const AUTOMACOES: {
     quando: "Saldo somado dos depósitos fica abaixo do mínimo do produto", cria: "“Repor estoque: …” (nova só depois de concluir a anterior)" },
   { gatilho: "ferramenta_atrasada", icon: "🔧", tipo: "rotina", titulo: "Ferramenta não devolvida", parametro: "dias antes da data de devolução",
     quando: "Cautela com devolução vencendo (ou vencida) e ferramentas ainda com o colaborador", cria: "“Cobrar devolução: CT-… — Fulano”" },
+  { gatilho: "os_concluida", icon: "💵", tipo: "evento", titulo: "OS concluída → faturar",
+    quando: "Uma OS é concluída (e ainda não foi faturada)", cria: "“Faturar OS-…” para a gerência conferir e confirmar no painel Faturar da OS" },
+  { gatilho: "manutencao_os", icon: "🔁", tipo: "rotina", titulo: "Manutenção recorrente → OS", parametro: "dias de antecedência",
+    quando: "A próxima data de uma manutenção recorrente está chegando", cria: "A OS preventiva (com o responsável escolhido); ao concluir, agenda a próxima" },
   { gatilho: "manutencao_ferramenta", icon: "🛠️", tipo: "rotina", titulo: "Manutenção de ferramenta", parametro: "dias antes da data",
     quando: "Ferramenta/equipamento com manutenção ou calibração chegando", cria: "“Manutenção: FER-… — descrição”" },
 ];

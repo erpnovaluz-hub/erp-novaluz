@@ -16,6 +16,7 @@ import OSApontamentos from "@/components/os/OSApontamentos";
 import OSFotos from "@/components/os/OSFotos";
 import OSChecklist from "@/components/os/OSChecklist";
 import OSMateriais from "@/components/os/OSMateriais";
+import OSFaturar from "@/components/os/OSFaturar";
 import { STATUS_OS as STATUS_OS_LIB } from "@/lib/os";
 import { useEquipe } from "@/components/tarefas/comum";
 
@@ -106,7 +107,9 @@ export default function OSDetail({ osId }: { osId: string }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold text-gray-900">{os.numero ? `${os.numero} · ` : ""}{os.titulo}</h1>
-            <p className="mt-1 text-sm text-gray-500">{cliNome[os.cliente_id] ?? "—"}{os.local ? ` · ${os.local}` : ""}</p>
+            <p className="mt-1 text-sm text-gray-500">{cliNome[os.cliente_id] ?? "—"}{os.local ? ` · ${os.local}` : ""}
+              {os.manutencao_id && <span className="ml-2 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-800" title="Gerada pela manutenção recorrente">🔁 manutenção recorrente</span>}
+            </p>
             <div className="mt-1 flex flex-wrap gap-3 text-xs">
               {os.contrato_id && <Link href={`/contratos/${os.contrato_id}`} className="text-brand-600 hover:underline">📜 Contrato {ctrNum[os.contrato_id] ?? ""}</Link>}
               {os.proposta_id && <Link href={`/propostas/${os.proposta_id}`} className="text-brand-600 hover:underline">📑 Proposta {propNum[os.proposta_id] ?? ""}</Link>}
@@ -140,6 +143,8 @@ export default function OSDetail({ osId }: { osId: string }) {
       </div>
 
       <OSControle os={os} onChange={carregar} />
+
+      {verValores && <OSFaturar os={os} onFaturado={carregar} />}
 
       {verValores && <OSResultado os={os} atualizar={tick} />}
 
