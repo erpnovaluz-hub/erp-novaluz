@@ -31,7 +31,7 @@ export default function AtenderRequisicao({ req, itens, prodNome, onAtendido }: 
     Promise.all([
       supabase.from("depositos").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("vw_equipe").select("id, nome").eq("ativo", true).order("nome").range(0, 4999),
-      supabase.from("ordens_servico").select("id, numero, titulo").in("status", ["a_fazer", "em_andamento"]).range(0, 999),
+      supabase.from("ordens_servico").select("id, numero, titulo").in("status", ["a_fazer", "em_andamento", "pausada"]).range(0, 999),
       supabase.from("obras_servicos").select("id, local").in("status", ["planejada", "em_execucao"]).range(0, 999),
       supabase.from("centros_custo").select("id, nome").eq("ativo", true).order("nome"),
     ]).then(([d, e, o, ob, cc]) => {

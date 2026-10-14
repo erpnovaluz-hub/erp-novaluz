@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { useEmissora } from "@/lib/useEmissora";
 import DocHeader from "@/components/DocHeader";
 import PrintButton from "@/components/PrintButton";
@@ -23,6 +23,7 @@ export default function OSDocumento({ id }: { id: string }) {
   const [colNome, setColNome] = useState<Record<string, string>>({});
   const [prodNome, setProdNome] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState(true);
+  const [respNome, setRespNome] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -31,6 +32,7 @@ export default function OSDocumento({ id }: { id: string }) {
       const i = await supabase.from("insumos_os").select("*").eq("os_id", id);
       setOs(o.data); setAtividades(a.data ?? []); setInsumos(i.data ?? []);
       if (o.data?.cliente_id) setCliente((await supabase.from("clientes").select("*").eq("id", o.data.cliente_id).maybeSingle()).data);
+      if (o.data?.responsavel_id) setRespNome((await supabase.from("perfis").select("nome, email").eq("id", o.data.responsavel_id).maybeSingle()).data?.nome ?? null);
       const col = await supabase.from("vw_equipe").select("id, nome").range(0, 4999);
       setColNome(Object.fromEntries((col.data ?? []).map((x: any) => [x.id, x.nome])));
       const pr = await supabase.from("produtos").select("id, nome").range(0, 4999);
@@ -42,7 +44,6 @@ export default function OSDocumento({ id }: { id: string }) {
   if (carregando) return <p className="text-gray-400">Carregando…</p>;
   if (!os) return <p className="text-gray-400">OS não encontrada. <Link href="/os" className="text-brand-600">voltar</Link></p>;
 
-  const custoInsumos = insumos.reduce((s, r) => s + Number(r.custo_total || 0), 0);
   const progresso = atividades.length ? Math.round(atividades.reduce((s, a) => s + Number(a.conclusao_pct || 0), 0) / atividades.length) : 0;
 
   return (
@@ -63,9 +64,9 @@ export default function OSDocumento({ id }: { id: string }) {
             {os.local && <p className="text-xs text-gray-500">Local: {os.local}</p>}
           </div>
           <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-50 p-3 text-sm">
-            <Campo rot="Responsável" val={os.responsavel} />
+            <Campo rot="Responsável" val={respNome ?? os.responsavel} />
             <Campo rot="Prazo" val={formatDate(os.prazo)} />
-            <Campo rot="Custo estimado" val={formatCurrency(os.custo_estimado)} />
+            <Campo rot="Nº da OS" val={os.numero} />
             <Campo rot="Progresso" val={`${progresso}%`} />
           </div>
         </div>
@@ -99,19 +100,17 @@ export default function OSDocumento({ id }: { id: string }) {
 
         {insumos.length > 0 && (
           <>
-            <h3 className="mt-6 mb-2 text-sm font-bold uppercase tracking-wide text-brand-700">Insumos · {formatCurrency(custoInsumos)}</h3>
+            <h3 className="mt-6 mb-2 text-sm font-bold uppercase tracking-wide text-brand-700">Materiais</h3>
             <table className="min-w-full text-sm">
               <thead className="border-b text-left text-xs uppercase text-gray-500">
-                <tr><th className="py-2 pr-2">Insumo</th><th className="py-2 pr-2">Produto</th><th className="py-2 pr-2 text-right">Qtd</th><th className="py-2 pr-2 text-right">Custo un.</th><th className="py-2 text-right">Total</th></tr>
+                <tr><th className="py-2 pr-2">Insumo</th><th className="py-2 pr-2">Produto</th><th className="py-2 text-right">Qtd</th></tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {insumos.map((i) => (
                   <tr key={i.id}>
                     <td className="py-2 pr-2">{i.descricao}</td>
                     <td className="py-2 pr-2 text-gray-600">{prodNome[i.produto_id] ?? "—"}</td>
-                    <td className="py-2 pr-2 text-right tabular-nums">{Number(i.quantidade)}</td>
-                    <td className="py-2 pr-2 text-right tabular-nums">{formatCurrency(i.custo_unitario)}</td>
-                    <td className="py-2 text-right font-medium tabular-nums">{formatCurrency(i.custo_total)}</td>
+                    <td className="py-2 text-right tabular-nums">{Number(i.quantidade)}</td>
                   </tr>
                 ))}
               </tbody>

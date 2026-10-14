@@ -34,7 +34,7 @@ export default function RequisicaoNova() {
     Promise.all([
       supabase.from("produtos").select("id, codigo, nome, unidade").eq("ativo", true).order("nome").range(0, 19999),
       supabase.from("saldos_estoque").select("produto_id, quantidade").range(0, 49999),
-      supabase.from("ordens_servico").select("id, numero, titulo").in("status", ["a_fazer", "em_andamento"]).order("numero", { ascending: false }).range(0, 999),
+      supabase.from("ordens_servico").select("id, numero, titulo").in("status", ["a_fazer", "em_andamento", "pausada"]).order("numero", { ascending: false }).range(0, 999),
       supabase.from("obras_servicos").select("id, local").in("status", ["planejada", "em_execucao"]).order("local").range(0, 999),
       supabase.from("centros_custo").select("id, nome").eq("ativo", true).order("nome"),
       userId ? supabase.from("perfis").select("nome").eq("id", userId).maybeSingle() : Promise.resolve({ data: null }),

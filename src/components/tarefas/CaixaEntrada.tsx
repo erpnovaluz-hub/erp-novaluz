@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { rotuloMudancaStatus } from "@/lib/os";
 import { createClient } from "@/lib/supabase/client";
 import { useAcesso } from "@/components/AcessoProvider";
 import { formatDateTime } from "@/lib/format";
@@ -10,8 +12,9 @@ import TarefaDrawer from "@/components/tarefas/TarefaDrawer";
 import AtivarNotificacoes from "@/components/pwa/AtivarNotificacoes";
 
 type Notificacao = {
-  id: string; ator_id: string | null; tipo: "atribuida" | "mencao" | "comentario" | "concluida" | "acompanhar";
-  tarefa_id: string | null; texto: string | null; lida: boolean; criado_em: string;
+  id: string; ator_id: string | null; tipo: "atribuida" | "mencao" | "comentario" | "concluida" | "acompanhar" | "os_atribuida" | "os_status";
+  tarefa_id: string | null; os_id?: string | null; texto: string | null; lida: boolean; criado_em: string;
+  ordens_servico?: { numero: string | null; titulo: string } | null;
   tarefas: { titulo: string } | null;
 };
 
@@ -21,6 +24,8 @@ const ACAO: Record<Notificacao["tipo"], string> = {
   comentario: "comentou em",
   concluida: "concluiu",
   acompanhar: "incluiu você como acompanhante de",
+  os_atribuida: "passou para você a OS",
+  os_status: "mudou o status da OS",
 };
 
 // avisa o menu para recontar as não lidas
@@ -38,6 +43,7 @@ function quando(iso: string) {
 
 export default function CaixaEntrada() {
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   const { userId } = useAcesso();
   const { porId } = useEquipe();
   const [itens, setItens] = useState<Notificacao[]>([]);
@@ -47,7 +53,7 @@ export default function CaixaEntrada() {
 
   const carregar = useCallback(async () => {
     if (!userId) return;
-    let q = supabase.from("notificacoes").select("*, tarefas(titulo)").order("criado_em", { ascending: false }).limit(100);
+    let q = supabase.from("notificacoes").select("*, tarefas(titulo), ordens_servico(numero, titulo)").order("criado_em", { ascending: false }).limit(100);
     if (soNaoLidas) q = q.eq("lida", false);
     const amanha = new Date(Date.now() + 86400000);
     const ate = `${amanha.getFullYear()}-${String(amanha.getMonth() + 1).padStart(2, "0")}-${String(amanha.getDate()).padStart(2, "0")}`;
@@ -77,6 +83,7 @@ export default function CaixaEntrada() {
       await supabase.from("notificacoes").update({ lida: true }).eq("id", n.id);
       avisarMenu();
     }
+    if (n.os_id) { router.push(`/os/${n.os_id}`); return; }
     if (n.tarefa_id) setAberta(n.tarefa_id);
   }
 
@@ -146,7 +153,10 @@ export default function CaixaEntrada() {
                   <div className="min-w-0 flex-1">
                     <p className="text-gray-700">
                       <b>{ator?.nome || ator?.email || (n.ator_id ? "Alguém" : "🤖 Automação")}</b> {ACAO[n.tipo]}{" "}
-                      <b className="text-gray-900">{n.tarefas?.titulo ?? "uma tarefa"}</b>
+                      <b className="text-gray-900">{n.os_id
+                        ? [n.ordens_servico?.numero, n.ordens_servico?.titulo].filter(Boolean).join(" · ") || "uma OS"
+                        : n.tarefas?.titulo ?? "uma tarefa"}</b>
+                      {n.tipo === "os_status" && n.texto?.includes("→") && <span className="text-gray-500"> → {rotuloMudancaStatus(n.texto)}</span>}
                     </p>
                     {(n.tipo === "mencao" || n.tipo === "comentario") && n.texto && (
                       <p className="mt-0.5 truncate text-gray-500">“{n.texto}”</p>

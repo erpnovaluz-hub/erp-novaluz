@@ -47,6 +47,7 @@ export type GroupDef = {
 };
 
 import { FOTOS_PORTFOLIO } from "@/lib/empresa";
+import { MOTIVOS_PAUSA, STATUS_OS as STATUS_OS_LIB } from "@/lib/os";
 const FOTO_OPCOES: Option[] = [
   ...FOTOS_PORTFOLIO.map((f) => ({ value: f.arquivo, label: f.titulo })),
 ];
@@ -223,12 +224,8 @@ const URGENCIA: Option[] = [
   { value: "media", label: "Média", color: "amber" },
   { value: "alta", label: "Alta", color: "red" },
 ];
-const STATUS_OS: Option[] = [
-  { value: "a_fazer", label: "A fazer", color: "gray" },
-  { value: "em_andamento", label: "Em andamento", color: "blue" },
-  { value: "concluido", label: "Concluído", color: "green" },
-  { value: "cancelado", label: "Cancelado", color: "gray" },
-];
+// status de OS: fonte única em src/lib/os.ts (migration 0051)
+const STATUS_OS: Option[] = STATUS_OS_LIB;
 const STATUS_ATIV: Option[] = [
   { value: "nao_iniciado", label: "Não iniciado", color: "gray" },
   { value: "em_andamento", label: "Em andamento", color: "blue" },
@@ -283,7 +280,8 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "tipo", label: "Tipo", type: "select", options: TIPO_INTERACAO, required: true },
       { key: "resumo", label: "Resumo", type: "textarea" },
       { key: "proximo_passo", label: "Próximo passo", type: "textarea" },
-      { key: "responsavel", label: "Responsável", type: "text" },
+      { key: "responsavel_id", label: "Responsável", type: "ref", ref: { table: "perfis", labelField: "nome" } },
+      { key: "responsavel", label: "Responsável (texto antigo)", type: "text", hideInForm: true },
     ],
   },
   oportunidades: {
@@ -821,7 +819,7 @@ export const ENTITIES: Record<string, EntityDef> = {
     key: "ordens_servico", label: "Ordem de Serviço", labelPlural: "Ordens de Serviço", icon: "📋", group: "os",
     hideInNav: true,
     titleField: "titulo", searchField: "titulo", orderBy: { column: "prazo", ascending: true },
-    listColumns: ["numero", "titulo", "cliente_id", "responsavel", "prazo", "urgencia", "status"],
+    listColumns: ["numero", "titulo", "cliente_id", "responsavel_id", "prazo", "urgencia", "status"],
     fields: [
       { key: "numero", label: "Número (automático se vazio)", type: "text" },
       { key: "cliente_id", label: "Cliente", type: "ref", ref: { table: "clientes", labelField: "nome" } },
@@ -837,6 +835,8 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "custo_estimado", label: "Custo estimado", type: "currency" },
       { key: "urgencia", label: "Urgência", type: "select", options: URGENCIA },
       { key: "status", label: "Status", type: "select", options: STATUS_OS },
+      { key: "motivo_pausa", label: "Motivo da pausa (se pausada)", type: "select", options: MOTIVOS_PAUSA },
+      { key: "pausa_obs", label: "Detalhe da pausa", type: "text" },
       { key: "is_obra", label: "É obra? (aparece no painel de obras)", type: "boolean" },
       { key: "gargalos", label: "Gargalos / atenção", type: "textarea" },
       { key: "orientacoes", label: "Principais cuidados / orientações", type: "textarea" },

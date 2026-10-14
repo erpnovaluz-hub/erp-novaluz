@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enviarParaPerfil } from "@/lib/push";
+import { rotuloMudancaStatus } from "@/lib/os";
 
 // Chamado pelo banco (pg_net) a cada notificação nova. Protegido por segredo
 // (PUSH_WEBHOOK_SECRET), não por login — por isso o middleware deixa passar.
@@ -10,6 +11,8 @@ const ACAO: Record<string, string> = {
   comentario: "comentou",
   concluida: "concluiu",
   acompanhar: "incluiu você como acompanhante",
+  os_atribuida: "passou para você a OS",
+  os_status: "atualizou a OS",
 };
 
 export async function POST(req: Request) {
@@ -26,7 +29,7 @@ export async function POST(req: Request) {
   try {
     const admin = createAdminClient();
     const { data: n } = await admin.from("notificacoes")
-      .select("id, destinatario_id, ator_id, tipo, tarefa_id, texto, lida, tarefas(titulo)").eq("id", id).maybeSingle();
+      .select("id, destinatario_id, ator_id, tipo, tarefa_id, os_id, texto, lida, tarefas(titulo), ordens_servico(numero, titulo)").eq("id", id).maybeSingle();
     if (!n || n.lida) return NextResponse.json({ ok: true, pulado: true });
 
     let ator = "🤖 Automação";
@@ -34,13 +37,17 @@ export async function POST(req: Request) {
       const { data: p } = await admin.from("perfis").select("nome, email").eq("id", n.ator_id).maybeSingle();
       ator = (p?.nome || p?.email || "Alguém").split(" ")[0];
     }
-    const titulo = (n as any).tarefas?.titulo ?? "uma tarefa";
-    const trecho = (n.tipo === "mencao" || n.tipo === "comentario") && n.texto ? `\n“${n.texto}”` : "";
+    const osInfo = (n as any).ordens_servico as { numero: string | null; titulo: string } | null;
+    const titulo = n.os_id
+      ? [osInfo?.numero, osInfo?.titulo].filter(Boolean).join(" · ") || "uma OS"
+      : (n as any).tarefas?.titulo ?? "uma tarefa";
+    const trecho = (n.tipo === "mencao" || n.tipo === "comentario") && n.texto ? `\n“${n.texto}”`
+      : n.tipo === "os_status" && n.texto?.includes("→") ? ` → ${rotuloMudancaStatus(n.texto)}` : "";
     const r = await enviarParaPerfil(admin, n.destinatario_id, {
       title: `${ator} ${ACAO[n.tipo] ?? "atualizou"}`,
       body: `${titulo}${trecho}`,
-      url: n.tarefa_id ? `/tarefas/caixa?tarefa=${n.tarefa_id}` : "/tarefas/caixa",
-      tag: n.tarefa_id ?? n.id,
+      url: n.os_id ? `/os/${n.os_id}` : n.tarefa_id ? `/tarefas/caixa?tarefa=${n.tarefa_id}` : "/tarefas/caixa",
+      tag: n.os_id ?? n.tarefa_id ?? n.id,
     }, new URL(req.url).origin);
     return NextResponse.json({ ok: true, ...r });
   } catch (e: any) {

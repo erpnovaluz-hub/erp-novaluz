@@ -51,7 +51,7 @@ export default function BalcaoAlmox() {
       supabase.from("depositos").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("produtos").select("id, codigo, nome, unidade, custo_medio").eq("ativo", true).order("nome").range(0, 19999),
       supabase.from("vw_equipe").select("id, nome").eq("ativo", true).order("nome").range(0, 4999),
-      supabase.from("ordens_servico").select("id, numero, titulo").in("status", ["a_fazer", "em_andamento"]).order("numero", { ascending: false }).range(0, 999),
+      supabase.from("ordens_servico").select("id, numero, titulo").in("status", ["a_fazer", "em_andamento", "pausada"]).order("numero", { ascending: false }).range(0, 999),
       supabase.from("obras_servicos").select("id, local").in("status", ["planejada", "em_execucao"]).order("local").range(0, 999),
       supabase.from("centros_custo").select("id, nome").eq("ativo", true).order("nome"),
       supabase.from("fornecedores").select("id, nome").order("nome").range(0, 4999),

@@ -10,9 +10,12 @@ import Badge from "@/components/Badge";
 import EntityForm from "@/components/EntityForm";
 import TarefasVinculadas from "@/components/tarefas/TarefasVinculadas";
 import { useAcesso } from "@/components/AcessoProvider";
+import OSControle from "@/components/os/OSControle";
+import { STATUS_OS as STATUS_OS_LIB } from "@/lib/os";
+import { useEquipe } from "@/components/tarefas/comum";
 
 type Row = Record<string, any>;
-const STATUS_OS = getEntity("ordens_servico")!.fields.find((f) => f.key === "status")!.options!;
+const STATUS_OS = STATUS_OS_LIB;
 const URGENCIA = getEntity("ordens_servico")!.fields.find((f) => f.key === "urgencia")!.options!;
 const STATUS_ATIV = getEntity("atividades_os")!.fields.find((f) => f.key === "status")!.options!;
 
@@ -20,6 +23,7 @@ export default function OSDetail({ osId }: { osId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const verValores = useAcesso().gerencia;   // custos: só gerência
+  const { pessoas, porId } = useEquipe();
   const [os, setOs] = useState<Row | null>(null);
   const [atividades, setAtividades] = useState<Row[]>([]);
   const [insumos, setInsumos] = useState<Row[]>([]);
@@ -79,6 +83,7 @@ export default function OSDetail({ osId }: { osId: string }) {
       cliente_id: clientes.map((c) => ({ value: c.id, label: c.nome })),
       contrato_id: contratos.map((c) => ({ value: c.id, label: c.numero })),
       proposta_id: propostas.map((p) => ({ value: p.id, label: p.numero })),
+      responsavel_id: pessoas.map((p) => ({ value: p.id, label: p.nome || p.email || "" })),
     }
     : tipo === "atividade" ? { colaborador_id: colaboradores.map((c) => ({ value: c.id, label: c.nome })) }
     : { produto_id: produtos.map((p) => ({ value: p.id, label: p.nome })) };
@@ -109,7 +114,7 @@ export default function OSDetail({ osId }: { osId: string }) {
         </div>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-          <Info rot="Responsável" val={os.responsavel} />
+          <Info rot="Responsável" val={os.responsavel_id ? (porId[os.responsavel_id]?.nome || porId[os.responsavel_id]?.email) : os.responsavel} />
           <Info rot="Prazo" val={formatDate(os.prazo)} />
           {verValores && <Info rot="Custo estimado" val={formatCurrency(os.custo_estimado)} />}
           {verValores && <Info rot="Custo de insumos" val={formatCurrency(custoInsumos)} />}
@@ -125,6 +130,8 @@ export default function OSDetail({ osId }: { osId: string }) {
           <div className="mt-1 h-2 w-full rounded-full bg-gray-100"><div className="h-2 rounded-full bg-brand-500" style={{ width: `${progresso}%` }} /></div>
         </div>
       </div>
+
+      <OSControle os={os} onChange={carregar} />
 
       {/* atividades */}
       <Secao titulo="Atividades" onAdd={() => setDrawer({ tipo: "atividade", registro: null })}>

@@ -35,7 +35,7 @@ export default function CautelaNova() {
     Promise.all([
       supabase.from("ferramentas").select("*").eq("status", "disponivel").order("codigo").range(0, 9999),
       supabase.from("vw_equipe").select("id, nome").eq("ativo", true).order("nome").range(0, 4999),
-      supabase.from("ordens_servico").select("id, numero, titulo").in("status", ["a_fazer", "em_andamento"]).range(0, 999),
+      supabase.from("ordens_servico").select("id, numero, titulo").in("status", ["a_fazer", "em_andamento", "pausada"]).range(0, 999),
       supabase.from("obras_servicos").select("id, local").in("status", ["planejada", "em_execucao"]).range(0, 999),
       supabase.from("centros_custo").select("id, nome").eq("ativo", true).order("nome"),
     ]).then(([f, e, o, ob, cc]) => {
