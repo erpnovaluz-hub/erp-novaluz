@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import RelatorioPublicoView from "@/components/RelatorioPublicoView";
+import { buscarTodos } from "@/lib/supabase/buscarTodos";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export default async function RelatorioPublicoPage(props: {
   if (searchParams.peca?.trim()) q = q.ilike("peca_nome", `%${searchParams.peca.trim()}%`);
 
   const [{ data: rows }, { data: servicos }, { data: colaboradores }, { data: empresa }] = await Promise.all([
-    q.order("data", { ascending: false }).range(0, 9999),
+    buscarTodos(q.order("data", { ascending: false })),
     supabase.from("servicos").select("id, nome").eq("empresa_consultora_id", empresaId),
     supabase.from("colaboradores").select("id, nome").eq("empresa_consultora_id", empresaId),
     supabase.from("empresas_consultoras").select("nome").eq("id", empresaId).maybeSingle(),

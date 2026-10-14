@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import PrintButton from "@/components/PrintButton";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import { buscarTodos } from "@/lib/supabase/buscarTodos";
 
 type Row = Record<string, any>;
 const CAP = 200;
@@ -37,7 +38,7 @@ export default function RelatorioFinanceiro() {
     let q = supabase.from("titulos_financeiros").select("tipo, status, valor, vencimento, competencia, categoria_id, cliente_id, descricao");
     if (dataDe) q = q.gte("vencimento", dataDe);
     if (dataAte) q = q.lte("vencimento", dataAte);
-    const { data } = await q.range(0, 9999);
+    const { data } = await buscarTodos(q.order("vencimento", { ascending: true }));
     setRows(data ?? []);
     setCarregando(false);
   }, [supabase, dataDe, dataAte]);

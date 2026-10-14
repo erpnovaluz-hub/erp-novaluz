@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import ProducaoDrawer from "@/components/ProducaoDrawer";
+import { buscarTodos } from "@/lib/supabase/buscarTodos";
 
 type Row = Record<string, any>;
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -57,7 +58,7 @@ export default function ProducaoView() {
         q = q.gte("data", `${ano}-01-01`).lt("data", `${parseInt(ano) + 1}-01-01`);
       }
     }
-    const { data } = await q.order("data", { ascending: false }).range(0, 4999);
+    const { data } = await buscarTodos(q.order("data", { ascending: false }));
     setRows(data ?? []); setCarregando(false);
   }, [supabase, cliente, colaborador, servico, buscaAtiva, ano, mes]);
 

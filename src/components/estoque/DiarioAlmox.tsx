@@ -9,6 +9,7 @@ import PrintButton from "@/components/PrintButton";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { normalizar } from "@/lib/planilha";
 import { TIPO_VALE_OPTS, qtdBR } from "@/lib/almox";
+import { buscarTodos } from "@/lib/supabase/buscarTodos";
 
 type Linha = {
   item_id: string; vale_id: string; numero: string; tipo: "saida" | "devolucao" | "entrada"; status: string;
@@ -39,9 +40,9 @@ export default function DiarioAlmox() {
 
   const carregar = useCallback(async () => {
     setCarregando(true);
-    let q = supabase.from("vw_diario_almox").select("*").gte("dia", de).lte("dia", ate).order("data", { ascending: false }).range(0, 9999);
+    let q = supabase.from("vw_diario_almox").select("*").gte("dia", de).lte("dia", ate).order("data", { ascending: false });
     if (!comCancelados) q = q.eq("status", "ativo");
-    const { data, error } = await q;
+    const { data, error } = await buscarTodos(q, "item_id");
     if (error) setErro(error.message);
     setLinhas((data ?? []) as Linha[]);
     setCarregando(false);

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import PrintButton from "@/components/PrintButton";
+import { buscarTodos } from "@/lib/supabase/buscarTodos";
 
 type Row = Record<string, any>;
 const LIMITE = 3000;
@@ -62,7 +63,7 @@ export default function RelatorioProducaoPage() {
     if (colaborador) q = q.eq("colaborador_id", colaborador);
     if (servico) q = q.eq("servico_id", servico);
     if (pecaAtiva.trim()) q = q.ilike("peca_nome", `%${pecaAtiva.trim()}%`);
-    const { data } = await q.order("data", { ascending: false }).range(0, 9999);
+    const { data } = await buscarTodos(q.order("data", { ascending: false }));
     setRows(data ?? []);
     setCarregando(false);
   }, [supabase, dataDe, dataAte, cliente, colaborador, servico, pecaAtiva]);
@@ -79,7 +80,7 @@ export default function RelatorioProducaoPage() {
     if (pecaAtiva.trim()) { qs = qs.ilike("peca_nome", `%${pecaAtiva.trim()}%`); qc = qc.ilike("peca_nome", `%${pecaAtiva.trim()}%`); }
     if (colaborador) qs = qs.eq("colaborador_id", colaborador); // lista de serviços respeita o funcionário selecionado
     if (servico) qc = qc.eq("servico_id", servico);             // lista de funcionários respeita o serviço selecionado
-    const [{ data: ds }, { data: dc }] = await Promise.all([qs.range(0, 9999), qc.range(0, 9999)]);
+    const [{ data: ds }, { data: dc }] = await Promise.all([buscarTodos(qs), buscarTodos(qc)]);
     setServicoIdsPeriodo(new Set((ds ?? []).map((r) => r.servico_id).filter(Boolean)));
     setColaboradorIdsPeriodo(new Set((dc ?? []).map((r) => r.colaborador_id).filter(Boolean)));
   }, [supabase, dataDe, dataAte, cliente, colaborador, servico, pecaAtiva]);

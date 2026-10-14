@@ -6,7 +6,7 @@ import { formatCurrency } from "@/lib/format";
 import { ultimoDiaMes } from "@/lib/folha";
 import PrintButton from "@/components/PrintButton";
 
-type Colab = { id: string; nome: string; cargo: string | null; salario_base: number | null };
+type Colab = { id: string; nome: string; cargo: string | null; salario_base: number | null; ativo: boolean };
 type Tipo = { id: string; nome: string };
 
 // linha editável por colaborador
@@ -15,6 +15,7 @@ type Linha = {
   nome: string;
   cargo: string | null;
   lancamento_id: string | null;
+  inativo: boolean;                   // desligado, mas com lançamento neste mês
   titulo_adiantamento_id: string | null;
   titulo_fechamento_id: string | null;
   pct_adiantamento: number;
@@ -59,12 +60,13 @@ export default function FolhaView() {
 
   const carregar = useCallback(async () => {
     setCarregando(true); setErro(null); setMsg(null);
+    // todos: os inativos só entram se tiverem lançamento neste mês (para poder corrigir/excluir)
     const [colabRes, tipoRes] = await Promise.all([
-      supabase.from("colaboradores").select("id, nome, cargo, salario_base").eq("ativo", true).order("nome").range(0, 4999),
+      supabase.from("colaboradores").select("id, nome, cargo, salario_base, ativo").order("nome").range(0, 4999),
       supabase.from("folha_tipos_beneficio").select("id, nome").eq("ativo", true).order("ordem").range(0, 999),
     ]);
     if (colabRes.error) { setErro(colabRes.error.message); setCarregando(false); return; }
-    const colabs: Colab[] = colabRes.data ?? [];
+    const todos: Colab[] = colabRes.data ?? [];
     const tp: Tipo[] = tipoRes.data ?? [];
     setTipos(tp);
 
@@ -72,6 +74,11 @@ export default function FolhaView() {
       .from("folha_lancamentos").select("*").eq("competencia", competencia).range(0, 4999);
     if (lErr) { setErro(lErr.message); setCarregando(false); return; }
     const lancByColab = Object.fromEntries((lancs ?? []).map((l: any) => [l.colaborador_id, l]));
+    // ativos primeiro; desligados com lançamento no fim
+    const colabs = [
+      ...todos.filter((c) => c.ativo !== false),
+      ...todos.filter((c) => c.ativo === false && lancByColab[c.id]),
+    ];
 
     const ids = (lancs ?? []).map((l: any) => l.id);
     let benByLanc: Record<string, Record<string, string>> = {};
@@ -91,6 +98,7 @@ export default function FolhaView() {
         nome: c.nome,
         cargo: c.cargo,
         lancamento_id: l?.id ?? null,
+        inativo: c.ativo === false,
         titulo_adiantamento_id: l?.titulo_adiantamento_id ?? null,
         titulo_fechamento_id: l?.titulo_fechamento_id ?? null,
         pct_adiantamento: l?.pct_adiantamento != null ? Number(l.pct_adiantamento) : 40,
@@ -173,6 +181,24 @@ export default function FolhaView() {
     } finally {
       setSalvando(false);
     }
+  }
+
+  // exclui o lançamento do mês (útil para desligados): contas a pagar em aberto saem junto; as já pagas ficam
+  async function excluirLancamento(l: Linha) {
+    if (!l.lancamento_id) return;
+    const temTitulo = l.titulo_adiantamento_id || l.titulo_fechamento_id;
+    if (!confirm(`Excluir o lançamento de ${l.nome} em ${MESES[+mes - 1]}/${ano}?`
+      + (temTitulo ? "\n\nAs contas a pagar deste lançamento que ainda estão EM ABERTO também serão excluídas. As já pagas continuam no Financeiro." : ""))) return;
+    setErro(null); setMsg(null);
+    const ids = [l.titulo_adiantamento_id, l.titulo_fechamento_id].filter(Boolean) as string[];
+    if (ids.length) {
+      const { error } = await supabase.from("titulos_financeiros").delete().in("id", ids).eq("status", "aberto");
+      if (error) { setErro(error.message); return; }
+    }
+    const { error } = await supabase.from("folha_lancamentos").delete().eq("id", l.lancamento_id);
+    if (error) { setErro(error.message); return; }
+    setMsg(`Lançamento de ${l.nome} excluído.`);
+    carregar();
   }
 
   async function categoriaFolhaId(): Promise<string | null> {
@@ -289,15 +315,19 @@ export default function FolhaView() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {linhas.map((l, idx) => (
-                <tr key={l.colaborador_id} className="hover:bg-gray-50/60">
+                <tr key={l.colaborador_id} className={l.inativo ? "bg-amber-50/50" : "hover:bg-gray-50/60"}>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-gray-900">{l.nome}</span>
+                      {l.inativo && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-800" title="Inativo no cadastro de colaboradores">desligado</span>}
                       <a href={`/rh/calculadora?colab=${l.colaborador_id}&mes=${mes}&ano=${ano}`}
                         title="Abrir na calculadora (extras, adiantamento…)"
                         className="no-print text-xs text-gray-300 hover:text-brand-600">🧮</a>
                     </div>
                     {l.cargo && <div className="text-xs text-gray-400">{l.cargo}</div>}
+                    {l.inativo && l.lancamento_id && (
+                      <button className="no-print mt-0.5 text-xs text-red-500 hover:underline" onClick={() => excluirLancamento(l)}>Excluir lançamento</button>
+                    )}
                   </td>
                   <td className="px-2 py-1"><CelInput valor={l.salario_liquido} onChange={(v) => setCampo(idx, "salario_liquido", v)} /></td>
                   {tipos.map((t) => (

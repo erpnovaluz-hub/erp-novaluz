@@ -13,6 +13,7 @@ import {
 import { Avatar, Check, useEquipe } from "@/components/tarefas/comum";
 import TarefaAnexos from "@/components/tarefas/TarefaAnexos";
 import TarefaComentarios from "@/components/tarefas/TarefaComentarios";
+import TarefaAcompanhantes from "@/components/tarefas/TarefaAcompanhantes";
 
 // Painel lateral da tarefa: tudo salva na hora (sem botão "salvar").
 export default function TarefaDrawer({ tarefaId, onClose, onChange }: {
@@ -147,6 +148,9 @@ export default function TarefaDrawer({ tarefaId, onClose, onChange }: {
                   {pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome || p.email}</option>)}
                 </select>
               </div>
+
+              <span className="self-start pt-1 text-gray-500">Acompanhantes</span>
+              <TarefaAcompanhantes tarefaId={t.id} responsavelId={t.responsavel_id} pessoas={pessoas} porId={porId} onChange={onChange} />
 
               <span className="text-gray-500">Início</span>
               <input type="date" className="inp w-44 py-1" value={t.inicio ?? ""} max={t.prazo ?? undefined}

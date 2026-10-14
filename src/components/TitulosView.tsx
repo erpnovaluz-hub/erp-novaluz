@@ -7,6 +7,7 @@ import Badge from "@/components/Badge";
 import TituloDrawer from "@/components/TituloDrawer";
 import PrintButton from "@/components/PrintButton";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import { buscarTodos } from "@/lib/supabase/buscarTodos";
 
 type Row = Record<string, any>;
 type Tipo = "pagar" | "receber";
@@ -94,7 +95,7 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
         q = q.gte(baseData, `${ano}-01-01`).lt(baseData, `${parseInt(ano) + 1}-01-01`);
       }
     }
-    const { data, error } = await q.order(baseData, { ascending: false }).range(0, 4999);
+    const { data, error } = await buscarTodos(q.order(baseData, { ascending: false }));
     if (error) setErro(error.message);
     setRows(data ?? []); setCarregando(false);
   }, [supabase, tipo, chip, categoria, subcategoria, buscaAtiva, ano, mes, diaIni, diaFim, hoje, baseData]);
