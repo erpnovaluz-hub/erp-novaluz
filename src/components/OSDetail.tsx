@@ -11,6 +11,8 @@ import EntityForm from "@/components/EntityForm";
 import TarefasVinculadas from "@/components/tarefas/TarefasVinculadas";
 import { useAcesso } from "@/components/AcessoProvider";
 import OSControle from "@/components/os/OSControle";
+import OSResultado from "@/components/os/OSResultado";
+import OSApontamentos from "@/components/os/OSApontamentos";
 import { STATUS_OS as STATUS_OS_LIB } from "@/lib/os";
 import { useEquipe } from "@/components/tarefas/comum";
 
@@ -34,6 +36,7 @@ export default function OSDetail({ osId }: { osId: string }) {
   const [propostas, setPropostas] = useState<any[]>([]);
   const [drawer, setDrawer] = useState<null | { tipo: "os" | "atividade" | "insumo"; registro: Row | null }>(null);
   const [carregando, setCarregando] = useState(true);
+  const [tick, setTick] = useState(0);   // recalcula o resultado após mudanças
 
   const cliNome = useMemo(() => Object.fromEntries(clientes.map((c) => [c.id, c.nome])), [clientes]);
   const colNome = useMemo(() => Object.fromEntries(colaboradores.map((c) => [c.id, c.nome])), [colaboradores]);
@@ -50,6 +53,7 @@ export default function OSDetail({ osId }: { osId: string }) {
     ]);
     setOs(o.data); setAtividades(a.data ?? []); setInsumos(i.data ?? []);
     setCarregando(false);
+    setTick((t) => t + 1);
   }, [supabase, osId]);
 
   useEffect(() => {
@@ -133,6 +137,8 @@ export default function OSDetail({ osId }: { osId: string }) {
 
       <OSControle os={os} onChange={carregar} />
 
+      {verValores && <OSResultado os={os} atualizar={tick} />}
+
       {/* atividades */}
       <Secao titulo="Atividades" onAdd={() => setDrawer({ tipo: "atividade", registro: null })}>
         {atividades.length === 0 ? <Vazio texto="Nenhuma atividade." /> : (
@@ -184,6 +190,8 @@ export default function OSDetail({ osId }: { osId: string }) {
           </table>
         )}
       </Secao>
+
+      <OSApontamentos osId={osId} atividades={atividades as any} onChange={carregar} />
 
       <TarefasVinculadas tipo="os" id={osId} rotulo={[os.numero, os.titulo].filter(Boolean).join(" · ")} />
 

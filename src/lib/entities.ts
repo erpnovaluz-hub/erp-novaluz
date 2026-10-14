@@ -95,6 +95,7 @@ export const GROUPS: GroupDef[] = [
   ] },
   { key: "os", label: "Ordens de Serviço", icon: "🧷", extras: [
     { href: "/os", label: "Ordens de Serviço", icon: "📋" },
+    { href: "/os/apontar", label: "Apontar horas", icon: "⏱️" },
     { href: "/obras", label: "Painel de obras (TV)", icon: "📺" },
   ] },
   { key: "relatorios", label: "Relatórios", icon: "📄", extras: [
