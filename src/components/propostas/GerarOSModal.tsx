@@ -26,7 +26,7 @@ function somarUteis(base: Date, n: number) {
 }
 function proximoUtil(d: Date) { const x = new Date(d); while (x.getDay() === 0 || x.getDay() === 6) x.setDate(x.getDate() + 1); return x; }
 
-// Cria a OS a partir da proposta: título, cliente, valor e etapas (dos itens, padrão ou sugeridas pela IA).
+// Cria a OS a partir da proposta: título, cliente, valor e etapas (dos itens ou padrão).
 export default function GerarOSModal({ prop, itens, onClose }: { prop: Row; itens: Row[]; onClose: () => void }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
@@ -37,10 +37,8 @@ export default function GerarOSModal({ prop, itens, onClose }: { prop: Row; iten
   const [local, setLocal] = useState("");
   const [ativs, setAtivs] = useState<Ativ[]>(() =>
     itens.length ? itens.map((i) => ({ descricao: String(i.descricao), setor: "", dias: 1 })) : ETAPAS_PADRAO);
-  const [obs, setObs] = useState<string | null>(null);
   const [existentes, setExistentes] = useState<Row[]>([]);
   const [contratoId, setContratoId] = useState<string | null>(null);
-  const [ia, setIa] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -61,17 +59,6 @@ export default function GerarOSModal({ prop, itens, onClose }: { prop: Row; iten
   }, [ativs, inicio]);
   const prazo = datas.length ? datas[datas.length - 1].fim : inicio;
 
-  async function sugerirIA() {
-    setIa(true); setErro(null);
-    try {
-      const r = await fetch("/api/ia/atividades-os", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ proposta_id: prop.id }) });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "Falha na IA.");
-      setAtivs(j.atividades); setObs(j.observacao || null);
-    } catch (e: any) { setErro(e.message); }
-    setIa(false);
-  }
-
   const mudar = (i: number, campos: Partial<Ativ>) => setAtivs((l) => l.map((a, k) => (k === i ? { ...a, ...campos } : a)));
   const mover = (i: number, d: number) => setAtivs((l) => {
     const j = i + d; if (j < 0 || j >= l.length) return l;
@@ -82,8 +69,7 @@ export default function GerarOSModal({ prop, itens, onClose }: { prop: Row; iten
     const lista = ativs.map((a, k) => ({ ...a, ...datas[k] })).filter((a) => a.descricao.trim());
     if (!titulo.trim()) { setErro("Informe o título da OS."); return; }
     setSalvando(true); setErro(null);
-    const como = [prop.escopo_desc, ...itens.map((i) => i.referencia ? `• ${i.descricao}: ${i.referencia}` : null),
-      obs ? `Pontos de atenção: ${obs}` : null].filter(Boolean).join("\n");
+    const como = [prop.escopo_desc, ...itens.map((i) => i.referencia ? `• ${i.descricao}: ${i.referencia}` : null)].filter(Boolean).join("\n");
     const { data: os, error } = await supabase.from("ordens_servico").insert({
       titulo: titulo.trim(), cliente_id: prop.cliente_id, proposta_id: prop.id, contrato_id: contratoId,
       motivo: `Proposta ${prop.numero ?? ""} aprovada`.trim(), local: local.trim() || null,
@@ -138,12 +124,10 @@ export default function GerarOSModal({ prop, itens, onClose }: { prop: Row; iten
         <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Etapas ({ativs.length})</h3>
           <div className="flex flex-wrap gap-2">
-            <button className="btn-ghost text-xs ring-1 ring-gray-200" onClick={() => { setAtivs(itens.map((i) => ({ descricao: String(i.descricao), setor: "", dias: 1 }))); setObs(null); }} disabled={!itens.length}>dos itens</button>
-            <button className="btn-ghost text-xs ring-1 ring-gray-200" onClick={() => { setAtivs(ETAPAS_PADRAO); setObs(null); }}>etapas padrão</button>
-            <button className="btn-primary text-xs" onClick={sugerirIA} disabled={ia}>{ia ? "✨ Pensando…" : "✨ Detalhar com IA"}</button>
+            <button className="btn-ghost text-xs ring-1 ring-gray-200" onClick={() => { setAtivs(itens.map((i) => ({ descricao: String(i.descricao), setor: "", dias: 1 }))); }} disabled={!itens.length}>dos itens</button>
+            <button className="btn-ghost text-xs ring-1 ring-gray-200" onClick={() => { setAtivs(ETAPAS_PADRAO); }}>etapas padrão</button>
           </div>
         </div>
-        {obs && <p className="mt-2 rounded-lg bg-blue-50 p-2 text-xs text-blue-800">💡 {obs}</p>}
 
         <ol className="mt-2 space-y-2">
           {ativs.map((a, i) => (
