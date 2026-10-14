@@ -7,13 +7,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getEntity } from "@/lib/entities";
 import { formatCurrency, formatDate } from "@/lib/format";
-import Badge from "@/components/Badge";
 import EntityForm from "@/components/EntityForm";
 import ItemPropostaDrawer from "@/components/ItemPropostaDrawer";
 import { CLAUSULAS_PADRAO } from "@/lib/contrato";
+import { usePode } from "@/components/AcessoProvider";
+import StatusPropostaPicker from "@/components/propostas/StatusPropostaPicker";
+import GerarOSModal from "@/components/propostas/GerarOSModal";
 
 type Row = Record<string, any>;
-const STATUS = getEntity("propostas")!.fields.find((f) => f.key === "status")!.options!;
 
 export default function PropostaComposer({ id }: { id: string }) {
   const supabase = useMemo(() => createClient(), []);
@@ -24,6 +25,8 @@ export default function PropostaComposer({ id }: { id: string }) {
   const [produtos, setProdutos] = useState<any[]>([]);
   const [drawer, setDrawer] = useState<null | { tipo: "prop" | "item"; registro: Row | null }>(null);
   const [carregando, setCarregando] = useState(true);
+  const [gerarOS, setGerarOS] = useState(false);
+  const podeOS = usePode("os", "editar");
 
   const cliNome = useMemo(() => Object.fromEntries(clientes.map((c) => [c.id, c.nome])), [clientes]);
 
@@ -83,11 +86,17 @@ export default function PropostaComposer({ id }: { id: string }) {
             <p className="mt-1 text-sm text-gray-500">{prop.objeto || "sem objeto"}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Badge value={prop.status} options={STATUS} />
             <Link href={`/propostas/${id}/documento`} className="btn-primary text-sm">📄 Documento / PDF</Link>
             <button className="btn-ghost text-sm ring-1 ring-gray-200" onClick={gerarContrato}>📜 Gerar contrato</button>
+            {podeOS && <button className="btn-ghost text-sm ring-1 ring-gray-200" onClick={() => setGerarOS(true)}>🛠 Gerar OS</button>}
             <button className="btn-ghost text-sm" onClick={() => setDrawer({ tipo: "prop", registro: prop })}>Editar</button>
           </div>
+        </div>
+        <div className="mt-4">
+          <StatusPropostaPicker prop={prop as any} variante="barra" onChange={(novo) => {
+            carregar();
+            if (novo === "aprovada" && podeOS && confirm("Proposta aprovada! Gerar a OS agora?")) setGerarOS(true);
+          }} />
         </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-sm">
           <Info rot="Emissão" val={formatDate(prop.data)} />
@@ -153,6 +162,8 @@ export default function PropostaComposer({ id }: { id: string }) {
           onSaved={() => { setDrawer(null); carregar(); }}
         />
       )}
+
+      {gerarOS && <GerarOSModal prop={prop} itens={itens} onClose={() => setGerarOS(false)} />}
 
       <TarefasVinculadas tipo="proposta" id={id}
         rotulo={[prop.numero, cliNome[prop.cliente_id]].filter(Boolean).join(" · ")} />
