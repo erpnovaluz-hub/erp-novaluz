@@ -19,7 +19,8 @@ const dias = (a: string, b: string) => Math.round((new Date(a + "T00:00:00").get
 // Indicadores de OS para a gerência: execução, prazo, faturamento e margem.
 export default function OSIndicadores() {
   const supabase = useMemo(() => createClient(), []);
-  const [periodo, setPeriodo] = useState(90);
+  const [desde, setDesde] = useState(() => iso(new Date(Date.now() - 90 * 86400000)));
+  const [ate, setAte] = useState(() => iso(new Date()));
   const [oss, setOss] = useState<OS[]>([]);
   const [res, setRes] = useState<Record<string, Res>>({});
   const [inicio, setInicio] = useState<Record<string, string>>({});
@@ -51,11 +52,18 @@ export default function OSIndicadores() {
   }, [supabase]);
   useEffect(() => { carregar(); }, [carregar]);
 
-  const desde = iso(new Date(Date.now() - periodo * 86400000));
+  const noPeriodo = (d: string | null) => !!d && d.slice(0, 10) >= desde && d.slice(0, 10) <= ate;
+  function atalho(t: "30" | "90" | "mes" | "mesAnt" | "ano") {
+    const h = new Date();
+    if (t === "30" || t === "90") { setDesde(iso(new Date(Date.now() - Number(t) * 86400000))); setAte(iso(h)); }
+    if (t === "mes") { setDesde(iso(new Date(h.getFullYear(), h.getMonth(), 1))); setAte(iso(h)); }
+    if (t === "mesAnt") { setDesde(iso(new Date(h.getFullYear(), h.getMonth() - 1, 1))); setAte(iso(new Date(h.getFullYear(), h.getMonth(), 0))); }
+    if (t === "ano") { setDesde(iso(new Date(h.getFullYear(), 0, 1))); setAte(iso(h)); }
+  }
   const abertas = oss.filter((o) => STATUS_OS_ABERTOS.includes(o.status as any));
   const atrasadas = abertas.filter(osAtrasada);
   const pausadas = oss.filter((o) => o.status === "pausada");
-  const concl = oss.filter((o) => (o.status === "concluido" || o.status === "faturada") && o.data_realizado && o.data_realizado >= desde);
+  const concl = oss.filter((o) => (o.status === "concluido" || o.status === "faturada") && noPeriodo(o.data_realizado));
   const comPrazo = concl.filter((o) => o.prazo);
   const noPrazo = comPrazo.filter((o) => o.data_realizado! <= o.prazo!);
   const tempos = concl.filter((o) => inicio[o.id]).map((o) => Math.max(0, dias(o.data_realizado!, inicio[o.id])));
@@ -63,7 +71,7 @@ export default function OSIndicadores() {
   const aFaturar = oss.filter((o) => o.status === "concluido")
     .sort((a, b) => (b.data_realizado ?? "").localeCompare(a.data_realizado ?? ""));
   const valorAFaturar = aFaturar.reduce((s, o) => s + Number(o.valor_venda ?? 0), 0);
-  const faturadas = oss.filter((o) => o.faturada_em && o.faturada_em.slice(0, 10) >= desde);
+  const faturadas = oss.filter((o) => noPeriodo(o.faturada_em));
   const faturado = faturadas.reduce((s, o) => s + Number(o.valor_venda ?? 0), 0);
   const comMargem = concl.map((o) => res[o.id]).filter((r) => r && r.margem_pct != null) as Res[];
   const margemMedia = comMargem.length ? comMargem.reduce((s, r) => s + Number(r.margem_pct), 0) / comMargem.length : null;
@@ -79,7 +87,7 @@ export default function OSIndicadores() {
     }
     return Array.from(m.entries()).map(([id, v]) => ({ id, ...v, margem: v.venda - v.custo })).sort((a, b) => b.venda - a.venda);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [oss, res, periodo]);
+  }, [oss, res, desde, ate]);
 
   const estouradas = abertas.concat(concl)
     .map((o) => ({ o, r: res[o.id] }))
@@ -107,10 +115,19 @@ export default function OSIndicadores() {
           <h1 className="text-xl font-semibold text-gray-900">📈 Indicadores de OS</h1>
           <p className="text-sm text-gray-500">Execução, prazo, faturamento e margem · só gerência</p>
         </div>
-        <select className="inp w-44 py-1.5" value={periodo} onChange={(e) => setPeriodo(Number(e.target.value))}>
-          <option value={30}>Últimos 30 dias</option><option value={90}>Últimos 90 dias</option>
-          <option value={180}>Últimos 180 dias</option><option value={365}>Últimos 12 meses</option>
-        </select>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <label className="flex items-center gap-1.5"><span className="text-xs text-gray-500">De</span>
+              <input type="date" className="inp w-40 py-1.5" value={desde} max={ate} onChange={(e) => e.target.value && setDesde(e.target.value)} /></label>
+            <label className="flex items-center gap-1.5"><span className="text-xs text-gray-500">até</span>
+              <input type="date" className="inp w-40 py-1.5" value={ate} min={desde} onChange={(e) => e.target.value && setAte(e.target.value)} /></label>
+          </div>
+          <div className="flex flex-wrap gap-1 text-xs">
+            {([["30", "30 dias"], ["90", "90 dias"], ["mes", "Este mês"], ["mesAnt", "Mês passado"], ["ano", "Este ano"]] as const).map(([k, l]) => (
+              <button key={k} className="rounded-full px-2.5 py-1 text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50" onClick={() => atalho(k)}>{l}</button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -168,7 +185,7 @@ export default function OSIndicadores() {
         </Tabela>
       )}
 
-      <Tabela t={`Por cliente · concluídas nos últimos ${periodo} dias`}>
+      <Tabela t={`Por cliente · concluídas de ${formatDate(desde)} a ${formatDate(ate)}`}>
         {porCliente.length === 0 ? <p className="px-4 py-6 text-center text-sm text-gray-400">Nenhuma OS concluída no período.</p> : (
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
