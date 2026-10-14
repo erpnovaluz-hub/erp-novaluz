@@ -6,13 +6,12 @@ export const dynamic = "force-dynamic";
 
 type SP = { de?: string; ate?: string; servico?: string; peca?: string };
 
-export default async function RelatorioPublicoPage({
-  params,
-  searchParams,
-}: {
-  params: { token: string };
-  searchParams: SP;
+export default async function RelatorioPublicoPage(props: {
+  params: Promise<{ token: string }>;
+  searchParams: Promise<SP>;
 }) {
+  const params = await props.params;
+  const searchParams = await props.searchParams;
   const supabase = createAdminClient();
 
   // resolve o cliente pelo token opaco — não expõe cliente_id na URL

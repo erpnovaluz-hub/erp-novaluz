@@ -6,8 +6,9 @@ import PrintButton from "@/components/PrintButton";
 export const dynamic = "force-dynamic";
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
-export default async function GerencialPage({ searchParams }: { searchParams: { ano?: string } }) {
-  const supabase = createClient();
+export default async function GerencialPage(props: { searchParams: Promise<{ ano?: string }> }) {
+  const searchParams = await props.searchParams;
+  const supabase = await createClient();
 
   const [
     { data: dre }, { data: titAbertos }, { data: contas },

@@ -4,7 +4,7 @@ import { formatCurrency } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 export default async function CustosObraPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("vw_custo_obra")
     .select("obra_id, local, custo_orcado, custo_material, custo_mao_obra, custo_real, saldo_orcamento, clientes(nome)")

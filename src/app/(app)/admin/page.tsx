@@ -4,7 +4,7 @@ import AdminPanel from "@/components/AdminPanel";
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: perfil } = await supabase.from("perfis").select("papel").eq("id", user?.id ?? "").maybeSingle();
 

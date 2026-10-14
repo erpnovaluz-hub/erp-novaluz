@@ -1,5 +1,6 @@
 import CotacaoCompraDocumento from "@/components/CotacaoCompraDocumento";
 
-export default function CotacaoCompraDocPage({ params }: { params: { id: string } }) {
+export default async function CotacaoCompraDocPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return <CotacaoCompraDocumento id={params.id} />;
 }

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 const fmtKg = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 0 }) + " kg";
 
 export default async function RelatorioGerencial() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: perfil } = await supabase
     .from("perfis").select("empresas_consultoras(nome)").eq("id", user?.id ?? "").maybeSingle();

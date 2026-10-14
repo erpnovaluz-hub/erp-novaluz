@@ -5,7 +5,7 @@ import { carregarAcesso } from "@/lib/acessoServidor";
 export const dynamic = "force-dynamic";
 
 export default async function SaldosPage() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { gerencia: verValores } = await carregarAcesso();   // custos: só gerência
   const { data, error } = await supabase
     .from("saldos_estoque")

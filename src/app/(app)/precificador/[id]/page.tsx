@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getEntity } from "@/lib/entities";
 import { formatCurrency } from "@/lib/format";
@@ -13,8 +13,8 @@ const CAT_LABEL: Record<string, string> = {
   terceiro: "Terceiros", frete: "Frete/transporte", outros: "Outros",
 };
 
-export default function PrecificadorItem({ params }: { params: { id: string } }) {
-  const id = params.id;
+export default function PrecificadorItem(props: { params: Promise<{ id: string }> }) {
+  const { id } = use(props.params);
   const supabase = useMemo(() => createClient(), []);
   const [prod, setProd] = useState<Row | null>(null);
   const [comp, setComp] = useState<Row[]>([]);
