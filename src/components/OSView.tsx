@@ -62,7 +62,14 @@ export default function OSView() {
     let q = supabase.from("ordens_servico").select("*");
     if (cliente) q = q.eq("cliente_id", cliente);
     if (status) q = q.eq("status", status);
-    else if (!verEncerradas) q = q.not("status", "in", `(${ENCERRADAS.join(",")})`);
+    else if (!verEncerradas) {
+      // No quadro a coluna "Concluída" mostra as concluídas nos últimos 30 dias (aguardando faturamento)
+      if (visao === "quadro") {
+        const d = new Date(Date.now() - 30 * 86400000);
+        const desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        q = q.or(`status.not.in.(${ENCERRADAS.join(",")}),and(status.eq.concluido,data_realizado.gte.${desde})`);
+      } else q = q.not("status", "in", `(${ENCERRADAS.join(",")})`);
+    }
     if (resp) q = resp === "ninguem" ? q.is("responsavel_id", null) : q.eq("responsavel_id", resp);
     if (buscaAtiva.trim()) q = q.or(`titulo.ilike.%${buscaAtiva.trim()}%,numero.ilike.%${buscaAtiva.trim()}%`);
     const [{ data }, r] = await Promise.all([
@@ -72,7 +79,7 @@ export default function OSView() {
     setRows(data ?? []);
     setResumo(Object.fromEntries((r.data ?? []).map((x: any) => [x.os_id, x])));
     setCarregando(false);
-  }, [supabase, cliente, status, resp, buscaAtiva, verEncerradas]);
+  }, [supabase, cliente, status, resp, buscaAtiva, verEncerradas, visao]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
