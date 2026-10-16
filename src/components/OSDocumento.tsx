@@ -70,10 +70,10 @@ export default function OSDocumento({ id }: { id: string }) {
           </div>
         </div>
 
-        {(os.motivo || os.como_sera_feito) && (
-          <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            {os.motivo && <div><p className="text-[11px] uppercase text-gray-400">Por quê</p><p className="text-gray-700">{os.motivo}</p></div>}
-            {os.como_sera_feito && <div><p className="text-[11px] uppercase text-gray-400">Como será feito</p><p className="text-gray-700">{os.como_sera_feito}</p></div>}
+        {os.como_sera_feito && (
+          <div className="mt-4 text-sm">
+            <p className="text-[11px] uppercase text-gray-400">Como será feito</p>
+            <p className="whitespace-pre-line text-gray-700">{os.como_sera_feito}</p>
           </div>
         )}
 
