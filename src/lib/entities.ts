@@ -37,6 +37,7 @@ export type EntityDef = {
   listColumns: string[];
   hideInNav?: boolean;   // existe no registro (form/rotas) mas não aparece no menu
   docRoute?: string;     // se definido, a lista mostra um link "🖨️" -> `${docRoute}/${id}`
+  reportRoute?: string;  // se definido, o cabeçalho da lista mostra o botão "📄 Relatório"
 };
 
 export type GroupDef = {
@@ -85,6 +86,7 @@ export const GROUPS: GroupDef[] = [
     { href: "/rh/relatorio", label: "Relatório da folha", icon: "📊" },
     { href: "/rh/beneficios", label: "Tipos de benefício", icon: "🎁" },
     { href: "/e/colaboradores", label: "Colaboradores", icon: "👷" },
+    { href: "/rh/colaboradores", label: "Relatório de colaboradores", icon: "📋" },
   ] },
   { key: "impacto", label: "Impacto / Produção", icon: "🏭", extras: [
     { href: "/impacto/producao", label: "Lançamentos de produção", icon: "⚙️" },
@@ -501,6 +503,7 @@ export const ENTITIES: Record<string, EntityDef> = {
   colaboradores: {
     key: "colaboradores", label: "Colaborador", labelPlural: "Colaboradores", icon: "👷", group: "cadastros",
     titleField: "nome", searchField: "nome", orderBy: { column: "nome", ascending: true },
+    reportRoute: "/rh/colaboradores",
     listColumns: ["nome", "cargo", "funcao_padrao", "salario_base", "ativo"],
     fields: [
       { key: "nome", label: "Nome", type: "text", required: true },

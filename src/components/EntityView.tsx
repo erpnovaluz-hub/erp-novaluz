@@ -131,6 +131,7 @@ export default function EntityView({ entityKey }: { entityKey: string }) {
               )}
             </form>
           )}
+          {entity.reportRoute && <Link href={entity.reportRoute} className="btn-ghost text-sm ring-1 ring-gray-200">📄 Relatório</Link>}
           {podeEditar && <button className="btn-primary" onClick={() => setEditando(null)}>+ Novo</button>}
         </div>
       </div>

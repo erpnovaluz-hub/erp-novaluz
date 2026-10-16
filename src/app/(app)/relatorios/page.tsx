@@ -8,6 +8,7 @@ const RELATORIOS = [
   { href: "/impacto/resumo", icon: "🏭", titulo: "Produção (resumo)", desc: "Peso e valor por peça, serviço, tipo e produtividade por colaborador.", tag: "operacional" },
   { href: "/financeiro/pagar", icon: "🔴", titulo: "Contas a Pagar", desc: "Títulos a pagar com filtros e totais.", tag: "operacional" },
   { href: "/financeiro/receber", icon: "🟢", titulo: "Contas a Receber", desc: "Títulos a receber com filtros e totais.", tag: "operacional" },
+  { href: "/rh/colaboradores", icon: "👷", titulo: "Colaboradores", desc: "Quadro de pessoal por cargo/função, admissão e tempo de casa; lista simples e lista de assinatura.", tag: "operacional" },
   { href: "/estoque/saldos", icon: "📦", titulo: "Saldos de estoque", desc: "Saldo por depósito, custo médio e valor total.", tag: "operacional" },
   { href: "/os", icon: "📋", titulo: "Ordens de Serviço", desc: "OS com atividades, progresso e insumos.", tag: "operacional" },
 ];
