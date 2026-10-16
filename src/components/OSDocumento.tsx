@@ -7,11 +7,12 @@ import { formatDate } from "@/lib/format";
 import { useEmissora } from "@/lib/useEmissora";
 import DocHeader from "@/components/DocHeader";
 import PrintButton from "@/components/PrintButton";
-import Badge from "@/components/Badge";
-import { getEntity } from "@/lib/entities";
+import QrCode from "@/components/ferramentas/QrCode";
 
 type Row = Record<string, any>;
-const STATUS_ATIV = getEntity("atividades_os")!.fields.find((f) => f.key === "status")!.options!;
+// QR da OS impressa → acompanhamento ao vivo (status, %, fotos), sem login
+const urlAcompanhamento = (token: string) =>
+  `${typeof window !== "undefined" ? window.location.origin : ""}/publico/os/${token}`;
 
 export default function OSDocumento({ id }: { id: string }) {
   const supabase = useMemo(() => createClient(), []);
@@ -44,8 +45,6 @@ export default function OSDocumento({ id }: { id: string }) {
   if (carregando) return <p className="text-gray-400">Carregando…</p>;
   if (!os) return <p className="text-gray-400">OS não encontrada. <Link href="/os" className="text-brand-600">voltar</Link></p>;
 
-  const progresso = atividades.length ? Math.round(atividades.reduce((s, a) => s + Number(a.conclusao_pct || 0), 0) / atividades.length) : 0;
-
   return (
     <div className="mx-auto max-w-3xl">
       <div className="no-print mb-4 flex items-center justify-between">
@@ -67,7 +66,7 @@ export default function OSDocumento({ id }: { id: string }) {
             <Campo rot="Responsável" val={respNome ?? os.responsavel} />
             <Campo rot="Prazo" val={formatDate(os.prazo)} />
             <Campo rot="Nº da OS" val={os.numero} />
-            <Campo rot="Progresso" val={`${progresso}%`} />
+            <Campo rot="Emitida em" val={formatDate(new Date().toISOString())} />
           </div>
         </div>
 
@@ -81,18 +80,16 @@ export default function OSDocumento({ id }: { id: string }) {
         <h3 className="mt-6 mb-2 text-sm font-bold uppercase tracking-wide text-brand-700">Atividades</h3>
         <table className="min-w-full text-sm">
           <thead className="border-b text-left text-xs uppercase text-gray-500">
-            <tr><th className="py-2 pr-2">Atividade</th><th className="py-2 pr-2">Responsável</th><th className="py-2 pr-2">Prazo</th><th className="py-2 pr-2 text-right">%</th><th className="py-2 text-right">Status</th></tr>
+            <tr><th className="py-2 pr-2">Atividade</th><th className="py-2 pr-2">Responsável</th><th className="py-2">Prazo</th></tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {atividades.length === 0 ? (
-              <tr><td colSpan={5} className="py-3 text-center text-gray-400">Sem atividades.</td></tr>
+              <tr><td colSpan={3} className="py-3 text-center text-gray-400">Sem atividades.</td></tr>
             ) : atividades.map((a) => (
               <tr key={a.id}>
                 <td className="py-2 pr-2">{a.descricao}</td>
                 <td className="py-2 pr-2 text-gray-600">{colNome[a.colaborador_id] ?? "—"}</td>
-                <td className="py-2 pr-2 text-gray-600">{formatDate(a.data_fim)}</td>
-                <td className="py-2 pr-2 text-right tabular-nums">{Number(a.conclusao_pct || 0)}%</td>
-                <td className="py-2 text-right"><Badge value={a.status} options={STATUS_ATIV} /></td>
+                <td className="py-2 text-gray-600">{formatDate(a.data_fim)}</td>
               </tr>
             ))}
           </tbody>
@@ -116,6 +113,18 @@ export default function OSDocumento({ id }: { id: string }) {
               </tbody>
             </table>
           </>
+        )}
+
+        {os.acompanhamento_token ? (
+          <div className="mt-6 flex items-center gap-4 rounded-lg border border-gray-200 p-3 break-inside-avoid">
+            <QrCode texto={urlAcompanhamento(os.acompanhamento_token)} tamanho={96} />
+            <div className="text-sm">
+              <p className="font-semibold text-gray-800">Acompanhamento</p>
+              <p className="text-gray-600">Aponte a câmera do celular para ver o andamento atualizado desta OS: status, progresso das atividades, fotos e histórico.</p>
+            </div>
+          </div>
+        ) : (
+          <p className="no-print mt-6 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Esta OS ainda não tem QR de acompanhamento. Rode a migration 0055 no Supabase.</p>
         )}
 
         <div className="mt-10 grid grid-cols-2 gap-8 text-sm">
