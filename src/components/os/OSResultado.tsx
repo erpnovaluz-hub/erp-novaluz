@@ -6,7 +6,7 @@ import { formatCurrency } from "@/lib/format";
 import { numeroBR } from "@/lib/planilha";
 
 type R = { valor_venda: number | null; custo_estimado: number | null; custo_material: number; horas: number;
-  custo_mao_obra: number; custo_total: number; margem: number | null; margem_pct: number | null };
+  custo_mao_obra: number; custo_terceiros: number | null; custo_total: number; margem: number | null; margem_pct: number | null };
 
 // Resultado da OS — só para a gerência (a função do banco já recusa os demais).
 export default function OSResultado({ os, atualizar }: { os: Record<string, any>; atualizar: number }) {
@@ -54,7 +54,7 @@ export default function OSResultado({ os, atualizar }: { os: Record<string, any>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">💰 Resultado da OS <span className="normal-case text-gray-400">· só gerência</span></h2>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
         <div>
           <p className="text-xs text-gray-400">Valor de venda</p>
           {editando ? (
@@ -75,7 +75,8 @@ export default function OSResultado({ os, atualizar }: { os: Record<string, any>
           )}
         </div>
         <Item rot="Material" v={formatCurrency(r.custo_material)} />
-        <Item rot={`Mão de obra (${Number(r.horas).toLocaleString("pt-BR")} h)`} v={formatCurrency(r.custo_mao_obra)} />
+        <Item rot={`Mão de obra própria (${Number(r.horas).toLocaleString("pt-BR")} h)`} v={formatCurrency(r.custo_mao_obra)} />
+        <Item rot="Mão de obra terceirizada" v={formatCurrency(r.custo_terceiros ?? 0)} />
         <Item rot="Custo total" v={formatCurrency(r.custo_total)} />
         <div>
           <p className="text-xs text-gray-400">Margem</p>

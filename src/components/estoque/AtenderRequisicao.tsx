@@ -26,6 +26,15 @@ export default function AtenderRequisicao({ req, itens, prodNome, onAtendido }: 
   const [erro, setErro] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
   const [feito, setFeito] = useState<{ id: string; numero: string } | null>(null);
+  // serviço (mão de obra de fora) não sai do estoque: só vira compra
+  const [servicos, setServicos] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    const ids = [...new Set(itens.map((it) => it.produto_id))];
+    if (!ids.length) { setServicos(new Set()); return; }
+    supabase.from("produtos").select("id").in("id", ids).eq("tipo", "servico").then(({ data }) =>
+      setServicos(new Set(((data ?? []) as any[]).map((x) => x.id))));
+  }, [supabase, itens]);
 
   useEffect(() => {
     Promise.all([
@@ -61,7 +70,7 @@ export default function AtenderRequisicao({ req, itens, prodNome, onAtendido }: 
     });
   }, [supabase, deposito, itens]);
 
-  const pendentes = itens.filter((it) => Number(it.quantidade) > Number(it.quantidade_atendida));
+  const pendentes = itens.filter((it) => Number(it.quantidade) > Number(it.quantidade_atendida) && !servicos?.has(it.produto_id));
   const entregar = pendentes.map((it) => ({ it, q: numeroBR(qtd[it.id]) ?? 0 })).filter((x) => x.q > 0);
   const excede = entregar.filter(({ it, q }) => q > Number(it.quantidade) - Number(it.quantidade_atendida) || q > (saldos[it.produto_id] ?? 0));
   const ok = deposito && colab && destTipo && destId && entregar.length > 0 && excede.length === 0;
@@ -81,7 +90,7 @@ export default function AtenderRequisicao({ req, itens, prodNome, onAtendido }: 
     onAtendido();
   }
 
-  if (pendentes.length === 0) return null;
+  if (!servicos || pendentes.length === 0) return null;
 
   return (
     <div className="no-print mb-4 rounded-xl border border-green-200 bg-green-50/60 p-4">

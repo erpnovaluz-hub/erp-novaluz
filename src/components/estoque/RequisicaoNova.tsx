@@ -7,7 +7,7 @@ import { useAcesso } from "@/components/AcessoProvider";
 import { normalizar, numeroBR } from "@/lib/planilha";
 import { DESTINOS, qtdBR, type DestinoTipo } from "@/lib/almox";
 
-type Produto = { id: string; codigo: string | null; nome: string; unidade: string | null };
+type Produto = { id: string; codigo: string | null; nome: string; unidade: string | null; tipo: string | null };
 type Opcao = { id: string; nome: string };
 
 // Nova requisição com os itens na mesma tela; mostra quanto já existe em estoque
@@ -33,7 +33,7 @@ export default function RequisicaoNova() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from("produtos").select("id, codigo, nome, unidade").eq("ativo", true).order("nome").range(0, 19999),
+      supabase.from("produtos").select("id, codigo, nome, unidade, tipo").eq("ativo", true).order("nome").range(0, 19999),
       supabase.from("saldos_estoque").select("produto_id, quantidade").range(0, 49999),
       supabase.from("ordens_servico").select("id, numero, titulo").in("status", ["a_fazer", "em_andamento", "pausada"]).order("numero", { ascending: false }).range(0, 999),
       supabase.from("obras_servicos").select("id, local").in("status", ["planejada", "em_execucao"]).order("local").range(0, 999),
@@ -60,9 +60,12 @@ export default function RequisicaoNova() {
 
   const opcoesDestino = destTipo === "os" ? oss : destTipo === "obra" ? obras : destTipo === "setor" ? setores : [];
   const invalidas = linhas.filter((l) => { const q = numeroBR(l.qtd); return q == null || Number.isNaN(q) || q <= 0; });
+  // mão de obra terceirizada vira custo da OS: com serviço, o destino tem que ser uma OS
+  const temServico = linhas.some((l) => l.produto.tipo === "servico");
+  const faltaOs = temServico && (destTipo !== "os" || !destId);
 
   async function salvar() {
-    if (!linhas.length || invalidas.length) return;
+    if (!linhas.length || invalidas.length || faltaOs) return;
     setGravando(true); setErro(null);
     const { data: req, error } = await supabase.from("requisicoes_compra").insert({
       solicitante: solicitante.trim() || null, observacao: obs.trim() || null, data: new Date().toISOString().slice(0, 10),
@@ -81,8 +84,8 @@ export default function RequisicaoNova() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-gray-900">📝 Nova requisição de material</h1>
-        <p className="text-sm text-gray-500">O almoxarifado entrega o que tiver em estoque; só o que faltar vira compra.</p>
+        <h1 className="text-xl font-semibold text-gray-900">📝 Nova requisição de material ou serviço</h1>
+        <p className="text-sm text-gray-500">O almoxarifado entrega o que tiver em estoque; só o que faltar vira compra. Mão de obra de fora: escolha o serviço (ex.: diária de soldador) e a OS.</p>
       </div>
 
       <div className="card space-y-4 p-4">
@@ -96,7 +99,7 @@ export default function RequisicaoNova() {
         </div>
 
         <div>
-          <span className="lbl">Para onde vai o material (opcional — agiliza a entrega)</span>
+          <span className="lbl">{temServico ? "OS do serviço *" : "Para onde vai o material (opcional — agiliza a entrega)"}</span>
           <div className="grid grid-cols-3 gap-2">
             {DESTINOS.map((d) => (
               <button key={d.key} type="button" onClick={() => { setDestTipo(destTipo === d.key ? "" : d.key); setDestId(""); }}
@@ -111,6 +114,7 @@ export default function RequisicaoNova() {
               {opcoesDestino.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
             </select>
           )}
+          {faltaOs && <p className="mt-1 text-xs text-amber-700">Há serviço na requisição: escolha a OS que vai receber o custo da mão de obra.</p>}
         </div>
 
         <div>
@@ -124,9 +128,11 @@ export default function RequisicaoNova() {
                     <button type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-gray-100"
                       onClick={() => { setLinhas((l) => [...l, { produto: p, qtd: "1" }]); setBusca(""); }}>
                       <span className="flex-1">{p.codigo && <span className="mr-2 text-xs text-gray-400">{p.codigo}</span>}{p.nome}</span>
-                      <span className={`text-xs ${(saldoTotal[p.id] ?? 0) > 0 ? "text-green-700" : "text-gray-400"}`}>
-                        {(saldoTotal[p.id] ?? 0) > 0 ? `em estoque: ${qtdBR(saldoTotal[p.id])} ${p.unidade ?? ""}` : "sem estoque"}
-                      </span>
+                      {p.tipo === "servico" ? <span className="text-xs text-purple-700">serviço</span> : (
+                        <span className={`text-xs ${(saldoTotal[p.id] ?? 0) > 0 ? "text-green-700" : "text-gray-400"}`}>
+                          {(saldoTotal[p.id] ?? 0) > 0 ? `em estoque: ${qtdBR(saldoTotal[p.id])} ${p.unidade ?? ""}` : "sem estoque"}
+                        </span>
+                      )}
                     </button>
                   </li>
                 ))}
@@ -142,9 +148,13 @@ export default function RequisicaoNova() {
                   <li key={l.produto.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-900">{l.produto.nome}</p>
-                      <p className={`text-xs ${est >= q && est > 0 ? "text-green-700" : est > 0 ? "text-amber-700" : "text-gray-400"}`}>
-                        {est >= q && est > 0 ? `✓ tem em estoque (${qtdBR(est)})` : est > 0 ? `estoque parcial: ${qtdBR(est)} — o resto vira compra` : "sem estoque — vira compra"}
-                      </p>
+                      {l.produto.tipo === "servico" ? (
+                        <p className="text-xs text-purple-700">serviço de terceiro — vira contratação (custo na OS)</p>
+                      ) : (
+                        <p className={`text-xs ${est >= q && est > 0 ? "text-green-700" : est > 0 ? "text-amber-700" : "text-gray-400"}`}>
+                          {est >= q && est > 0 ? `✓ tem em estoque (${qtdBR(est)})` : est > 0 ? `estoque parcial: ${qtdBR(est)} — o resto vira compra` : "sem estoque — vira compra"}
+                        </p>
+                      )}
                     </div>
                     <input inputMode="decimal" className="inp w-24 text-right" value={l.qtd}
                       onChange={(e) => setLinhas((x) => x.map((y, k) => (k === i ? { ...y, qtd: e.target.value } : y)))} />
@@ -158,7 +168,7 @@ export default function RequisicaoNova() {
         </div>
 
         {erro && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
-        <button className="btn-primary w-full py-3" disabled={gravando || linhas.length === 0 || invalidas.length > 0} onClick={salvar}>
+        <button className="btn-primary w-full py-3" disabled={gravando || linhas.length === 0 || invalidas.length > 0 || faltaOs} onClick={salvar}>
           {gravando ? "Salvando…" : `Enviar requisição${linhas.length ? ` (${linhas.length} ${linhas.length === 1 ? "item" : "itens"})` : ""}`}
         </button>
       </div>

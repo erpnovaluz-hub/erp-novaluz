@@ -13,6 +13,7 @@ const hojeISO = () => { const d = new Date(); return `${d.getFullYear()}-${Strin
 
 // Conferência do recebimento: o que chegou de cada item, NF, foto da NF e divergências.
 // Cada recebimento dá entrada no estoque e gera 1 título a pagar com o valor recebido.
+// Item de serviço (mão de obra terceirizada): lança as diárias/horas executadas como custo da OS.
 export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido }: {
   ped: Record<string, any>; itens: Item[]; prodNome: Record<string, string>; prodUn: Record<string, string>;
   onRecebido: (msg: string, vale: { id: string; numero: string } | null) => void;
@@ -40,8 +41,19 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
   const [obras, setObras] = useState<Opcao[]>([]);
   const [setores, setSetores] = useState<Opcao[]>([]);
   const [equipe, setEquipe] = useState<Opcao[]>([]);
+  // mão de obra terceirizada: item de serviço vira custo da OS (não passa pelo estoque)
+  const [servicos, setServicos] = useState<Set<string>>(new Set());
+  const [servOs, setServOs] = useState("");
 
   const pendentes = itens.filter((it) => Number(it.quantidade) > Number(it.quantidade_recebida));
+  const ehServico = (it: Item) => servicos.has(it.produto_id);
+
+  useEffect(() => {
+    const ids = [...new Set(itens.map((it) => it.produto_id))];
+    if (!ids.length) return;
+    supabase.from("produtos").select("id").in("id", ids).eq("tipo", "servico").then(({ data: s }) =>
+      setServicos(new Set(((s ?? []) as any[]).map((x) => x.id))));
+  }, [supabase, itens]);
 
   useEffect(() => {
     supabase.from("depositos").select("id, nome").eq("ativo", true).order("nome").then(({ data: d }) => {
@@ -66,20 +78,28 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
       const r = rq.data as any;
       const id = r?.destino_tipo === "os" ? r.os_id : r?.destino_tipo === "obra" ? r.obra_id : r?.destino_tipo === "setor" ? r.centro_custo_id : null;
       if (r?.destino_tipo && id) { setDestTipo(r.destino_tipo); setDestId(id); }
+      if (r?.destino_tipo === "os" && r.os_id) setServOs(r.os_id);
     });
   }, [supabase, ped.id]);
 
-  // começa sugerindo "chegou tudo que falta"; o almoxarife corrige o que veio diferente
+  // material: sugere "chegou tudo que falta" e o almoxarife corrige o que veio diferente;
+  // serviço começa vazio: lança só as diárias/horas que já foram trabalhadas
   useEffect(() => {
-    setQtd(Object.fromEntries(pendentes.map((it) => [it.id, String(Number(it.quantidade) - Number(it.quantidade_recebida)).replace(".", ",")])));
+    setQtd(Object.fromEntries(pendentes.map((it) => [it.id,
+      servicos.has(it.produto_id) ? "" : String(Number(it.quantidade) - Number(it.quantidade_recebida)).replace(".", ",")])));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itens]);
+  }, [itens, servicos]);
 
   const receber = pendentes.map((it) => ({ it, q: numeroBR(qtd[it.id]) ?? 0, pend: Number(it.quantidade) - Number(it.quantidade_recebida) }));
   const aceitos = receber.filter((x) => x.q > 0);
   const excede = receber.filter((x) => x.q > x.pend || Number.isNaN(x.q) || x.q < 0);
-  const faltando = receber.filter((x) => x.q < x.pend && !div[x.it.id]?.trim());
-  const ok = deposito && aceitos.length > 0 && excede.length === 0 && (!direta || (destTipo && destId));
+  const faltando = receber.filter((x) => !servicos.has(x.it.produto_id) && x.q < x.pend && !div[x.it.id]?.trim());
+  const temMaterial = pendentes.some((it) => !ehServico(it));
+  const temServico = pendentes.some(ehServico);
+  const matAceito = aceitos.some((x) => !ehServico(x.it));
+  const servAceito = aceitos.some((x) => ehServico(x.it));
+  const ok = aceitos.length > 0 && excede.length === 0 && (!matAceito || deposito) && (!servAceito || servOs)
+    && (!direta || !matAceito || (destTipo && destId));
   const opcoesDestino = destTipo === "os" ? oss : destTipo === "obra" ? obras : destTipo === "setor" ? setores : [];
 
   async function confirmar() {
@@ -95,10 +115,11 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
       if (up.error) { setGravando(false); setErro(`Foto da NF: ${up.error.message}`); return; }
     }
     const { data: r, error } = await supabase.rpc("receber_pedido", { p: {
-      pedido_id: ped.id, deposito_id: deposito, data, nota_fiscal: nf, observacao: obs,
+      pedido_id: ped.id, deposito_id: matAceito ? deposito : null, data, nota_fiscal: nf, observacao: obs,
       anexo_caminho, anexo_nome: arquivo?.name ?? null, vencimento: gerencia ? venc || null : null,
       itens: aceitos.map(({ it, q }) => ({ item_id: it.id, quantidade: q, divergencia: div[it.id] ?? null })),
-      ...(direta ? {
+      servico_os_id: servAceito ? servOs : null,
+      ...(direta && matAceito ? {
         destino_tipo: destTipo, colaborador_id: colaborador || null,
         os_id: destTipo === "os" ? destId : null, obra_id: destTipo === "obra" ? destId : null,
         centro_custo_id: destTipo === "setor" ? destId : null,
@@ -113,24 +134,38 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
     const st = (r as any)?.status === "recebido" ? "Pedido totalmente recebido." : "Recebimento parcial registrado; o restante segue pendente.";
     const vale = (r as any)?.vale_id ? { id: (r as any).vale_id as string, numero: (r as any).vale_numero as string } : null;
     setDireta(false); setColaborador("");
-    onRecebido(vale
-      ? `✓ ${(r as any)?.numero ?? "Recebimento"} registrado e entregue direto no destino pelo vale ${vale.numero}; o custo foi lançado lá. ${st}`
-      : `✓ ${(r as any)?.numero ?? "Recebimento"} registrado. Estoque atualizado. ${st}`, vale);
+    const partes = [
+      matAceito && (vale ? `material entregue direto no destino pelo vale ${vale.numero}` : "estoque atualizado"),
+      servAceito && "serviço lançado na OS como mão de obra terceirizada",
+    ].filter(Boolean).join("; ");
+    onRecebido(`✓ ${(r as any)?.numero ?? "Recebimento"} registrado: ${partes}. ${st}`, vale);
   }
 
   if (pendentes.length === 0) return null;
 
   return (
     <div className="no-print mb-4 rounded-xl border border-green-200 bg-green-50/60 p-4">
-      <p className="mb-3 text-sm font-semibold text-green-900">📥 Receber material (conferência)</p>
+      <p className="mb-3 text-sm font-semibold text-green-900">
+        📥 {temMaterial && temServico ? "Receber material e lançar serviço" : temServico ? "Lançar serviço executado" : "Receber material (conferência)"}
+      </p>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <label className="block"><span className="lbl">Depósito *</span>
-          <select className="inp" value={deposito} onChange={(e) => setDeposito(e.target.value)}>
-            <option value="">—</option>
-            {depositos.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
-          </select>
-        </label>
+        {temMaterial && (
+          <label className="block"><span className="lbl">Depósito *</span>
+            <select className="inp" value={deposito} onChange={(e) => setDeposito(e.target.value)}>
+              <option value="">—</option>
+              {depositos.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
+            </select>
+          </label>
+        )}
+        {temServico && (
+          <label className="block"><span className="lbl">OS do serviço *</span>
+            <select className="inp" value={servOs} onChange={(e) => setServOs(e.target.value)}>
+              <option value="">— escolher OS —</option>
+              {oss.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
+            </select>
+          </label>
+        )}
         <label className="block"><span className="lbl">Data do recebimento</span>
           <input type="date" className="inp" value={data} onChange={(e) => setData(e.target.value)} />
         </label>
@@ -156,12 +191,15 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-xs uppercase text-gray-500">
-            <tr><th className="py-1.5">Material</th><th className="py-1.5 text-right">Pedido</th><th className="py-1.5 text-right">Já recebido</th><th className="py-1.5 text-right">Chegou agora</th><th className="py-1.5 pl-3">Divergência / obs.</th></tr>
+            <tr><th className="py-1.5">Item</th><th className="py-1.5 text-right">Pedido</th><th className="py-1.5 text-right">Já recebido</th><th className="py-1.5 text-right">Chegou / executado</th><th className="py-1.5 pl-3">Divergência / obs.</th></tr>
           </thead>
           <tbody className="divide-y divide-green-100">
             {receber.map(({ it, q, pend }) => (
               <tr key={it.id}>
-                <td className="py-1.5 pr-2">{prodNome[it.produto_id] ?? "—"} <span className="text-xs text-gray-400">{prodUn[it.produto_id]}</span></td>
+                <td className="py-1.5 pr-2">
+                  {prodNome[it.produto_id] ?? "—"} <span className="text-xs text-gray-400">{prodUn[it.produto_id]}</span>
+                  {ehServico(it) && <span className="ml-1 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">serviço</span>}
+                </td>
                 <td className="py-1.5 text-right tabular-nums">{qtdBR(it.quantidade)}</td>
                 <td className="py-1.5 text-right tabular-nums text-gray-500">{qtdBR(it.quantidade_recebida)}</td>
                 <td className="py-1.5 text-right">
@@ -169,7 +207,8 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
                     value={qtd[it.id] ?? ""} onChange={(e) => setQtd((m) => ({ ...m, [it.id]: e.target.value }))} />
                 </td>
                 <td className="py-1.5 pl-3">
-                  <input className="inp min-w-[150px] py-1 text-xs" placeholder={q < pend ? "por que veio menos?" : "avaria, lote, etc. (opcional)"}
+                  <input className="inp min-w-[150px] py-1 text-xs"
+                    placeholder={ehServico(it) ? "dias/período trabalhado (opcional)" : q < pend ? "por que veio menos?" : "avaria, lote, etc. (opcional)"}
                     value={div[it.id] ?? ""} onChange={(e) => setDiv((m) => ({ ...m, [it.id]: e.target.value }))} />
                 </td>
               </tr>
@@ -180,7 +219,7 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
 
       <input className="inp mt-3" placeholder="Observação do recebimento (opcional)" value={obs} onChange={(e) => setObs(e.target.value)} />
 
-      <div className="mt-3 rounded-lg border border-green-200 bg-white p-3">
+      {temMaterial && <div className="mt-3 rounded-lg border border-green-200 bg-white p-3">
         <label className="flex cursor-pointer items-start gap-2 text-sm">
           <input type="checkbox" className="mt-0.5" checked={direta} onChange={(e) => setDireta(e.target.checked)} />
           <span><b>🚚 Entrega direta na obra / OS / setor</b>
@@ -216,7 +255,7 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
             </label>
           </div>
         )}
-      </div>
+      </div>}
       {excede.length > 0 && <p className="mt-2 text-xs text-red-600">Quantidade maior que o pendente em {excede.length} item(ns). Sobra de fornecedor entra como entrada avulsa no Balcão.</p>}
       {faltando.length > 0 && <p className="mt-2 text-xs text-amber-700">{faltando.length} item(ns) chegando a menos — anote o motivo na divergência.</p>}
       {erro && <p className="mt-2 text-sm text-red-600">{erro}</p>}
@@ -225,10 +264,12 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
           {gravando ? "Registrando…" : `Confirmar recebimento (${aceitos.length} item(ns))`}
         </button>
         <span className="text-xs text-gray-500">
-          {direta ? "Gera o título a pagar e o vale de saída para o destino; o saldo do depósito não muda."
+          {!temMaterial ? "Gera o título a pagar e lança o custo na OS como mão de obra terceirizada."
+            : direta ? "Gera o título a pagar e o vale de saída para o destino; o saldo do depósito não muda."
             : "Dá entrada no estoque e gera o título a pagar do que chegou."}
         </span>
-        {direta && (!destTipo || !destId) && <span className="text-xs text-amber-700">Escolha o destino da entrega direta.</span>}
+        {direta && matAceito && (!destTipo || !destId) && <span className="text-xs text-amber-700">Escolha o destino da entrega direta.</span>}
+        {servAceito && !servOs && <span className="text-xs text-amber-700">Escolha a OS do serviço.</span>}
       </div>
     </div>
   );
