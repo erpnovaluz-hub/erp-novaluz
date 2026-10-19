@@ -4,9 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAcesso } from "@/components/AcessoProvider";
 import { numeroBR } from "@/lib/planilha";
-import { qtdBR } from "@/lib/almox";
+import { DESTINOS, qtdBR, type DestinoTipo } from "@/lib/almox";
 
 type Item = { id: string; produto_id: string; quantidade: number; quantidade_recebida: number };
+type Opcao = { id: string; nome: string };
 
 const hojeISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
@@ -14,7 +15,7 @@ const hojeISO = () => { const d = new Date(); return `${d.getFullYear()}-${Strin
 // Cada recebimento dá entrada no estoque e gera 1 título a pagar com o valor recebido.
 export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido }: {
   ped: Record<string, any>; itens: Item[]; prodNome: Record<string, string>; prodUn: Record<string, string>;
-  onRecebido: (msg: string) => void;
+  onRecebido: (msg: string, vale: { id: string; numero: string } | null) => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const { gerencia, empresaId } = useAcesso();
@@ -30,6 +31,15 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
   const [erro, setErro] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
   const inputArq = useRef<HTMLInputElement>(null);
+  // entrega direta: o material vai do fornecedor direto para a obra/OS/setor
+  const [direta, setDireta] = useState(false);
+  const [destTipo, setDestTipo] = useState<DestinoTipo | "">("");
+  const [destId, setDestId] = useState("");
+  const [colaborador, setColaborador] = useState("");
+  const [oss, setOss] = useState<Opcao[]>([]);
+  const [obras, setObras] = useState<Opcao[]>([]);
+  const [setores, setSetores] = useState<Opcao[]>([]);
+  const [equipe, setEquipe] = useState<Opcao[]>([]);
 
   const pendentes = itens.filter((it) => Number(it.quantidade) > Number(it.quantidade_recebida));
 
@@ -39,6 +49,25 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
       setDeposito((atual) => atual || d?.[0]?.id || "");
     });
   }, [supabase]);
+
+  // cadastros do destino + destino da requisição de origem (já vem marcado)
+  useEffect(() => {
+    Promise.all([
+      supabase.from("ordens_servico").select("id, numero, titulo").in("status", ["a_fazer", "em_andamento", "pausada"]).order("numero", { ascending: false }).range(0, 999),
+      supabase.from("obras_servicos").select("id, local").in("status", ["planejada", "em_execucao"]).order("local").range(0, 999),
+      supabase.from("centros_custo").select("id, nome").eq("ativo", true).order("nome"),
+      supabase.from("vw_equipe").select("id, nome").eq("ativo", true).order("nome").range(0, 4999),
+      supabase.from("requisicoes_compra").select("destino_tipo, os_id, obra_id, centro_custo_id").eq("pedido_id", ped.id).limit(1).maybeSingle(),
+    ]).then(([o, ob, cc, e, rq]) => {
+      setOss(((o.data ?? []) as any[]).map((x) => ({ id: x.id, nome: [x.numero, x.titulo].filter(Boolean).join(" · ") })));
+      setObras(((ob.data ?? []) as any[]).map((x) => ({ id: x.id, nome: x.local || "(obra sem local)" })));
+      setSetores(cc.data ?? []);
+      setEquipe(e.data ?? []);
+      const r = rq.data as any;
+      const id = r?.destino_tipo === "os" ? r.os_id : r?.destino_tipo === "obra" ? r.obra_id : r?.destino_tipo === "setor" ? r.centro_custo_id : null;
+      if (r?.destino_tipo && id) { setDestTipo(r.destino_tipo); setDestId(id); }
+    });
+  }, [supabase, ped.id]);
 
   // começa sugerindo "chegou tudo que falta"; o almoxarife corrige o que veio diferente
   useEffect(() => {
@@ -50,7 +79,8 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
   const aceitos = receber.filter((x) => x.q > 0);
   const excede = receber.filter((x) => x.q > x.pend || Number.isNaN(x.q) || x.q < 0);
   const faltando = receber.filter((x) => x.q < x.pend && !div[x.it.id]?.trim());
-  const ok = deposito && aceitos.length > 0 && excede.length === 0;
+  const ok = deposito && aceitos.length > 0 && excede.length === 0 && (!direta || (destTipo && destId));
+  const opcoesDestino = destTipo === "os" ? oss : destTipo === "obra" ? obras : destTipo === "setor" ? setores : [];
 
   async function confirmar() {
     if (!ok) return;
@@ -68,6 +98,11 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
       pedido_id: ped.id, deposito_id: deposito, data, nota_fiscal: nf, observacao: obs,
       anexo_caminho, anexo_nome: arquivo?.name ?? null, vencimento: gerencia ? venc || null : null,
       itens: aceitos.map(({ it, q }) => ({ item_id: it.id, quantidade: q, divergencia: div[it.id] ?? null })),
+      ...(direta ? {
+        destino_tipo: destTipo, colaborador_id: colaborador || null,
+        os_id: destTipo === "os" ? destId : null, obra_id: destTipo === "obra" ? destId : null,
+        centro_custo_id: destTipo === "setor" ? destId : null,
+      } : {}),
     } });
     setGravando(false);
     if (error) {
@@ -76,7 +111,11 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
     }
     setNf(""); setObs(""); setArquivo(null); setDiv({});
     const st = (r as any)?.status === "recebido" ? "Pedido totalmente recebido." : "Recebimento parcial registrado; o restante segue pendente.";
-    onRecebido(`✓ ${(r as any)?.numero ?? "Recebimento"} registrado. Estoque atualizado. ${st}`);
+    const vale = (r as any)?.vale_id ? { id: (r as any).vale_id as string, numero: (r as any).vale_numero as string } : null;
+    setDireta(false); setColaborador("");
+    onRecebido(vale
+      ? `✓ ${(r as any)?.numero ?? "Recebimento"} registrado e entregue direto no destino pelo vale ${vale.numero}; o custo foi lançado lá. ${st}`
+      : `✓ ${(r as any)?.numero ?? "Recebimento"} registrado. Estoque atualizado. ${st}`, vale);
   }
 
   if (pendentes.length === 0) return null;
@@ -140,6 +179,44 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
       </div>
 
       <input className="inp mt-3" placeholder="Observação do recebimento (opcional)" value={obs} onChange={(e) => setObs(e.target.value)} />
+
+      <div className="mt-3 rounded-lg border border-green-200 bg-white p-3">
+        <label className="flex cursor-pointer items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={direta} onChange={(e) => setDireta(e.target.checked)} />
+          <span><b>🚚 Entrega direta na obra / OS / setor</b>
+            <span className="block text-xs text-gray-500">O material não fica no almoxarifado: o sistema dá entrada e já gera o vale de saída para o destino, pelo preço do pedido. O custo é lançado no destino.</span>
+          </span>
+        </label>
+        {direta && (
+          <div className="mt-3 space-y-2">
+            <div className="grid grid-cols-3 gap-2">
+              {DESTINOS.map((d) => (
+                <button key={d.key} type="button" onClick={() => { setDestTipo(d.key); setDestId(""); }}
+                  className={`rounded-lg border py-2 text-sm ${destTipo === d.key ? "border-brand-600 bg-brand-50 font-medium text-brand-700" : "border-gray-200 text-gray-600"}`}>
+                  {d.icon} {d.label}
+                </button>
+              ))}
+            </div>
+            {destTipo && (
+              <select className="inp" value={destId} onChange={(e) => setDestId(e.target.value)}>
+                <option value="">— escolher {DESTINOS.find((d) => d.key === destTipo)?.label} —</option>
+                {opcoesDestino.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
+              </select>
+            )}
+            {destTipo && opcoesDestino.length === 0 && (
+              <p className="text-xs text-amber-700">
+                {destTipo === "os" ? "Nenhuma OS aberta." : destTipo === "obra" ? "Nenhuma obra planejada ou em execução." : "Nenhum setor cadastrado (cadastre no Balcão)."}
+              </p>
+            )}
+            <label className="block"><span className="lbl">Quem recebeu no destino (opcional)</span>
+              <select className="inp" value={colaborador} onChange={(e) => setColaborador(e.target.value)}>
+                <option value="">—</option>
+                {equipe.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+              </select>
+            </label>
+          </div>
+        )}
+      </div>
       {excede.length > 0 && <p className="mt-2 text-xs text-red-600">Quantidade maior que o pendente em {excede.length} item(ns). Sobra de fornecedor entra como entrada avulsa no Balcão.</p>}
       {faltando.length > 0 && <p className="mt-2 text-xs text-amber-700">{faltando.length} item(ns) chegando a menos — anote o motivo na divergência.</p>}
       {erro && <p className="mt-2 text-sm text-red-600">{erro}</p>}
@@ -147,7 +224,11 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
         <button className="btn-primary" disabled={!ok || gravando} onClick={confirmar}>
           {gravando ? "Registrando…" : `Confirmar recebimento (${aceitos.length} item(ns))`}
         </button>
-        <span className="text-xs text-gray-500">Dá entrada no estoque e gera o título a pagar do que chegou.</span>
+        <span className="text-xs text-gray-500">
+          {direta ? "Gera o título a pagar e o vale de saída para o destino; o saldo do depósito não muda."
+            : "Dá entrada no estoque e gera o título a pagar do que chegou."}
+        </span>
+        {direta && (!destTipo || !destId) && <span className="text-xs text-amber-700">Escolha o destino da entrega direta.</span>}
       </div>
     </div>
   );

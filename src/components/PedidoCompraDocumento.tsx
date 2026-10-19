@@ -32,6 +32,7 @@ export default function PedidoCompraDocumento({ id }: { id: string }) {
   const [recItens, setRecItens] = useState<Row[]>([]);
   const [prodUn, setProdUn] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
+  const [valeDireto, setValeDireto] = useState<{ id: string; numero: string } | null>(null);
   const [ped, setPed] = useState<Row | null>(null);
   const [itens, setItens] = useState<Row[]>([]);
   const [fornecedor, setFornecedor] = useState<Row | null>(null);
@@ -67,7 +68,7 @@ export default function PedidoCompraDocumento({ id }: { id: string }) {
     if (!motivo?.trim()) return;
     const { error } = await supabase.rpc("encerrar_pedido", { p_pedido: id, p_motivo: motivo.trim() });
     if (error) { setMsg({ ok: false, t: error.message }); return; }
-    setMsg({ ok: true, t: "Pedido encerrado." });
+    setMsg({ ok: true, t: "Pedido encerrado." }); setValeDireto(null);
     carregar();
   }
 
@@ -92,10 +93,15 @@ export default function PedidoCompraDocumento({ id }: { id: string }) {
         </div>
       </div>
 
-      {msg && <div className={`no-print mb-4 rounded-lg p-3 text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{msg.t}</div>}
+      {msg && (
+        <div className={`no-print mb-4 flex flex-wrap items-center gap-3 rounded-lg p-3 text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+          <span className="flex-1">{msg.t}</span>
+          {valeDireto && <Link href={`/estoque/vale/${valeDireto.id}`} className="btn-primary px-3 py-1.5">🖨️ Imprimir vale {valeDireto.numero}</Link>}
+        </div>
+      )}
       {podeReceber && ["aberto", "parcial"].includes(ped.status) && (
         <ReceberPedido ped={ped} itens={itens as any} prodNome={prodNome} prodUn={prodUn}
-          onRecebido={(t) => { setMsg({ ok: true, t }); carregar(); }} />
+          onRecebido={(t, vale) => { setMsg({ ok: true, t }); setValeDireto(vale); carregar(); }} />
       )}
 
       <div className="doc rounded-xl bg-white p-8 text-gray-800 shadow-sm print:p-0 print:shadow-none">
@@ -171,6 +177,7 @@ export default function PedidoCompraDocumento({ id }: { id: string }) {
                     <span className="text-gray-500">{formatDate(r.data)}</span>
                     {r.nota_fiscal && <span className="text-gray-600">NF {r.nota_fiscal}</span>}
                     {r.anexo_caminho && <button className="text-brand-700 hover:underline" onClick={() => abrirAnexo(r.anexo_caminho)}>📎 {r.anexo_nome ?? "nota fiscal"}</button>}
+                    {r.vale_id && <Link href={`/estoque/vale/${r.vale_id}`} className="text-brand-700 hover:underline">🚚 entrega direta (vale)</Link>}
                     {gerencia && <span className="ml-auto font-medium tabular-nums">{formatCurrency(r.valor)}</span>}
                   </div>
                   <ul className="mt-1 text-xs text-gray-600">
