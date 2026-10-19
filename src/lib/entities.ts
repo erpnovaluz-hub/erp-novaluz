@@ -449,6 +449,10 @@ export const ENTITIES: Record<string, EntityDef> = {
         { value: "outros", label: "Outros" },
       ] },
       { key: "tipo", label: "Tipo", type: "select", options: TIPO_PRODUTO },
+      { key: "custo_os", label: "Custo na OS (só para Serviço comprado)", type: "select", options: [
+        { value: "mao_obra", label: "Mão de obra terceirizada (diária, hora)" },
+        { value: "outros", label: "Outros custos (frete, aluguel de equipamento, hospedagem…)" },
+      ] },
       { key: "unidade", label: "Unidade", type: "text", placeholder: "un, kg, m…" },
       { key: "custo_medio", label: "Custo médio", type: "currency", hideInForm: true },
       { key: "estoque_minimo", label: "Estoque mínimo", type: "number" },
@@ -625,6 +629,7 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "numero", label: "Número", type: "text" },
       { key: "fornecedor_id", label: "Fornecedor", type: "ref", required: true, ref: { table: "fornecedores", labelField: "nome" } },
       { key: "deposito_id", label: "Depósito de destino", type: "ref", ref: { table: "depositos", labelField: "nome" } },
+      { key: "os_id", label: "OS (serviços e custos do pedido vão para ela)", type: "ref", ref: { table: "ordens_servico", labelField: "titulo" } },
       { key: "categoria_id", label: "Categoria (a pagar)", type: "ref", ref: { table: "categorias_financeiras", labelField: "nome" } },
       { key: "data", label: "Data", type: "date" },
       { key: "vencimento", label: "Vencimento (a pagar)", type: "date" },

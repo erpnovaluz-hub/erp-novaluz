@@ -37,6 +37,7 @@ export default function PedidoCompraDocumento({ id }: { id: string }) {
   const [itens, setItens] = useState<Row[]>([]);
   const [fornecedor, setFornecedor] = useState<Row | null>(null);
   const [deposito, setDeposito] = useState<Row | null>(null);
+  const [osPed, setOsPed] = useState<Row | null>(null);
   const [prodNome, setProdNome] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState(true);
 
@@ -46,6 +47,7 @@ export default function PedidoCompraDocumento({ id }: { id: string }) {
     setPed(p.data); setItens(it.data ?? []);
     if (p.data?.fornecedor_id) setFornecedor((await supabase.from("fornecedores").select("*").eq("id", p.data.fornecedor_id).maybeSingle()).data);
     if (p.data?.deposito_id) setDeposito((await supabase.from("depositos").select("nome").eq("id", p.data.deposito_id).maybeSingle()).data);
+    if (p.data?.os_id) setOsPed((await supabase.from("ordens_servico").select("numero, titulo").eq("id", p.data.os_id).maybeSingle()).data);
     const prods = await supabase.from("produtos").select("id, nome, unidade").range(0, 19999);
     setProdNome(Object.fromEntries((prods.data ?? []).map((x: any) => [x.id, x.nome])));
     setProdUn(Object.fromEntries((prods.data ?? []).map((x: any) => [x.id, x.unidade ?? ""])));
@@ -119,6 +121,7 @@ export default function PedidoCompraDocumento({ id }: { id: string }) {
             <Campo rot="Vencimento" val={formatDate(ped.vencimento)} />
             <Campo rot="Depósito" val={deposito?.nome} />
             <div><p className="text-[11px] uppercase text-gray-400">Status</p><Badge value={ped.status} options={STATUS} /></div>
+            {osPed && <div className="col-span-2"><Campo rot="OS" val={[osPed.numero, osPed.titulo].filter(Boolean).join(" · ")} /></div>}
           </div>
         </div>
 

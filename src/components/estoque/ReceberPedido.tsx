@@ -43,7 +43,7 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
   const [equipe, setEquipe] = useState<Opcao[]>([]);
   // mão de obra terceirizada: item de serviço vira custo da OS (não passa pelo estoque)
   const [servicos, setServicos] = useState<Set<string>>(new Set());
-  const [servOs, setServOs] = useState("");
+  const [servOs, setServOs] = useState<string>(ped.os_id ?? "");
 
   const pendentes = itens.filter((it) => Number(it.quantidade) > Number(it.quantidade_recebida));
   const ehServico = (it: Item) => servicos.has(it.produto_id);
@@ -77,10 +77,12 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
       setEquipe(e.data ?? []);
       const r = rq.data as any;
       const id = r?.destino_tipo === "os" ? r.os_id : r?.destino_tipo === "obra" ? r.obra_id : r?.destino_tipo === "setor" ? r.centro_custo_id : null;
-      if (r?.destino_tipo && id) { setDestTipo(r.destino_tipo); setDestId(id); }
-      if (r?.destino_tipo === "os" && r.os_id) setServOs(r.os_id);
+      // OS do pedido tem prioridade; senão, o destino da requisição de origem
+      if (ped.os_id) { setDestTipo("os"); setDestId(ped.os_id); }
+      else if (r?.destino_tipo && id) { setDestTipo(r.destino_tipo); setDestId(id); }
+      if (!ped.os_id && r?.destino_tipo === "os" && r.os_id) setServOs(r.os_id);
     });
-  }, [supabase, ped.id]);
+  }, [supabase, ped.id, ped.os_id]);
 
   // material: sugere "chegou tudo que falta" e o almoxarife corrige o que veio diferente;
   // serviço começa vazio: lança só as diárias/horas que já foram trabalhadas
@@ -136,7 +138,7 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
     setDireta(false); setColaborador("");
     const partes = [
       matAceito && (vale ? `material entregue direto no destino pelo vale ${vale.numero}` : "estoque atualizado"),
-      servAceito && "serviço lançado na OS como mão de obra terceirizada",
+      servAceito && "serviço lançado no custo da OS",
     ].filter(Boolean).join("; ");
     onRecebido(`✓ ${(r as any)?.numero ?? "Recebimento"} registrado: ${partes}. ${st}`, vale);
   }
@@ -264,7 +266,7 @@ export default function ReceberPedido({ ped, itens, prodNome, prodUn, onRecebido
           {gravando ? "Registrando…" : `Confirmar recebimento (${aceitos.length} item(ns))`}
         </button>
         <span className="text-xs text-gray-500">
-          {!temMaterial ? "Gera o título a pagar e lança o custo na OS como mão de obra terceirizada."
+          {!temMaterial ? "Gera o título a pagar e lança o custo na OS (mão de obra terceirizada ou outros custos, conforme o cadastro do serviço)."
             : direta ? "Gera o título a pagar e o vale de saída para o destino; o saldo do depósito não muda."
             : "Dá entrada no estoque e gera o título a pagar do que chegou."}
         </span>
