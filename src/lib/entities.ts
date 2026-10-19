@@ -99,6 +99,7 @@ export const GROUPS: GroupDef[] = [
     { href: "/os", label: "Ordens de Serviço", icon: "📋" },
     { href: "/os/apontar", label: "Apontar horas", icon: "⏱️" },
     { href: "/os/indicadores", label: "Indicadores de OS", icon: "📈" },
+    { href: "/e/obras_servicos", label: "Obras (cadastro)", icon: "🏗️" },
     { href: "/obras", label: "Painel de obras (TV)", icon: "📺" },
   ] },
   { key: "relatorios", label: "Relatórios", icon: "📄", extras: [
