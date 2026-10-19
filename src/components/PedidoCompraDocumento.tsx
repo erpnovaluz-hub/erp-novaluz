@@ -12,6 +12,9 @@ import WhatsAppButton from "@/components/WhatsAppButton";
 import ReceberPedido from "@/components/estoque/ReceberPedido";
 import { useAcesso, usePode } from "@/components/AcessoProvider";
 import { qtdBR } from "@/lib/almox";
+import { FORMA_PAGAMENTO } from "@/lib/entities";
+
+const formaLabel = (v: string | null | undefined) => (v ? FORMA_PAGAMENTO.find((o) => o.value === v)?.label ?? v : null);
 
 type Row = Record<string, any>;
 const STATUS = [
@@ -79,7 +82,7 @@ export default function PedidoCompraDocumento({ id }: { id: string }) {
 
   function msgWhats() {
     const linhas = itens.map((it) => `• ${prodNome[it.produto_id] ?? "-"} — ${Number(it.quantidade)} x ${formatCurrency(it.custo_unitario)} = ${formatCurrency(it.subtotal)}`).join("\n");
-    return `*PEDIDO DE COMPRA ${ped!.numero ?? ""}*\nFornecedor: ${fornecedor?.nome ?? "-"}\nData: ${formatDate(ped!.data)} · Venc.: ${formatDate(ped!.vencimento)}\n\n${linhas}\n\nTOTAL: ${formatCurrency(ped!.valor_total)}${ped!.observacao ? `\nObs: ${ped!.observacao}` : ""}`;
+    return `*PEDIDO DE COMPRA ${ped!.numero ?? ""}*\nFornecedor: ${fornecedor?.nome ?? "-"}\nData: ${formatDate(ped!.data)} · Venc.: ${formatDate(ped!.vencimento)}${ped!.forma_pagamento ? `\nPagamento: ${formaLabel(ped!.forma_pagamento)}` : ""}\n\n${linhas}\n\nTOTAL: ${formatCurrency(ped!.valor_total)}${ped!.observacao ? `\nObs: ${ped!.observacao}` : ""}`;
   }
 
   return (
@@ -122,6 +125,13 @@ export default function PedidoCompraDocumento({ id }: { id: string }) {
             <Campo rot="Depósito" val={deposito?.nome} />
             <div><p className="text-[11px] uppercase text-gray-400">Status</p><Badge value={ped.status} options={STATUS} /></div>
             {osPed && <div className="col-span-2"><Campo rot="OS" val={[osPed.numero, osPed.titulo].filter(Boolean).join(" · ")} /></div>}
+            <div className="col-span-2"><Campo rot="Forma de pagamento" val={formaLabel(ped.forma_pagamento)} /></div>
+            {ped.dados_pagamento && (
+              <div className="col-span-2">
+                <p className="text-[11px] uppercase text-gray-400">Dados para pagamento</p>
+                <p className="whitespace-pre-line text-sm">{ped.dados_pagamento}</p>
+              </div>
+            )}
           </div>
         </div>
 

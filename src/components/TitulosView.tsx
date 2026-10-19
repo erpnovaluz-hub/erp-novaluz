@@ -8,6 +8,7 @@ import TituloDrawer from "@/components/TituloDrawer";
 import PrintButton from "@/components/PrintButton";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
 import { buscarTodos } from "@/lib/supabase/buscarTodos";
+import { FORMA_PAGAMENTO } from "@/lib/entities";
 
 type Row = Record<string, any>;
 type Tipo = "pagar" | "receber";
@@ -215,6 +216,8 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
                       <p className="truncate text-xs text-gray-400">
                         {catNome[r.categoria_id] ?? "sem categoria"}
                         {r.subcategoria_id && subNome[r.subcategoria_id] ? ` › ${subNome[r.subcategoria_id]}` : ""}
+                        {r.forma_pagamento && ` · ${FORMA_PAGAMENTO.find((o) => o.value === r.forma_pagamento)?.label ?? r.forma_pagamento}`}
+                        {r.forma_pagamento && !r.dados_pagamento && r.forma_pagamento !== "dinheiro" && r.forma_pagamento !== "cartao" && " (sem dados)"}
                       </p>
                     </div>
                     <div className="w-28 shrink-0 text-right font-medium tabular-nums text-gray-900">{formatCurrency(r.valor)}</div>

@@ -175,6 +175,12 @@ const STATUS_OBRA: Option[] = [
 const TIPO_PRODUTO: Option[] = [
   { value: "insumo", label: "Insumo" }, { value: "produto", label: "Produto" }, { value: "servico", label: "Serviço" },
 ];
+export const FORMA_PAGAMENTO: Option[] = [
+  { value: "pix", label: "PIX" }, { value: "boleto", label: "Boleto" },
+  { value: "transferencia", label: "Transferência (TED)" }, { value: "cartao", label: "Cartão" },
+  { value: "dinheiro", label: "Dinheiro" }, { value: "cheque", label: "Cheque" },
+];
+const DADOS_PAGAMENTO_PH = "chave PIX, banco/agência/conta, favorecido, condição (ex.: 28 dias)…";
 const NATUREZA: Option[] = [
   { value: "receita", label: "Receita", color: "green" }, { value: "despesa", label: "Despesa", color: "red" },
 ];
@@ -413,6 +419,8 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "telefone", label: "Telefone", type: "text" },
       { key: "email", label: "E-mail", type: "text" },
       { key: "contato", label: "Contato", type: "text" },
+      { key: "forma_pagamento", label: "Forma de pagamento (padrão)", type: "select", options: FORMA_PAGAMENTO },
+      { key: "dados_pagamento", label: "Dados para pagamento (padrão)", type: "textarea", placeholder: DADOS_PAGAMENTO_PH },
       { key: "ativo", label: "Ativo", type: "boolean" },
     ],
   },
@@ -633,6 +641,8 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "categoria_id", label: "Categoria (a pagar)", type: "ref", ref: { table: "categorias_financeiras", labelField: "nome" } },
       { key: "data", label: "Data", type: "date" },
       { key: "vencimento", label: "Vencimento (a pagar)", type: "date" },
+      { key: "forma_pagamento", label: "Forma de pagamento (vazio = padrão do fornecedor)", type: "select", options: FORMA_PAGAMENTO },
+      { key: "dados_pagamento", label: "Dados para pagamento (vazio = padrão do fornecedor)", type: "textarea", placeholder: DADOS_PAGAMENTO_PH },
       { key: "valor_total", label: "Valor total", type: "currency", hideInForm: true },
       { key: "status", label: "Status (para receber use a tela do pedido 🖨️ → Receber material)", type: "select", options: STATUS_PEDIDO },
       { key: "observacao", label: "Observação", type: "textarea" },
