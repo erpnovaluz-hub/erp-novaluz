@@ -51,6 +51,9 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [editando, setEditando] = useState<Row | null>(null);
+  // marcação para somar valores (ex.: o que vai ser pago hoje)
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  const marcar = (id: string) => setMarcados((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const catNome = useMemo(() => Object.fromEntries(cats.map((c) => [c.id, c.nome])), [cats]);
   const subNome = useMemo(() => Object.fromEntries(subs.map((s) => [s.id, s.nome])), [subs]);
@@ -106,6 +109,10 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
 
   const total = rows.reduce((s, r) => s + Number(r.valor || 0), 0);
   const aberto = rows.filter((r) => r.status === "aberto").reduce((s, r) => s + Number(r.valor || 0), 0);
+  // só conta o que está na lista atual (filtro trocado não soma marcado escondido)
+  const selecionados = rows.filter((r) => marcados.has(r.id));
+  const somaMarcados = selecionados.reduce((s, r) => s + Number(r.valor || 0), 0);
+  const todosMarcados = rows.length > 0 && selecionados.length === rows.length;
 
   const cor = tipo === "pagar" ? "text-red-600" : "text-green-600";
   const titulo = tipo === "pagar" ? "Contas a Pagar" : "Contas a Receber";
@@ -194,6 +201,12 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
         <span className="text-gray-500">{rows.length} lançamento(s)</span>
         <span className="text-gray-500">Total: <b className="text-gray-900">{formatCurrency(total)}</b></span>
         <span className="text-gray-500">Em aberto: <b className={cor}>{formatCurrency(aberto)}</b></span>
+        {selecionados.length > 0 && (
+          <span className="rounded-full bg-brand-50 px-3 py-0.5 text-brand-700 ring-1 ring-brand-200">
+            ☑ {selecionados.length} marcado(s): <b>{formatCurrency(somaMarcados)}</b>
+            <button className="no-print ml-2 text-xs text-brand-600 underline" onClick={() => setMarcados(new Set())}>desmarcar</button>
+          </span>
+        )}
       </div>
 
       {erro && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
@@ -206,11 +219,20 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
           <div className="px-4 py-12 text-center text-gray-400">Nenhum lançamento neste filtro.</div>
         ) : (
           <ul className="divide-y divide-gray-100">
+            <li className="no-print flex items-center gap-3 bg-gray-50 px-4 py-2 text-xs text-gray-500">
+              <input type="checkbox" className="h-4 w-4" checked={todosMarcados} aria-label="Marcar todos"
+                onChange={() => setMarcados(todosMarcados ? new Set() : new Set(rows.map((r) => r.id)))} />
+              <span>{todosMarcados ? "desmarcar todos" : "marcar todos"}</span>
+            </li>
             {rows.map((r) => {
               const vencido = r.status === "aberto" && r.vencimento && r.vencimento < hoje;
               return (
-                <li key={r.id}>
-                  <button onClick={() => setEditando(r)} className="linha-lista flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-gray-50">
+                <li key={r.id} className={`flex items-center ${marcados.has(r.id) ? "bg-brand-50/60" : ""}`}>
+                  <label className="no-print flex cursor-pointer items-center self-stretch pl-4 pr-1">
+                    <input type="checkbox" className="h-4 w-4" checked={marcados.has(r.id)} onChange={() => marcar(r.id)}
+                      aria-label={`Marcar ${r.descricao}`} />
+                  </label>
+                  <button onClick={() => setEditando(r)} className="linha-lista flex min-w-0 flex-1 items-center gap-4 px-3 py-3 text-left hover:bg-gray-50">
                     <div className="linha-principal min-w-0 flex-1">
                       <p className="truncate font-medium text-gray-900">{r.descricao}</p>
                       <p className="truncate text-xs text-gray-400">
