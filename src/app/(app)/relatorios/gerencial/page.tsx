@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency } from "@/lib/format";
 import ReportHeader from "@/components/ReportHeader";
+import { STATUS_OS } from "@/lib/os";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ export default async function RelatorioGerencial() {
   const valorProd = (prod ?? []).reduce((s: number, r: any) => s + Number(r.valor_total || 0), 0);
 
   const osStatus = (os ?? []).reduce((m: Record<string, number>, r: any) => { m[r.status] = (m[r.status] || 0) + 1; return m; }, {});
-  const osLabels: Record<string, string> = { a_fazer: "A fazer", em_andamento: "Em andamento", concluido: "Concluído", cancelado: "Cancelado" };
+  const osLabels: Record<string, string> = Object.fromEntries(STATUS_OS.map((s) => [s.value, s.label]));
 
   return (
     <div className="space-y-6">

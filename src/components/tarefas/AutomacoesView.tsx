@@ -146,7 +146,7 @@ export default function AutomacoesView() {
                   </label>
                 ) : <span />}
                 {/* estes usam a própria data (vencimento / devolução / manutenção) como prazo */}
-                {!["titulo_vencendo", "ferramenta_atrasada", "manutencao_ferramenta"].includes(a.gatilho) && (
+                {!["titulo_vencendo", "ferramenta_atrasada", "manutencao_ferramenta", "manutencao_os"].includes(a.gatilho) && (
                   <label className="block">
                     <span className="text-xs text-gray-500">Prazo da tarefa</span>
                     <div className="mt-1 flex items-center gap-2">

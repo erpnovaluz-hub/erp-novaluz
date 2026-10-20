@@ -1,5 +1,6 @@
+import { Suspense } from "react";
 import RequisicaoNova from "@/components/estoque/RequisicaoNova";
 
 export default function NovaRequisicaoPage() {
-  return <RequisicaoNova />;
+  return <Suspense><RequisicaoNova /></Suspense>;
 }

@@ -18,7 +18,7 @@ export default function PainelObras() {
 
   const carregar = useCallback(async () => {
     const { data: os } = await supabase.from("ordens_servico").select("*")
-      .eq("is_obra", true).not("status", "in", "(concluida,cancelada)").order("prazo", { ascending: true, nullsFirst: false });
+      .eq("is_obra", true).not("status", "in", "(concluido,faturada,cancelado)").order("prazo", { ascending: true, nullsFirst: false });
     const lista = os ?? [];
     setObras(lista);
     const ids = lista.map((o: any) => o.id);

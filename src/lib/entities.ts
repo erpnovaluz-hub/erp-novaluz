@@ -37,6 +37,7 @@ export type EntityDef = {
   listColumns: string[];
   hideInNav?: boolean;   // existe no registro (form/rotas) mas não aparece no menu
   docRoute?: string;     // se definido, a lista mostra um link "🖨️" -> `${docRoute}/${id}`
+  reportRoute?: string;  // se definido, o cabeçalho da lista mostra o botão "📄 Relatório"
 };
 
 export type GroupDef = {
@@ -47,6 +48,7 @@ export type GroupDef = {
 };
 
 import { FOTOS_PORTFOLIO } from "@/lib/empresa";
+import { MOTIVOS_PAUSA, STATUS_OS as STATUS_OS_LIB } from "@/lib/os";
 const FOTO_OPCOES: Option[] = [
   ...FOTOS_PORTFOLIO.map((f) => ({ value: f.arquivo, label: f.titulo })),
 ];
@@ -84,6 +86,7 @@ export const GROUPS: GroupDef[] = [
     { href: "/rh/relatorio", label: "Relatório da folha", icon: "📊" },
     { href: "/rh/beneficios", label: "Tipos de benefício", icon: "🎁" },
     { href: "/e/colaboradores", label: "Colaboradores", icon: "👷" },
+    { href: "/rh/colaboradores", label: "Relatório de colaboradores", icon: "📋" },
   ] },
   { key: "impacto", label: "Impacto / Produção", icon: "🏭", extras: [
     { href: "/impacto/producao", label: "Lançamentos de produção", icon: "⚙️" },
@@ -94,6 +97,9 @@ export const GROUPS: GroupDef[] = [
   ] },
   { key: "os", label: "Ordens de Serviço", icon: "🧷", extras: [
     { href: "/os", label: "Ordens de Serviço", icon: "📋" },
+    { href: "/os/apontar", label: "Apontar horas", icon: "⏱️" },
+    { href: "/os/indicadores", label: "Indicadores de OS", icon: "📈" },
+    { href: "/e/obras_servicos", label: "Obras (cadastro)", icon: "🏗️" },
     { href: "/obras", label: "Painel de obras (TV)", icon: "📺" },
   ] },
   { key: "relatorios", label: "Relatórios", icon: "📄", extras: [
@@ -169,6 +175,12 @@ const STATUS_OBRA: Option[] = [
 const TIPO_PRODUTO: Option[] = [
   { value: "insumo", label: "Insumo" }, { value: "produto", label: "Produto" }, { value: "servico", label: "Serviço" },
 ];
+export const FORMA_PAGAMENTO: Option[] = [
+  { value: "pix", label: "PIX" }, { value: "boleto", label: "Boleto" },
+  { value: "transferencia", label: "Transferência (TED)" }, { value: "cartao", label: "Cartão" },
+  { value: "dinheiro", label: "Dinheiro" }, { value: "cheque", label: "Cheque" },
+];
+const DADOS_PAGAMENTO_PH = "chave PIX, banco/agência/conta, favorecido, condição (ex.: 28 dias)…";
 const NATUREZA: Option[] = [
   { value: "receita", label: "Receita", color: "green" }, { value: "despesa", label: "Despesa", color: "red" },
 ];
@@ -223,12 +235,8 @@ const URGENCIA: Option[] = [
   { value: "media", label: "Média", color: "amber" },
   { value: "alta", label: "Alta", color: "red" },
 ];
-const STATUS_OS: Option[] = [
-  { value: "a_fazer", label: "A fazer", color: "gray" },
-  { value: "em_andamento", label: "Em andamento", color: "blue" },
-  { value: "concluido", label: "Concluído", color: "green" },
-  { value: "cancelado", label: "Cancelado", color: "gray" },
-];
+// status de OS: fonte única em src/lib/os.ts (migration 0051)
+const STATUS_OS: Option[] = STATUS_OS_LIB;
 const STATUS_ATIV: Option[] = [
   { value: "nao_iniciado", label: "Não iniciado", color: "gray" },
   { value: "em_andamento", label: "Em andamento", color: "blue" },
@@ -283,7 +291,8 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "tipo", label: "Tipo", type: "select", options: TIPO_INTERACAO, required: true },
       { key: "resumo", label: "Resumo", type: "textarea" },
       { key: "proximo_passo", label: "Próximo passo", type: "textarea" },
-      { key: "responsavel", label: "Responsável", type: "text" },
+      { key: "responsavel_id", label: "Responsável", type: "ref", ref: { table: "perfis", labelField: "nome" } },
+      { key: "responsavel", label: "Responsável (texto antigo)", type: "text", hideInForm: true },
     ],
   },
   oportunidades: {
@@ -410,6 +419,8 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "telefone", label: "Telefone", type: "text" },
       { key: "email", label: "E-mail", type: "text" },
       { key: "contato", label: "Contato", type: "text" },
+      { key: "forma_pagamento", label: "Forma de pagamento (padrão)", type: "select", options: FORMA_PAGAMENTO },
+      { key: "dados_pagamento", label: "Dados para pagamento (padrão)", type: "textarea", placeholder: DADOS_PAGAMENTO_PH },
       { key: "ativo", label: "Ativo", type: "boolean" },
     ],
   },
@@ -446,6 +457,10 @@ export const ENTITIES: Record<string, EntityDef> = {
         { value: "outros", label: "Outros" },
       ] },
       { key: "tipo", label: "Tipo", type: "select", options: TIPO_PRODUTO },
+      { key: "custo_os", label: "Custo na OS (só para Serviço comprado)", type: "select", options: [
+        { value: "mao_obra", label: "Mão de obra terceirizada (diária, hora)" },
+        { value: "outros", label: "Outros custos (frete, aluguel de equipamento, hospedagem…)" },
+      ] },
       { key: "unidade", label: "Unidade", type: "text", placeholder: "un, kg, m…" },
       { key: "custo_medio", label: "Custo médio", type: "currency", hideInForm: true },
       { key: "estoque_minimo", label: "Estoque mínimo", type: "number" },
@@ -501,6 +516,7 @@ export const ENTITIES: Record<string, EntityDef> = {
   colaboradores: {
     key: "colaboradores", label: "Colaborador", labelPlural: "Colaboradores", icon: "👷", group: "cadastros",
     titleField: "nome", searchField: "nome", orderBy: { column: "nome", ascending: true },
+    reportRoute: "/rh/colaboradores",
     listColumns: ["nome", "cargo", "funcao_padrao", "salario_base", "ativo"],
     fields: [
       { key: "nome", label: "Nome", type: "text", required: true },
@@ -621,9 +637,12 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "numero", label: "Número", type: "text" },
       { key: "fornecedor_id", label: "Fornecedor", type: "ref", required: true, ref: { table: "fornecedores", labelField: "nome" } },
       { key: "deposito_id", label: "Depósito de destino", type: "ref", ref: { table: "depositos", labelField: "nome" } },
+      { key: "os_id", label: "OS (serviços e custos do pedido vão para ela)", type: "ref", ref: { table: "ordens_servico", labelField: "titulo" } },
       { key: "categoria_id", label: "Categoria (a pagar)", type: "ref", ref: { table: "categorias_financeiras", labelField: "nome" } },
       { key: "data", label: "Data", type: "date" },
       { key: "vencimento", label: "Vencimento (a pagar)", type: "date" },
+      { key: "forma_pagamento", label: "Forma de pagamento (vazio = padrão do fornecedor)", type: "select", options: FORMA_PAGAMENTO },
+      { key: "dados_pagamento", label: "Dados para pagamento (vazio = padrão do fornecedor)", type: "textarea", placeholder: DADOS_PAGAMENTO_PH },
       { key: "valor_total", label: "Valor total", type: "currency", hideInForm: true },
       { key: "status", label: "Status (para receber use a tela do pedido 🖨️ → Receber material)", type: "select", options: STATUS_PEDIDO },
       { key: "observacao", label: "Observação", type: "textarea" },
@@ -821,7 +840,7 @@ export const ENTITIES: Record<string, EntityDef> = {
     key: "ordens_servico", label: "Ordem de Serviço", labelPlural: "Ordens de Serviço", icon: "📋", group: "os",
     hideInNav: true,
     titleField: "titulo", searchField: "titulo", orderBy: { column: "prazo", ascending: true },
-    listColumns: ["numero", "titulo", "cliente_id", "responsavel", "prazo", "urgencia", "status"],
+    listColumns: ["numero", "titulo", "cliente_id", "responsavel_id", "prazo", "urgencia", "status"],
     fields: [
       { key: "numero", label: "Número (automático se vazio)", type: "text" },
       { key: "cliente_id", label: "Cliente", type: "ref", ref: { table: "clientes", labelField: "nome" } },
@@ -837,6 +856,8 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "custo_estimado", label: "Custo estimado", type: "currency" },
       { key: "urgencia", label: "Urgência", type: "select", options: URGENCIA },
       { key: "status", label: "Status", type: "select", options: STATUS_OS },
+      { key: "motivo_pausa", label: "Motivo da pausa (se pausada)", type: "select", options: MOTIVOS_PAUSA },
+      { key: "pausa_obs", label: "Detalhe da pausa", type: "text" },
       { key: "is_obra", label: "É obra? (aparece no painel de obras)", type: "boolean" },
       { key: "gargalos", label: "Gargalos / atenção", type: "textarea" },
       { key: "orientacoes", label: "Principais cuidados / orientações", type: "textarea" },

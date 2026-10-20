@@ -22,8 +22,8 @@ export default function CautelaNova() {
   const [equipe, setEquipe] = useState<Opcao[]>([]);
   const [destinos, setDestinos] = useState<Record<DestinoTipo, Opcao[]>>({ os: [], obra: [], setor: [] });
   const [colab, setColab] = useState("");
-  const [destTipo, setDestTipo] = useState<DestinoTipo | "">("");
-  const [destId, setDestId] = useState("");
+  const [destTipo, setDestTipo] = useState<DestinoTipo | "">(() => (params.get("os") ? "os" : ""));
+  const [destId, setDestId] = useState(() => params.get("os") ?? "");
   const [previsao, setPrevisao] = useState(() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10); });
   const [obs, setObs] = useState("");
   const [busca, setBusca] = useState("");
@@ -35,7 +35,7 @@ export default function CautelaNova() {
     Promise.all([
       supabase.from("ferramentas").select("*").eq("status", "disponivel").order("codigo").range(0, 9999),
       supabase.from("vw_equipe").select("id, nome").eq("ativo", true).order("nome").range(0, 4999),
-      supabase.from("ordens_servico").select("id, numero, titulo").in("status", ["a_fazer", "em_andamento"]).range(0, 999),
+      supabase.from("ordens_servico").select("id, numero, titulo").in("status", ["a_fazer", "em_andamento", "pausada"]).range(0, 999),
       supabase.from("obras_servicos").select("id, local").in("status", ["planejada", "em_execucao"]).range(0, 999),
       supabase.from("centros_custo").select("id, nome").eq("ativo", true).order("nome"),
     ]).then(([f, e, o, ob, cc]) => {

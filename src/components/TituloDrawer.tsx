@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/format";
+import { FORMA_PAGAMENTO } from "@/lib/entities";
 
 type Opt = { id: string; nome: string };
 type SubOpt = { id: string; nome: string; categoria_id: string };
@@ -41,6 +42,8 @@ export default function TituloDrawer({
     status: registro.status ?? "aberto",
     conta_bancaria_id: registro.conta_bancaria_id ?? "",
     data_pagamento: (registro.data_pagamento ?? "").slice(0, 10),
+    forma_pagamento: registro.forma_pagamento ?? "",
+    dados_pagamento: registro.dados_pagamento ?? "",
   });
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -65,6 +68,8 @@ export default function TituloDrawer({
       subcategoria_id: f.subcategoria_id || null,
       cliente_id: tipo === "receber" ? (f.cliente_id || null) : null,
       fornecedor_id: tipo === "pagar" ? (f.fornecedor_id || null) : null,
+      forma_pagamento: f.forma_pagamento || null,
+      dados_pagamento: f.dados_pagamento.trim() || null,
     };
 
     // parcelamento (só em novo lançamento)
@@ -170,6 +175,21 @@ export default function TituloDrawer({
               </select>
             </div>
           )}
+
+          <div className="rounded-lg border border-gray-200 p-3">
+            <label className="lbl">Forma de pagamento</label>
+            <select className="inp" value={f.forma_pagamento} onChange={(e) => set("forma_pagamento", e.target.value)}>
+              <option value="">{tipo === "pagar" ? "— (padrão do fornecedor)" : "—"}</option>
+              {FORMA_PAGAMENTO.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <label className="lbl mt-3">Dados para pagamento</label>
+            <textarea className="inp min-h-[70px]" value={f.dados_pagamento} onChange={(e) => set("dados_pagamento", e.target.value)}
+              placeholder="chave PIX, banco/agência/conta, favorecido, linha digitável…" />
+            {f.dados_pagamento.trim() && (
+              <button type="button" className="mt-1 text-xs text-brand-600 hover:underline"
+                onClick={() => navigator.clipboard?.writeText(f.dados_pagamento.trim())}>📋 copiar dados</button>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>

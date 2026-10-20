@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency } from "@/lib/format";
 import PrintButton from "@/components/PrintButton";
+import { STATUS_OS } from "@/lib/os";
 
 export const dynamic = "force-dynamic";
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -141,7 +142,7 @@ export default async function GerencialPage(props: { searchParams: Promise<{ ano
           </Secao>
           <Secao titulo="Ordens de Serviço">
             <div className="card divide-y divide-gray-100">
-              {[["a_fazer", "A fazer"], ["em_andamento", "Em andamento"], ["concluido", "Concluído"], ["cancelado", "Cancelado"]].map(([k, l]) => (
+              {STATUS_OS.map((s) => [s.value, s.label]).map(([k, l]) => (
                 <div key={k} className="flex justify-between px-4 py-2 text-sm">
                   <span className="text-gray-600">{l}</span><span className="font-medium">{osStatus[k] ?? 0}</span>
                 </div>

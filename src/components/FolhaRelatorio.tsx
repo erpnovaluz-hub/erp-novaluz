@@ -40,7 +40,19 @@ export default function FolhaRelatorio() {
     const inativo = Object.fromEntries((colRes.data ?? []).map((c: any) => [c.id, c.ativo === false]));
     setColabInativo(inativo);
     // desligado conta no custo do mês em que recebeu; lançamento vazio de desligado não aparece
-    const rows = (lRes.data ?? []).filter((r: any) => !inativo[r.colaborador_id]
+    const brutas = lRes.data ?? [];
+    // adicional_dia15 não está na view (criada antes da coluna): busca direto da tabela
+    // e soma no custo, já que ele também sai do caixa (junto do adiantamento)
+    const adic15: Record<string, number> = {};
+    if (brutas.length) {
+      const { data } = await buscarTodos(supabase.from("folha_lancamentos").select("id, adicional_dia15").gte("competencia", ini).lt("competencia", fim).neq("adicional_dia15", 0));
+      for (const a of (data ?? []) as any[]) adic15[a.id] = num(a.adicional_dia15);
+    }
+    const comAdic = brutas.map((r: any) => {
+      const a15 = adic15[r.id] ?? 0;
+      return { ...r, adicional_dia15: a15, custo_total: num(r.custo_total) + a15 };
+    });
+    const rows = comAdic.filter((r: any) => !inativo[r.colaborador_id]
       || num(r.custo_total) !== 0 || num(r.salario_liquido) !== 0 || num(r.adiantamento) !== 0);
     setLancs(rows);
     const ids = rows.map((r: any) => r.id);
@@ -63,7 +75,7 @@ export default function FolhaRelatorio() {
 
   // por mês (ano inteiro — gráfico e tabela mensal)
   const porMes = useMemo(() => {
-    const base = MESES.map(() => ({ salarios: 0, beneficios: 0, extras: 0, descontos: 0, custo: 0, adiant: 0, fech: 0, colabs: 0 }));
+    const base = MESES.map(() => ({ salarios: 0, beneficios: 0, extras: 0, descontos: 0, custo: 0, adiant: 0, adic15: 0, fech: 0, colabs: 0 }));
     for (const l of lancs) {
       const m = mesDe(l.competencia);
       base[m].salarios += num(l.salario_liquido);
@@ -72,6 +84,7 @@ export default function FolhaRelatorio() {
       base[m].descontos += num(l.descontos);
       base[m].custo += num(l.custo_total);
       base[m].adiant += num(l.adiantamento);
+      base[m].adic15 += num(l.adicional_dia15);
       base[m].fech += num(l.fechamento);
       base[m].colabs += 1;
     }
@@ -88,28 +101,28 @@ export default function FolhaRelatorio() {
     return {
       salarios: a.salarios + num(l.salario_liquido), beneficios: a.beneficios + num(l.total_beneficios),
       extras: a.extras + num(l.horas_extras), descontos: a.descontos + num(l.descontos),
-      custo: a.custo + num(l.custo_total), adiant: a.adiant + num(l.adiantamento), fech: a.fech + num(l.fechamento),
+      custo: a.custo + num(l.custo_total), adiant: a.adiant + num(l.adiantamento), adic15: a.adic15 + num(l.adicional_dia15), fech: a.fech + num(l.fechamento),
       fSalario: a.fSalario + cam.fechSoSalario, fExtras: a.fExtras + cam.fechSalarioExtras,
     };
-  }, { salarios: 0, beneficios: 0, extras: 0, descontos: 0, custo: 0, adiant: 0, fech: 0, fSalario: 0, fExtras: 0 }), [lancsF]);
+  }, { salarios: 0, beneficios: 0, extras: 0, descontos: 0, custo: 0, adiant: 0, adic15: 0, fech: 0, fSalario: 0, fExtras: 0 }), [lancsF]);
 
   const totAno = useMemo(() => porMes.reduce((a, m) => ({
     salarios: a.salarios + m.salarios, beneficios: a.beneficios + m.beneficios,
     extras: a.extras + m.extras, descontos: a.descontos + m.descontos, custo: a.custo + m.custo,
-    adiant: a.adiant + m.adiant, fech: a.fech + m.fech,
-  }), { salarios: 0, beneficios: 0, extras: 0, descontos: 0, custo: 0, adiant: 0, fech: 0 }), [porMes]);
+    adiant: a.adiant + m.adiant, adic15: a.adic15 + m.adic15, fech: a.fech + m.fech,
+  }), { salarios: 0, beneficios: 0, extras: 0, descontos: 0, custo: 0, adiant: 0, adic15: 0, fech: 0 }), [porMes]);
 
   const mesesComDados = porMes.filter((m) => m.colabs > 0).length;
   const maxCusto = Math.max(1, ...porMes.map((m) => m.custo));
 
   // por colaborador (escopo)
   const porColab = useMemo(() => {
-    const map: Record<string, { custo: number; meses: number; faltas: number; adiant: number; fech: number }> = {};
+    const map: Record<string, { custo: number; meses: number; faltas: number; adiant: number; adic15: number; fech: number }> = {};
     for (const l of lancsF) {
       const k = l.colaborador_id;
-      (map[k] ??= { custo: 0, meses: 0, faltas: 0, adiant: 0, fech: 0 });
+      (map[k] ??= { custo: 0, meses: 0, faltas: 0, adiant: 0, adic15: 0, fech: 0 });
       map[k].custo += num(l.custo_total); map[k].meses += 1; map[k].faltas += num(l.faltas);
-      map[k].adiant += num(l.adiantamento); map[k].fech += num(l.fechamento);
+      map[k].adiant += num(l.adiantamento); map[k].adic15 += num(l.adicional_dia15); map[k].fech += num(l.fechamento);
     }
     return Object.entries(map)
       .map(([id, v]) => ({ id, nome: colabNome[id] ?? "—", inativo: !!colabInativo[id], ...v }))
@@ -149,7 +162,7 @@ export default function FolhaRelatorio() {
           {/* KPIs do escopo */}
           <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             <Kpi titulo={mes ? `Custo de ${escopo}` : "Custo total do ano"} valor={formatCurrency(tot.custo)} destaque />
-            <Kpi titulo="Adiantamento · dia 15" valor={formatCurrency(tot.adiant)} cor="amber" />
+            <Kpi titulo="Dia 15 · adiant. + adicional" valor={formatCurrency(tot.adiant + tot.adic15)} cor="amber" />
             <Kpi titulo="Fechamento · fim do mês" valor={formatCurrency(tot.fech)} cor="blue" />
             <Kpi titulo="Salários líquidos" valor={formatCurrency(tot.salarios)} />
             <Kpi titulo="Benefícios" valor={formatCurrency(tot.beneficios)} />
@@ -161,9 +174,13 @@ export default function FolhaRelatorio() {
           {/* planejamento de pagamento */}
           <div className="mb-5 grid gap-3 md:grid-cols-2">
             <div className="card p-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">Pagamento dia 15 — adiantamento</p>
-              <p className="text-2xl font-bold tabular-nums text-amber-900">{formatCurrency(tot.adiant)}</p>
-              <p className="mt-1 text-xs text-gray-400">líquido do adiantamento (% do salário) — {escopo}</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">Pagamento dia 15 — adiantamento + adicional</p>
+              <p className="text-2xl font-bold tabular-nums text-amber-900">{formatCurrency(tot.adiant + tot.adic15)}</p>
+              <div className="mt-2 space-y-1 text-sm">
+                <div className="flex justify-between"><span className="text-gray-600">Adiantamento <span className="text-xs text-gray-400">(% do salário)</span></span><span className="tabular-nums">{formatCurrency(tot.adiant)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-600">Adicional dia 15</span><span className="tabular-nums">{formatCurrency(tot.adic15)}</span></div>
+              </div>
+              <p className="mt-1 text-xs text-gray-400">{escopo}</p>
             </div>
             <div className="card p-4">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-700">Pagamento fim do mês — fechamento (em camadas)</p>
@@ -206,12 +223,18 @@ export default function FolhaRelatorio() {
             {/* por colaborador */}
             <div className="card overflow-x-auto p-4">
               <h2 className="mb-3 text-sm font-semibold text-gray-700">Custo por colaborador ({escopo})</h2>
-              <table className="w-full min-w-[460px] text-sm">
+              <table className="w-full min-w-[560px] text-sm">
                 <thead>
+                  <tr className="text-xs uppercase text-gray-400">
+                    <th colSpan={2} />
+                    <th colSpan={2} className="border-b border-amber-200 pt-1 text-center text-[10px] font-semibold tracking-wide text-amber-700">Dia 15</th>
+                    <th colSpan={2} />
+                  </tr>
                   <tr className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
                     <th className="py-2">Colaborador</th>
                     <th className="py-2 text-right">Faltas</th>
                     <th className="py-2 text-right text-amber-700">Adiant. 40%</th>
+                    <th className="py-2 pl-2 text-right text-amber-700">Adicional</th>
                     <th className="py-2 text-right text-blue-700">Fecham. 60%</th>
                     <th className="py-2 text-right">Total</th>
                   </tr>
@@ -225,6 +248,7 @@ export default function FolhaRelatorio() {
                       </td>
                       <td className={`py-2 text-right tabular-nums ${c.faltas > 0 ? "text-red-600" : "text-gray-400"}`}>{c.faltas || "—"}</td>
                       <td className="py-2 text-right tabular-nums text-amber-700">{formatCurrency(c.adiant)}</td>
+                      <td className={`py-2 pl-2 text-right tabular-nums ${c.adic15 ? "text-amber-700" : "text-gray-300"}`}>{c.adic15 ? formatCurrency(c.adic15) : "—"}</td>
                       <td className="py-2 text-right tabular-nums text-blue-700">{formatCurrency(c.fech)}</td>
                       <td className="py-2 text-right font-medium tabular-nums text-gray-900">{formatCurrency(c.custo)}</td>
                     </tr>
@@ -235,6 +259,7 @@ export default function FolhaRelatorio() {
                     <td className="py-2">Total</td>
                     <td className="py-2" />
                     <td className="py-2 text-right tabular-nums text-amber-700">{formatCurrency(tot.adiant)}</td>
+                    <td className="py-2 pl-2 text-right tabular-nums text-amber-700">{formatCurrency(tot.adic15)}</td>
                     <td className="py-2 text-right tabular-nums text-blue-700">{formatCurrency(tot.fech)}</td>
                     <td className="py-2 text-right tabular-nums text-brand-700">{formatCurrency(tot.custo)}</td>
                   </tr>
@@ -268,7 +293,7 @@ export default function FolhaRelatorio() {
           {/* tabela mensal detalhada */}
           <div className="card mt-5 overflow-x-auto">
             <h2 className="px-3 pt-3 text-sm font-semibold text-gray-700">Detalhamento mensal ({ano})</h2>
-            <table className="mt-2 w-full min-w-[860px] text-sm">
+            <table className="mt-2 w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
                   <th className="px-3 py-2">Mês</th>
@@ -278,6 +303,7 @@ export default function FolhaRelatorio() {
                   <th className="px-3 py-2 text-right">Horas extras</th>
                   <th className="px-3 py-2 text-right">Descontos</th>
                   <th className="px-3 py-2 text-right text-amber-700">Adiant. 40%</th>
+                  <th className="px-3 py-2 text-right text-amber-700">Adic. dia 15</th>
                   <th className="px-3 py-2 text-right text-blue-700">Fecham. 60%</th>
                   <th className="px-3 py-2 text-right">Custo total</th>
                 </tr>
@@ -292,6 +318,7 @@ export default function FolhaRelatorio() {
                     <td className="px-3 py-2 text-right tabular-nums">{m.extras ? formatCurrency(m.extras) : "—"}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{m.descontos ? formatCurrency(m.descontos) : "—"}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-amber-700">{m.adiant ? formatCurrency(m.adiant) : "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-amber-700">{m.adic15 ? formatCurrency(m.adic15) : "—"}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-blue-700">{m.fech ? formatCurrency(m.fech) : "—"}</td>
                     <td className="px-3 py-2 text-right font-medium tabular-nums text-gray-900">{m.custo ? formatCurrency(m.custo) : "—"}</td>
                   </tr>
@@ -306,6 +333,7 @@ export default function FolhaRelatorio() {
                   <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totAno.extras)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totAno.descontos)}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-amber-700">{formatCurrency(totAno.adiant)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-amber-700">{formatCurrency(totAno.adic15)}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-blue-700">{formatCurrency(totAno.fech)}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-brand-700">{formatCurrency(totAno.custo)}</td>
                 </tr>

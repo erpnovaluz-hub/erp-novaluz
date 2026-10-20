@@ -44,7 +44,7 @@ export default async function Dashboard() {
     supabase.from("vw_titulos_resumo").select("tipo, total").eq("status", "aberto"),
     supabase.from("vw_dre").select("competencia, tipo, total"),
     supabase.from("saldos_estoque").select("quantidade, produtos(custo_medio, estoque_minimo)"),
-    supabase.from("ordens_servico").select("*", { count: "exact", head: true }).in("status", ["a_fazer", "em_andamento"]),
+    supabase.from("ordens_servico").select("*", { count: "exact", head: true }).in("status", ["orcamento", "a_fazer", "em_andamento", "pausada"]),
     supabase.from("vw_producao_cliente").select("valor_total"),
   ]);
 

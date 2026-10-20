@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { useEmissora } from "@/lib/useEmissora";
 import DocHeader from "@/components/DocHeader";
 import PrintButton from "@/components/PrintButton";
-import Badge from "@/components/Badge";
-import { getEntity } from "@/lib/entities";
+import QrCode from "@/components/ferramentas/QrCode";
 
 type Row = Record<string, any>;
-const STATUS_ATIV = getEntity("atividades_os")!.fields.find((f) => f.key === "status")!.options!;
+// QR da OS impressa → acompanhamento ao vivo (status, %, fotos), sem login
+const urlAcompanhamento = (token: string) =>
+  `${typeof window !== "undefined" ? window.location.origin : ""}/publico/os/${token}`;
 
 export default function OSDocumento({ id }: { id: string }) {
   const supabase = useMemo(() => createClient(), []);
@@ -23,6 +24,7 @@ export default function OSDocumento({ id }: { id: string }) {
   const [colNome, setColNome] = useState<Record<string, string>>({});
   const [prodNome, setProdNome] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState(true);
+  const [respNome, setRespNome] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -31,6 +33,7 @@ export default function OSDocumento({ id }: { id: string }) {
       const i = await supabase.from("insumos_os").select("*").eq("os_id", id);
       setOs(o.data); setAtividades(a.data ?? []); setInsumos(i.data ?? []);
       if (o.data?.cliente_id) setCliente((await supabase.from("clientes").select("*").eq("id", o.data.cliente_id).maybeSingle()).data);
+      if (o.data?.responsavel_id) setRespNome((await supabase.from("perfis").select("nome, email").eq("id", o.data.responsavel_id).maybeSingle()).data?.nome ?? null);
       const col = await supabase.from("vw_equipe").select("id, nome").range(0, 4999);
       setColNome(Object.fromEntries((col.data ?? []).map((x: any) => [x.id, x.nome])));
       const pr = await supabase.from("produtos").select("id, nome").range(0, 4999);
@@ -41,9 +44,6 @@ export default function OSDocumento({ id }: { id: string }) {
 
   if (carregando) return <p className="text-gray-400">Carregando…</p>;
   if (!os) return <p className="text-gray-400">OS não encontrada. <Link href="/os" className="text-brand-600">voltar</Link></p>;
-
-  const custoInsumos = insumos.reduce((s, r) => s + Number(r.custo_total || 0), 0);
-  const progresso = atividades.length ? Math.round(atividades.reduce((s, a) => s + Number(a.conclusao_pct || 0), 0) / atividades.length) : 0;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -63,35 +63,33 @@ export default function OSDocumento({ id }: { id: string }) {
             {os.local && <p className="text-xs text-gray-500">Local: {os.local}</p>}
           </div>
           <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-50 p-3 text-sm">
-            <Campo rot="Responsável" val={os.responsavel} />
+            <Campo rot="Responsável" val={respNome ?? os.responsavel} />
             <Campo rot="Prazo" val={formatDate(os.prazo)} />
-            <Campo rot="Custo estimado" val={formatCurrency(os.custo_estimado)} />
-            <Campo rot="Progresso" val={`${progresso}%`} />
+            <Campo rot="Nº da OS" val={os.numero} />
+            <Campo rot="Emitida em" val={formatDate(new Date().toISOString())} />
           </div>
         </div>
 
-        {(os.motivo || os.como_sera_feito) && (
-          <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            {os.motivo && <div><p className="text-[11px] uppercase text-gray-400">Por quê</p><p className="text-gray-700">{os.motivo}</p></div>}
-            {os.como_sera_feito && <div><p className="text-[11px] uppercase text-gray-400">Como será feito</p><p className="text-gray-700">{os.como_sera_feito}</p></div>}
+        {os.como_sera_feito && (
+          <div className="mt-4 text-sm">
+            <p className="text-[11px] uppercase text-gray-400">Como será feito</p>
+            <p className="whitespace-pre-line text-gray-700">{os.como_sera_feito}</p>
           </div>
         )}
 
         <h3 className="mt-6 mb-2 text-sm font-bold uppercase tracking-wide text-brand-700">Atividades</h3>
         <table className="min-w-full text-sm">
           <thead className="border-b text-left text-xs uppercase text-gray-500">
-            <tr><th className="py-2 pr-2">Atividade</th><th className="py-2 pr-2">Responsável</th><th className="py-2 pr-2">Prazo</th><th className="py-2 pr-2 text-right">%</th><th className="py-2 text-right">Status</th></tr>
+            <tr><th className="py-2 pr-2">Atividade</th><th className="py-2 pr-2">Responsável</th><th className="py-2">Prazo</th></tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {atividades.length === 0 ? (
-              <tr><td colSpan={5} className="py-3 text-center text-gray-400">Sem atividades.</td></tr>
+              <tr><td colSpan={3} className="py-3 text-center text-gray-400">Sem atividades.</td></tr>
             ) : atividades.map((a) => (
               <tr key={a.id}>
                 <td className="py-2 pr-2">{a.descricao}</td>
                 <td className="py-2 pr-2 text-gray-600">{colNome[a.colaborador_id] ?? "—"}</td>
-                <td className="py-2 pr-2 text-gray-600">{formatDate(a.data_fim)}</td>
-                <td className="py-2 pr-2 text-right tabular-nums">{Number(a.conclusao_pct || 0)}%</td>
-                <td className="py-2 text-right"><Badge value={a.status} options={STATUS_ATIV} /></td>
+                <td className="py-2 text-gray-600">{formatDate(a.data_fim)}</td>
               </tr>
             ))}
           </tbody>
@@ -99,24 +97,34 @@ export default function OSDocumento({ id }: { id: string }) {
 
         {insumos.length > 0 && (
           <>
-            <h3 className="mt-6 mb-2 text-sm font-bold uppercase tracking-wide text-brand-700">Insumos · {formatCurrency(custoInsumos)}</h3>
+            <h3 className="mt-6 mb-2 text-sm font-bold uppercase tracking-wide text-brand-700">Materiais</h3>
             <table className="min-w-full text-sm">
               <thead className="border-b text-left text-xs uppercase text-gray-500">
-                <tr><th className="py-2 pr-2">Insumo</th><th className="py-2 pr-2">Produto</th><th className="py-2 pr-2 text-right">Qtd</th><th className="py-2 pr-2 text-right">Custo un.</th><th className="py-2 text-right">Total</th></tr>
+                <tr><th className="py-2 pr-2">Insumo</th><th className="py-2 pr-2">Produto</th><th className="py-2 text-right">Qtd</th></tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {insumos.map((i) => (
                   <tr key={i.id}>
                     <td className="py-2 pr-2">{i.descricao}</td>
                     <td className="py-2 pr-2 text-gray-600">{prodNome[i.produto_id] ?? "—"}</td>
-                    <td className="py-2 pr-2 text-right tabular-nums">{Number(i.quantidade)}</td>
-                    <td className="py-2 pr-2 text-right tabular-nums">{formatCurrency(i.custo_unitario)}</td>
-                    <td className="py-2 text-right font-medium tabular-nums">{formatCurrency(i.custo_total)}</td>
+                    <td className="py-2 text-right tabular-nums">{Number(i.quantidade)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </>
+        )}
+
+        {os.acompanhamento_token ? (
+          <div className="mt-6 flex items-center gap-4 rounded-lg border border-gray-200 p-3 break-inside-avoid">
+            <QrCode texto={urlAcompanhamento(os.acompanhamento_token)} tamanho={96} />
+            <div className="text-sm">
+              <p className="font-semibold text-gray-800">Acompanhamento</p>
+              <p className="text-gray-600">Aponte a câmera do celular para ver o andamento atualizado desta OS: status, progresso das atividades, fotos e histórico.</p>
+            </div>
+          </div>
+        ) : (
+          <p className="no-print mt-6 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Esta OS ainda não tem QR de acompanhamento. Rode a migration 0055 no Supabase.</p>
         )}
 
         <div className="mt-10 grid grid-cols-2 gap-8 text-sm">

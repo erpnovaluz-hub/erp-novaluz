@@ -10,9 +10,19 @@ import Badge from "@/components/Badge";
 import EntityForm from "@/components/EntityForm";
 import TarefasVinculadas from "@/components/tarefas/TarefasVinculadas";
 import { useAcesso } from "@/components/AcessoProvider";
+import OSControle from "@/components/os/OSControle";
+import OSResultado from "@/components/os/OSResultado";
+import OSApontamentos from "@/components/os/OSApontamentos";
+import OSFotos from "@/components/os/OSFotos";
+import OSChecklist from "@/components/os/OSChecklist";
+import OSMateriais from "@/components/os/OSMateriais";
+import OSFaturar from "@/components/os/OSFaturar";
+import StatusOSPicker from "@/components/os/StatusOSPicker";
+import { STATUS_OS as STATUS_OS_LIB } from "@/lib/os";
+import { useEquipe } from "@/components/tarefas/comum";
 
 type Row = Record<string, any>;
-const STATUS_OS = getEntity("ordens_servico")!.fields.find((f) => f.key === "status")!.options!;
+const STATUS_OS = STATUS_OS_LIB;
 const URGENCIA = getEntity("ordens_servico")!.fields.find((f) => f.key === "urgencia")!.options!;
 const STATUS_ATIV = getEntity("atividades_os")!.fields.find((f) => f.key === "status")!.options!;
 
@@ -20,6 +30,7 @@ export default function OSDetail({ osId }: { osId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const verValores = useAcesso().gerencia;   // custos: só gerência
+  const { pessoas, porId } = useEquipe();
   const [os, setOs] = useState<Row | null>(null);
   const [atividades, setAtividades] = useState<Row[]>([]);
   const [insumos, setInsumos] = useState<Row[]>([]);
@@ -30,6 +41,7 @@ export default function OSDetail({ osId }: { osId: string }) {
   const [propostas, setPropostas] = useState<any[]>([]);
   const [drawer, setDrawer] = useState<null | { tipo: "os" | "atividade" | "insumo"; registro: Row | null }>(null);
   const [carregando, setCarregando] = useState(true);
+  const [tick, setTick] = useState(0);   // recalcula o resultado após mudanças
 
   const cliNome = useMemo(() => Object.fromEntries(clientes.map((c) => [c.id, c.nome])), [clientes]);
   const colNome = useMemo(() => Object.fromEntries(colaboradores.map((c) => [c.id, c.nome])), [colaboradores]);
@@ -46,6 +58,7 @@ export default function OSDetail({ osId }: { osId: string }) {
     ]);
     setOs(o.data); setAtividades(a.data ?? []); setInsumos(i.data ?? []);
     setCarregando(false);
+    setTick((t) => t + 1);
   }, [supabase, osId]);
 
   useEffect(() => {
@@ -79,6 +92,7 @@ export default function OSDetail({ osId }: { osId: string }) {
       cliente_id: clientes.map((c) => ({ value: c.id, label: c.nome })),
       contrato_id: contratos.map((c) => ({ value: c.id, label: c.numero })),
       proposta_id: propostas.map((p) => ({ value: p.id, label: p.numero })),
+      responsavel_id: pessoas.map((p) => ({ value: p.id, label: p.nome || p.email || "" })),
     }
     : tipo === "atividade" ? { colaborador_id: colaboradores.map((c) => ({ value: c.id, label: c.nome })) }
     : { produto_id: produtos.map((p) => ({ value: p.id, label: p.nome })) };
@@ -94,7 +108,9 @@ export default function OSDetail({ osId }: { osId: string }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold text-gray-900">{os.numero ? `${os.numero} · ` : ""}{os.titulo}</h1>
-            <p className="mt-1 text-sm text-gray-500">{cliNome[os.cliente_id] ?? "—"}{os.local ? ` · ${os.local}` : ""}</p>
+            <p className="mt-1 text-sm text-gray-500">{cliNome[os.cliente_id] ?? "—"}{os.local ? ` · ${os.local}` : ""}
+              {os.manutencao_id && <span className="ml-2 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-800" title="Gerada pela manutenção recorrente">🔁 manutenção recorrente</span>}
+            </p>
             <div className="mt-1 flex flex-wrap gap-3 text-xs">
               {os.contrato_id && <Link href={`/contratos/${os.contrato_id}`} className="text-brand-600 hover:underline">📜 Contrato {ctrNum[os.contrato_id] ?? ""}</Link>}
               {os.proposta_id && <Link href={`/propostas/${os.proposta_id}`} className="text-brand-600 hover:underline">📑 Proposta {propNum[os.proposta_id] ?? ""}</Link>}
@@ -102,14 +118,14 @@ export default function OSDetail({ osId }: { osId: string }) {
           </div>
           <div className="flex items-center gap-2">
             <Badge value={os.urgencia} options={URGENCIA} />
-            <Badge value={os.status} options={STATUS_OS} />
             <Link href={`/os/${osId}/documento`} className="btn-ghost text-sm ring-1 ring-gray-200">🖨️ Imprimir OS</Link>
+            <Link href={`/os/${osId}/relatorio`} className="btn-ghost text-sm ring-1 ring-gray-200">📄 Relatório de execução</Link>
             <button className="btn-ghost text-sm" onClick={() => setDrawer({ tipo: "os", registro: os })}>Editar</button>
           </div>
         </div>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-          <Info rot="Responsável" val={os.responsavel} />
+          <Info rot="Responsável" val={os.responsavel_id ? (porId[os.responsavel_id]?.nome || porId[os.responsavel_id]?.email) : os.responsavel} />
           <Info rot="Prazo" val={formatDate(os.prazo)} />
           {verValores && <Info rot="Custo estimado" val={formatCurrency(os.custo_estimado)} />}
           {verValores && <Info rot="Custo de insumos" val={formatCurrency(custoInsumos)} />}
@@ -125,6 +141,14 @@ export default function OSDetail({ osId }: { osId: string }) {
           <div className="mt-1 h-2 w-full rounded-full bg-gray-100"><div className="h-2 rounded-full bg-brand-500" style={{ width: `${progresso}%` }} /></div>
         </div>
       </div>
+
+      <StatusOSPicker os={os as any} variante="barra" onChange={carregar} />
+
+      <OSControle os={os} onChange={carregar} />
+
+      {verValores && <OSFaturar os={os} onFaturado={carregar} />}
+
+      {verValores && <OSResultado os={os} atualizar={tick} />}
 
       {/* atividades */}
       <Secao titulo="Atividades" onAdd={() => setDrawer({ tipo: "atividade", registro: null })}>
@@ -177,6 +201,14 @@ export default function OSDetail({ osId }: { osId: string }) {
           </table>
         )}
       </Secao>
+
+      <OSApontamentos osId={osId} atividades={atividades as any} onChange={carregar} />
+
+      <OSChecklist osId={osId} />
+
+      <OSFotos osId={osId} />
+
+      <OSMateriais osId={osId} />
 
       <TarefasVinculadas tipo="os" id={osId} rotulo={[os.numero, os.titulo].filter(Boolean).join(" · ")} />
 

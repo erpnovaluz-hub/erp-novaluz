@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getEntity } from "@/lib/entities";
 import { formatCurrency, formatDate } from "@/lib/format";
-import Badge from "@/components/Badge";
+import StatusPropostaPicker from "@/components/propostas/StatusPropostaPicker";
 import EntityForm from "@/components/EntityForm";
 
 type Row = Record<string, any>;
@@ -62,7 +62,7 @@ export default function PropostasView() {
         </form>
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="card">
         {carregando ? (
           <div className="px-4 py-12 text-center text-gray-400">Carregando…</div>
         ) : rows.length === 0 ? (
@@ -78,7 +78,7 @@ export default function PropostasView() {
                   </div>
                   <div className="w-28 shrink-0 text-right font-medium tabular-nums text-gray-900">{formatCurrency(r.valor_total)}</div>
                   <div className="w-20 shrink-0 text-right text-xs text-gray-500">{formatDate(r.data)}</div>
-                  <div className="w-24 shrink-0 text-right"><Badge value={r.status} options={STATUS} /></div>
+                  <div className="w-28 shrink-0 text-right"><StatusPropostaPicker prop={r as any} variante="menu" onChange={carregar} /></div>
                 </Link>
               </li>
             ))}
