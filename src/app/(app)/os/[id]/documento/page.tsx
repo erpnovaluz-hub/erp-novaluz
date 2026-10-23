@@ -1,5 +1,6 @@
 import OSDocumento from "@/components/OSDocumento";
 
-export default function OSDocumentoPage({ params }: { params: { id: string } }) {
+export default async function OSDocumentoPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return <OSDocumento id={params.id} />;
 }

@@ -5,7 +5,7 @@ import { enviarParaPerfil } from "@/lib/push";
 
 // "Enviar teste": manda um push para os aparelhos do próprio usuário logado.
 export async function POST(req: Request) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   try {

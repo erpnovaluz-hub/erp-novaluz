@@ -19,7 +19,8 @@ const ETAPAS = [
 
 // Acompanhamento da OS pelo QR code da OS impressa. Sem login, só leitura e
 // SEM valores (venda/custo nunca saem para o campo nem para o cliente).
-export default async function AcompanhamentoOSPage({ params }: { params: { token: string } }) {
+export default async function AcompanhamentoOSPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const supabase = createAdminClient();
 
   // resolve a OS pelo token opaco — não expõe o id na URL
@@ -46,7 +47,7 @@ export default async function AcompanhamentoOSPage({ params }: { params: { token
   }
 
   // quem tem login ganha o atalho para abrir a OS no sistema
-  const { data: { user } } = await createClient().auth.getUser();
+  const { data: { user } } = await (await createClient()).auth.getUser();
 
   const ativs = atividades ?? [];
   const progresso = ativs.length ? Math.round(ativs.reduce((s, a) => s + Number(a.conclusao_pct || 0), 0) / ativs.length) : 0;
