@@ -37,6 +37,7 @@ export default function PropostaDocumento({ id }: { id: string }) {
   if (carregando) return <p className="text-gray-400">Carregando…</p>;
   if (!prop) return <p className="text-gray-400">Proposta não encontrada. <Link href="/propostas" className="text-brand-600">voltar</Link></p>;
 
+  const temDesconto = Number(prop.desconto_valor) > 0;
   const apres = prop.apresentacao || `Prezado(a) ${cliente?.nome ?? ""}, agradecemos a oportunidade de apresentar esta proposta técnica e comercial para o seu projeto.`;
 
   return (
@@ -81,7 +82,10 @@ export default function PropostaDocumento({ id }: { id: string }) {
           <div className="mt-4 grid grid-cols-3 gap-3 rounded-lg bg-gray-50 p-4 text-sm">
             <Campo rot="Emissão" val={formatDate(prop.data)} />
             <Campo rot="Válido até" val={formatDate(prop.validade)} />
-            <Campo rot="Valor total" val={formatCurrency(prop.valor_total)} destaque />
+            <Campo rot={temDesconto ? "Valor final (com desconto)" : "Valor total"} val={<>
+              {temDesconto && <span className="mr-2 text-xs font-normal text-gray-400 line-through">{formatCurrency(prop.subtotal)}</span>}
+              {formatCurrency(prop.valor_total)}
+            </>} destaque />
           </div>
 
           {/* Apresentação breve */}
@@ -115,8 +119,18 @@ export default function PropostaDocumento({ id }: { id: string }) {
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="border-t-2 border-brand-600 font-semibold">
-                <tr><td colSpan={4} className="py-2 pr-2 text-right">VALOR TOTAL</td><td className="py-2 text-right text-brand-700">{formatCurrency(prop.valor_total)}</td></tr>
+              <tfoot className="border-t-2 border-brand-600">
+                {temDesconto && (<>
+                  <tr className="text-gray-600"><td colSpan={4} className="pt-2 pr-2 text-right">Subtotal</td><td className="pt-2 text-right tabular-nums">{formatCurrency(prop.subtotal)}</td></tr>
+                  <tr className="text-green-700">
+                    <td colSpan={4} className="py-1 pr-2 text-right">
+                      Desconto{prop.desconto_tipo === "percentual" ? ` (${Number(prop.desconto)}%)` : ""}
+                      {prop.desconto_motivo && <span className="text-xs text-gray-500"> — {prop.desconto_motivo}</span>}
+                    </td>
+                    <td className="py-1 text-right tabular-nums">− {formatCurrency(prop.desconto_valor)}</td>
+                  </tr>
+                </>)}
+                <tr className="font-semibold"><td colSpan={4} className="py-2 pr-2 text-right">{temDesconto ? "VALOR FINAL" : "VALOR TOTAL"}</td><td className="py-2 text-right tabular-nums text-brand-700">{formatCurrency(prop.valor_total)}</td></tr>
               </tfoot>
             </table>
           </Secao>
