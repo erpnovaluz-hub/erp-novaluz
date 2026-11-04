@@ -34,6 +34,7 @@ export default function OSView() {
   const [clientes, setClientes] = useState<{ id: string; nome: string }[]>([]);
   const [contratos, setContratos] = useState<{ id: string; numero: string }[]>([]);
   const [propostas, setPropostas] = useState<{ id: string; numero: string }[]>([]);
+  const [obras, setObras] = useState<{ id: string; local: string | null }[]>([]);
   const [visao, setVisao] = useState<Visao>("lista");
   const [cliente, setCliente] = useState("");
   const [status, setStatus] = useState("");
@@ -54,6 +55,7 @@ export default function OSView() {
     supabase.from("clientes").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setClientes(data ?? []));
     supabase.from("contratos").select("id, numero").order("data_inicio", { ascending: false }).range(0, 4999).then(({ data }) => setContratos(data ?? []));
     supabase.from("propostas").select("id, numero").order("data", { ascending: false }).range(0, 4999).then(({ data }) => setPropostas(data ?? []));
+    supabase.from("obras_servicos").select("id, local").order("local").range(0, 4999).then(({ data }) => setObras(data ?? []));
   }, [supabase]);
   function trocarVisao(v: Visao) { setVisao(v); try { localStorage.setItem("os.visao", v); } catch {} }
 
@@ -238,6 +240,7 @@ export default function OSView() {
             cliente_id: clientes.map((c) => ({ value: c.id, label: c.nome })),
             contrato_id: contratos.map((c) => ({ value: c.id, label: c.numero })),
             proposta_id: propostas.map((p) => ({ value: p.id, label: p.numero })),
+            obra_id: obras.map((o) => ({ value: o.id, label: o.local || "(sem nome)" })),
             responsavel_id: pessoas.map((p) => ({ value: p.id, label: p.nome || p.email || "" })),
           }}
           onClose={() => setNovo(false)}

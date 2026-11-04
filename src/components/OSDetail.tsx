@@ -39,6 +39,7 @@ export default function OSDetail({ osId }: { osId: string }) {
   const [produtos, setProdutos] = useState<any[]>([]);
   const [contratos, setContratos] = useState<any[]>([]);
   const [propostas, setPropostas] = useState<any[]>([]);
+  const [obras, setObras] = useState<any[]>([]);
   const [drawer, setDrawer] = useState<null | { tipo: "os" | "atividade" | "insumo"; registro: Row | null }>(null);
   const [carregando, setCarregando] = useState(true);
   const [tick, setTick] = useState(0);   // recalcula o resultado após mudanças
@@ -67,6 +68,7 @@ export default function OSDetail({ osId }: { osId: string }) {
     supabase.from("produtos").select("id, nome").order("nome").range(0, 4999).then(({ data }) => setProdutos(data ?? []));
     supabase.from("contratos").select("id, numero").order("data_inicio", { ascending: false }).range(0, 4999).then(({ data }) => setContratos(data ?? []));
     supabase.from("propostas").select("id, numero").order("data", { ascending: false }).range(0, 4999).then(({ data }) => setPropostas(data ?? []));
+    supabase.from("obras_servicos").select("id, local").order("local").range(0, 4999).then(({ data }) => setObras(data ?? []));
   }, [supabase]);
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -92,6 +94,7 @@ export default function OSDetail({ osId }: { osId: string }) {
       cliente_id: clientes.map((c) => ({ value: c.id, label: c.nome })),
       contrato_id: contratos.map((c) => ({ value: c.id, label: c.numero })),
       proposta_id: propostas.map((p) => ({ value: p.id, label: p.numero })),
+      obra_id: obras.map((o) => ({ value: o.id, label: o.local || "(sem nome)" })),
       responsavel_id: pessoas.map((p) => ({ value: p.id, label: p.nome || p.email || "" })),
     }
     : tipo === "atividade" ? { colaborador_id: colaboradores.map((c) => ({ value: c.id, label: c.nome })) }
