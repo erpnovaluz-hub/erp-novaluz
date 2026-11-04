@@ -64,6 +64,18 @@ export const VINCULOS: VinculoDef[] = [
     busca: "numero", ordem: "numero", rotulo: (r) => [r.numero, r.observacao].filter(Boolean).join(" · "), href: (id) => `/compras/pedido/${id}` },
 ];
 
+// Tarefas da OS e da obra ligada a ela, para relatórios impressos.
+// Só tarefas principais; projeto privado não sai no papel.
+export async function tarefasDaOS(sb: any, os: { id: string; obra_id?: string | null }) {
+  const alvos = [`and(vinculo_tipo.eq.os,vinculo_id.eq.${os.id})`];
+  if (os.obra_id) alvos.push(`and(vinculo_tipo.eq.obra,vinculo_id.eq.${os.obra_id})`);
+  const { data } = await sb.from("tarefas").select("id, titulo, prazo, concluida, responsavel_id, projetos(privado)")
+    .or(alvos.join(",")).is("parent_id", null)
+    .order("concluida").order("prazo", { ascending: true, nullsFirst: false });
+  return ((data ?? []) as any[]).filter((t) => !t.projetos?.privado) as
+    { id: string; titulo: string; prazo: string | null; concluida: boolean; responsavel_id: string | null }[];
+}
+
 export function vinculoDef(tipo: string | null | undefined): VinculoDef | undefined {
   return VINCULOS.find((v) => v.tipo === tipo);
 }

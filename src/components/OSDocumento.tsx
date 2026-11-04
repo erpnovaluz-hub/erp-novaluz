@@ -8,6 +8,7 @@ import { useEmissora } from "@/lib/useEmissora";
 import DocHeader from "@/components/DocHeader";
 import PrintButton from "@/components/PrintButton";
 import QrCode from "@/components/ferramentas/QrCode";
+import { tarefasDaOS } from "@/lib/tarefas";
 
 type Row = Record<string, any>;
 // QR da OS impressa → acompanhamento ao vivo (status, %, fotos), sem login
@@ -25,6 +26,8 @@ export default function OSDocumento({ id }: { id: string }) {
   const [prodNome, setProdNome] = useState<Record<string, string>>({});
   const [carregando, setCarregando] = useState(true);
   const [respNome, setRespNome] = useState<string | null>(null);
+  const [tarefas, setTarefas] = useState<Awaited<ReturnType<typeof tarefasDaOS>>>([]);
+  const [pessoaNome, setPessoaNome] = useState<Record<string, string>>({});
 
   useEffect(() => {
     (async () => {
@@ -34,6 +37,15 @@ export default function OSDocumento({ id }: { id: string }) {
       setOs(o.data); setAtividades(a.data ?? []); setInsumos(i.data ?? []);
       if (o.data?.cliente_id) setCliente((await supabase.from("clientes").select("*").eq("id", o.data.cliente_id).maybeSingle()).data);
       if (o.data?.responsavel_id) setRespNome((await supabase.from("perfis").select("nome, email").eq("id", o.data.responsavel_id).maybeSingle()).data?.nome ?? null);
+      if (o.data) {
+        const ts = await tarefasDaOS(supabase, o.data as any);
+        setTarefas(ts);
+        const ids = Array.from(new Set(ts.map((t) => t.responsavel_id).filter(Boolean))) as string[];
+        if (ids.length) {
+          const pf = await supabase.from("perfis").select("id, nome, email").in("id", ids);
+          setPessoaNome(Object.fromEntries((pf.data ?? []).map((x: any) => [x.id, x.nome || x.email])));
+        }
+      }
       const col = await supabase.from("vw_equipe").select("id, nome").range(0, 4999);
       setColNome(Object.fromEntries((col.data ?? []).map((x: any) => [x.id, x.nome])));
       const pr = await supabase.from("produtos").select("id, nome").range(0, 4999);
@@ -94,6 +106,27 @@ export default function OSDocumento({ id }: { id: string }) {
             ))}
           </tbody>
         </table>
+
+        {tarefas.length > 0 && (
+          <>
+            <h3 className="mt-6 mb-2 text-sm font-bold uppercase tracking-wide text-brand-700">Tarefas</h3>
+            <table className="min-w-full text-sm">
+              <thead className="border-b text-left text-xs uppercase text-gray-500">
+                <tr><th className="w-6 py-2" /><th className="py-2 pr-2">Tarefa</th><th className="py-2 pr-2">Responsável</th><th className="py-2">Prazo</th></tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {tarefas.map((t) => (
+                  <tr key={t.id} className={t.concluida ? "text-gray-400" : ""}>
+                    <td className="py-2">{t.concluida ? "✔" : "◻"}</td>
+                    <td className={`py-2 pr-2 ${t.concluida ? "line-through" : ""}`}>{t.titulo}</td>
+                    <td className="py-2 pr-2 text-gray-600">{(t.responsavel_id && pessoaNome[t.responsavel_id]) || "—"}</td>
+                    <td className="py-2 text-gray-600">{formatDate(t.prazo)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
 
         {insumos.length > 0 && (
           <>
