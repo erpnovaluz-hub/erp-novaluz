@@ -9,7 +9,10 @@ import TarefaDrawer from "@/components/tarefas/TarefaDrawer";
 
 // Bloco "Tarefas" dentro de um registro do ERP (OS, requisição…).
 // Cria a tarefa já vinculada; mostra só as que o usuário pode ver (RLS).
-export default function TarefasVinculadas({ tipo, id, rotulo }: { tipo: VinculoTipo; id: string; rotulo: string }) {
+// `tambem`: outros registros cujas tarefas aparecem junto (ex.: a obra da OS).
+export default function TarefasVinculadas({ tipo, id, rotulo, tambem = [] }: {
+  tipo: VinculoTipo; id: string; rotulo: string; tambem?: { tipo: VinculoTipo; id: string }[];
+}) {
   const supabase = useMemo(() => createClient(), []);
   const { porId, pessoas } = useEquipe();
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
@@ -19,12 +22,17 @@ export default function TarefasVinculadas({ tipo, id, rotulo }: { tipo: VinculoT
   const [prazo, setPrazo] = useState("");
   const [erro, setErro] = useState<string | null>(null);
 
+  const chaveTambem = tambem.map((a) => `${a.tipo}:${a.id}`).join("|");
   const carregar = useCallback(async () => {
+    const alvos = [{ tipo, id }, ...tambem];
     const { data } = await supabase.from("vw_tarefas").select("*")
-      .eq("vinculo_tipo", tipo).eq("vinculo_id", id).is("parent_id", null)
+      .or(alvos.map((a) => `and(vinculo_tipo.eq.${a.tipo},vinculo_id.eq.${a.id})`).join(","))
+      .is("parent_id", null)
       .order("concluida").order("prazo", { ascending: true, nullsFirst: false });
     setTarefas((data ?? []) as Tarefa[]);
-  }, [supabase, tipo, id]);
+    // chaveTambem no lugar de `tambem` (array novo a cada render)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabase, tipo, id, chaveTambem]);
 
   useEffect(() => { carregar(); }, [carregar]);
 

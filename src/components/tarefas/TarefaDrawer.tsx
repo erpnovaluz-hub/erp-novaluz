@@ -187,6 +187,7 @@ export default function TarefaDrawer({ tarefaId, onClose, onChange }: {
               <span className="text-gray-500">Vinculada a</span>
               <div>
                 {vinc && t.vinculo_id ? (
+                  <>
                   <div className="flex items-center gap-2">
                     {podeAbrirVinculo ? (
                       <Link href={vinc.href(t.vinculo_id)} className="rounded-md bg-brand-50 px-2 py-1 text-brand-700 hover:underline">
@@ -200,6 +201,8 @@ export default function TarefaDrawer({ tarefaId, onClose, onChange }: {
                     <button className="text-xs text-gray-400 hover:text-red-500"
                       onClick={() => salvar({ vinculo_tipo: null, vinculo_id: null, vinculo_rotulo: null })}>remover</button>
                   </div>
+                  <VinculoRelacionado tipo={t.vinculo_tipo!} id={t.vinculo_id} />
+                  </>
                 ) : vinculando ? (
                   <VinculoPicker onEscolher={(tipo, id, rotulo) => { setVinculando(false); salvar({ vinculo_tipo: tipo, vinculo_id: id, vinculo_rotulo: rotulo }); }}
                     onCancelar={() => setVinculando(false)} />
@@ -274,8 +277,13 @@ function VinculoPicker({ onEscolher, onCancelar }: {
   useEffect(() => {
     let vivo = true;
     const h = setTimeout(async () => {
-      let q = supabase.from(def.tabela).select(def.colunas).order(def.ordem, { ascending: false }).limit(20);
-      if (busca.trim()) q = q.ilike(def.busca, `%${busca.trim()}%`);
+      // nullsFirst:false — sem isso registros antigos sem número tomam as 20 vagas
+      let q = supabase.from(def.tabela).select(def.colunas).order(def.ordem, { ascending: false, nullsFirst: false }).limit(20);
+      const termo = busca.trim().replace(/[,()*%]/g, " ").trim();
+      if (termo) {
+        const campos = Array.isArray(def.busca) ? def.busca : [def.busca];
+        q = q.or(campos.map((c) => `${c}.ilike.*${termo}*`).join(","));
+      }
       const { data } = await q;
       if (vivo) setItens(data ?? []);
     }, 250);
@@ -302,6 +310,42 @@ function VinculoPicker({ onEscolher, onCancelar }: {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+// OS ↔ obra: mostra a obra da OS vinculada, ou as OS da obra vinculada.
+function VinculoRelacionado({ tipo, id }: { tipo: VinculoTipo; id: string }) {
+  const supabase = useMemo(() => createClient(), []);
+  const acesso = useAcesso();
+  const [rel, setRel] = useState<{ href: string; texto: string }[]>([]);
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      let r: { href: string; texto: string }[] = [];
+      if (tipo === "os") {
+        const { data } = await supabase.from("ordens_servico").select("obra_id, obras_servicos(local)").eq("id", id).maybeSingle();
+        const ob = (data as any)?.obras_servicos;
+        if (data?.obra_id && ob) r = [{ href: "/e/obras_servicos", texto: `🏗️ Obra: ${ob.local ?? "(sem nome)"}` }];
+      } else if (tipo === "obra") {
+        const { data } = await supabase.from("ordens_servico").select("id, numero, titulo").eq("obra_id", id)
+          .order("numero", { ascending: false, nullsFirst: false });
+        r = (data ?? []).map((o: any) => ({ href: `/os/${o.id}`, texto: `🧷 ${[o.numero, o.titulo].filter(Boolean).join(" · ")}` }));
+      }
+      if (vivo) setRel(r);
+    })();
+    return () => { vivo = false; };
+  }, [supabase, tipo, id]);
+
+  if (rel.length === 0 || !podeArea(acesso, "os")) return null;
+  return (
+    <div className="mt-1 flex flex-wrap gap-1 text-xs">
+      {rel.map((x) => (
+        <Link key={x.href + x.texto} href={x.href} className="max-w-full truncate rounded-md bg-gray-50 px-2 py-0.5 text-gray-600 hover:underline">
+          {x.texto}
+        </Link>
+      ))}
     </div>
   );
 }

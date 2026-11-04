@@ -40,14 +40,14 @@ export type VinculoTipo = "os" | "obra" | "cliente" | "oportunidade" | "proposta
 
 type VinculoDef = {
   tipo: VinculoTipo; label: string; icon: string; modulo: Modulo;
-  tabela: string; colunas: string; busca: string; ordem: string;
+  tabela: string; colunas: string; busca: string | string[]; ordem: string;
   rotulo: (r: any) => string;
   href: (id: string) => string;
 };
 
 export const VINCULOS: VinculoDef[] = [
   { tipo: "os", label: "Ordem de serviço", icon: "🧷", modulo: "os", tabela: "ordens_servico", colunas: "id, numero, titulo",
-    busca: "titulo", ordem: "numero", rotulo: (r) => [r.numero, r.titulo].filter(Boolean).join(" · "), href: (id) => `/os/${id}` },
+    busca: ["numero", "titulo", "local"], ordem: "numero", rotulo: (r) => [r.numero, r.titulo].filter(Boolean).join(" · "), href: (id) => `/os/${id}` },
   { tipo: "obra", label: "Obra", icon: "🏗️", modulo: "os", tabela: "obras_servicos", colunas: "id, local, tipo_servico",
     busca: "local", ordem: "local", rotulo: (r) => [r.local, r.tipo_servico].filter(Boolean).join(" · "), href: () => `/e/obras_servicos` },
   { tipo: "cliente", label: "Cliente", icon: "🏢", modulo: "comercial", tabela: "clientes", colunas: "id, nome",

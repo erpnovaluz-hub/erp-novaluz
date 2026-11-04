@@ -859,6 +859,7 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "motivo_pausa", label: "Motivo da pausa (se pausada)", type: "select", options: MOTIVOS_PAUSA },
       { key: "pausa_obs", label: "Detalhe da pausa", type: "text" },
       { key: "is_obra", label: "É obra? (aparece no painel de obras)", type: "boolean" },
+      { key: "obra_id", label: "Obra (cadastro) — tarefas da obra aparecem aqui", type: "ref", ref: { table: "obras_servicos", labelField: "local" } },
       { key: "gargalos", label: "Gargalos / atenção", type: "textarea" },
       { key: "orientacoes", label: "Principais cuidados / orientações", type: "textarea" },
     ],

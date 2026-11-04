@@ -210,7 +210,8 @@ export default function OSDetail({ osId }: { osId: string }) {
 
       <OSMateriais osId={osId} />
 
-      <TarefasVinculadas tipo="os" id={osId} rotulo={[os.numero, os.titulo].filter(Boolean).join(" · ")} />
+      <TarefasVinculadas tipo="os" id={osId} rotulo={[os.numero, os.titulo].filter(Boolean).join(" · ")}
+        tambem={os.obra_id ? [{ tipo: "obra", id: os.obra_id }] : []} />
 
       <button className="text-sm text-red-500 hover:underline" onClick={excluirOS}>Excluir esta OS</button>
 
