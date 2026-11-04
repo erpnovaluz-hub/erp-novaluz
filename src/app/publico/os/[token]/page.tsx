@@ -25,19 +25,27 @@ export default async function AcompanhamentoOSPage({ params }: { params: { token
   // resolve a OS pelo token opaco — não expõe o id na URL
   const { data: os } = await supabase
     .from("ordens_servico")
-    .select("id, numero, titulo, local, prazo, data_realizado, status, motivo_pausa, status_desde, cliente_id, empresa_consultora_id")
+    .select("id, numero, titulo, local, prazo, data_realizado, status, motivo_pausa, status_desde, cliente_id, empresa_consultora_id, obra_id")
     .eq("acompanhamento_token", params.token)
     .maybeSingle();
   if (!os) notFound();
 
-  const [{ data: atividades }, { data: historico }, { data: fotos }, { data: cliente }, { data: empresa }] = await Promise.all([
+  // tarefas da OS e da obra dela (só título/prazo/feito; projeto privado não sai)
+  const alvos = [`and(vinculo_tipo.eq.os,vinculo_id.eq.${os.id})`];
+  if (os.obra_id) alvos.push(`and(vinculo_tipo.eq.obra,vinculo_id.eq.${os.obra_id})`);
+
+  const [{ data: atividades }, { data: historico }, { data: fotos }, { data: cliente }, { data: empresa }, { data: tarefasRaw }] = await Promise.all([
     supabase.from("atividades_os").select("id, descricao, data_fim, status, conclusao_pct")
       .eq("os_id", os.id).order("data_inicio", { ascending: true, nullsFirst: false }),
     supabase.from("os_historico").select("id, de, para, motivo, data").eq("os_id", os.id).order("data", { ascending: false }).limit(50),
     supabase.from("os_fotos").select("id, etapa, caminho, legenda").eq("os_id", os.id).eq("no_relatorio", true).order("criado_em"),
     os.cliente_id ? supabase.from("clientes").select("nome").eq("id", os.cliente_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("empresas_consultoras").select("nome, logo").eq("id", os.empresa_consultora_id).maybeSingle(),
+    supabase.from("tarefas").select("id, titulo, prazo, concluida, projetos(privado)")
+      .eq("empresa_consultora_id", os.empresa_consultora_id).or(alvos.join(",")).is("parent_id", null)
+      .order("concluida").order("prazo", { ascending: true, nullsFirst: false }),
   ]);
+  const tarefas = (tarefasRaw ?? []).filter((t: any) => !t.projetos?.privado);
 
   const urls: Record<string, string> = {};
   if (fotos?.length) {
@@ -109,6 +117,24 @@ export default async function AcompanhamentoOSPage({ params }: { params: { token
             </ul>
           )}
         </section>
+
+        {tarefas.length > 0 && (
+          <section className="rounded-xl bg-white p-4 shadow-sm">
+            <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-brand-700">
+              Tarefas · {tarefas.filter((t) => t.concluida).length}/{tarefas.length} feitas
+            </h2>
+            <ul className="divide-y divide-gray-100">
+              {tarefas.map((t) => (
+                <li key={t.id} className="flex items-start justify-between gap-3 py-2 text-sm">
+                  <span className={t.concluida ? "text-gray-400 line-through" : ""}>
+                    <span className={t.concluida ? "text-green-600" : "text-gray-300"}>{t.concluida ? "✓" : "○"}</span> {t.titulo}
+                  </span>
+                  {t.prazo && <span className="shrink-0 text-xs text-gray-500">{formatDate(t.prazo)}</span>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {(fotos?.length ?? 0) > 0 && (
           <section className="rounded-xl bg-white p-4 shadow-sm">
