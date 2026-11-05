@@ -3,7 +3,7 @@ import { isGerencia, montarAcesso, type Acesso } from "@/lib/permissoes";
 
 // Acesso do usuário logado (server components / rotas de API).
 export async function carregarAcesso(): Promise<Acesso & { perfil: Record<string, any> | null }> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ...montarAcesso(null), perfil: null };
 

@@ -24,7 +24,7 @@ const NIVEL_STYLE: Record<Alerta["nivel"], string> = {
 };
 
 export default async function Dashboard() {
-  const supabase = createClient();
+  const supabase = await createClient();
   // rotinas de automação (títulos, propostas, estoque): no máx. 1x por dia por empresa
   await supabase.rpc("rodar_automacoes", { p_forcar: false }).then(() => null, () => null);
   const agora = new Date();

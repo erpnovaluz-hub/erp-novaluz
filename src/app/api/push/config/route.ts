@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const env = (nome: string) => (process.env[nome] ?? "").trim();
 
 export async function GET() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
 

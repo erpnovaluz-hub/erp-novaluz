@@ -9,8 +9,9 @@ const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov"
 
 type Row = { competencia: string; grupo_dre: string; natureza: string | null; tipo: string; total: number };
 
-export default async function DrePage({ searchParams }: { searchParams: { ano?: string } }) {
-  const supabase = createClient();
+export default async function DrePage(props: { searchParams: Promise<{ ano?: string }> }) {
+  const searchParams = await props.searchParams;
+  const supabase = await createClient();
   const { data } = await supabase.from("vw_dre").select("*");
   const rows = (data ?? []) as Row[];
 

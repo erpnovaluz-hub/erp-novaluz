@@ -33,7 +33,7 @@ function emDias(dias: number): string {
 }
 
 export async function coletarAlertas(): Promise<Alerta[]> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const alertas: Alerta[] = [];
   const hoje = new Date().toISOString().slice(0, 10);
 

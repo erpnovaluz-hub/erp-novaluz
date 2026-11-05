@@ -1,5 +1,6 @@
 import PropostaDocumento from "@/components/PropostaDocumento";
 
-export default function PropostaDocumentoPage({ params }: { params: { id: string } }) {
+export default async function PropostaDocumentoPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   return <PropostaDocumento id={params.id} />;
 }
