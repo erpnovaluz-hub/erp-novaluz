@@ -31,6 +31,12 @@ export default function EquipeAcessos({ empresaId, empresaNome, meuId }: { empre
   const [nPapel, setNPapel] = useState<Papel>("almoxarifado");
   const [criando, setCriando] = useState(false);
 
+  // edição de usuário (nome / e-mail)
+  const [editId, setEditId] = useState<string | null>(null);
+  const [eNome, setENome] = useState("");
+  const [eEmail, setEEmail] = useState("");
+  const [salvando, setSalvando] = useState(false);
+
   const carregar = useCallback(async () => {
     if (!empresaId) return;
     setCarregando(true);
@@ -67,6 +73,25 @@ export default function EquipeAcessos({ empresaId, empresaNome, meuId }: { empre
     const { error } = await supabase.from("perfis").update(campos).eq("id", p.id);
     if (error) { setErro(error.message); return; }
     aviso("Alteração salva.");
+    carregar();
+  }
+
+  function iniciarEdicao(p: Perfil) {
+    setEditId(p.id); setENome(p.nome ?? ""); setEEmail(p.email ?? ""); setErro(null);
+  }
+
+  async function salvarEdicao(p: Perfil) {
+    setSalvando(true); setErro(null);
+    const r = await fetch("/api/equipe/usuarios", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: p.id, nome: eNome.trim(), email: eEmail.trim() }),
+    });
+    const j = await r.json().catch(() => ({}));
+    setSalvando(false);
+    if (!r.ok) { setErro(j.error ?? "Falha ao salvar o usuário."); return; }
+    setEditId(null);
+    aviso((p.email ?? "").toLowerCase() !== eEmail.trim().toLowerCase()
+      ? "Usuário salvo. O login agora é pelo novo e-mail." : "Usuário salvo.");
     carregar();
   }
 
@@ -138,10 +163,19 @@ export default function EquipeAcessos({ empresaId, empresaNome, meuId }: { empre
               ) : perfis.map((p) => {
                 const eu = p.id === meuId;
                 const ativo = p.ativo !== false;
+                const editando = editId === p.id;
                 return (
                   <tr key={p.id} className={ativo ? "" : "bg-gray-50 text-gray-400"}>
-                    <td className="px-4 py-2">{p.nome ?? "—"}{eu && <span className="ml-2 text-[10px] text-gray-400">(você)</span>}</td>
-                    <td className="px-4 py-2 text-gray-600">{p.email ?? "—"}</td>
+                    <td className="px-4 py-2">
+                      {editando
+                        ? <input className="inp py-1" value={eNome} onChange={(e) => setENome(e.target.value)} placeholder="Nome" autoFocus />
+                        : <>{p.nome ?? "—"}{eu && <span className="ml-2 text-[10px] text-gray-400">(você)</span>}</>}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {editando
+                        ? <input className="inp py-1" type="email" value={eEmail} onChange={(e) => setEEmail(e.target.value)} placeholder="E-mail de login" />
+                        : p.email ?? "—"}
+                    </td>
                     <td className="px-4 py-2">
                       {eu ? papelLabel(p.papel) : (
                         <select className="inp py-1" value={p.papel} onChange={(e) => alterar(p, { papel: e.target.value })}>
@@ -155,7 +189,16 @@ export default function EquipeAcessos({ empresaId, empresaNome, meuId }: { empre
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-2 text-right">
-                      {!eu && (
+                      {editando ? (
+                        <>
+                          <button className="mr-3 text-green-700 hover:underline disabled:opacity-50" disabled={salvando || !eNome.trim() || !eEmail.trim()}
+                            onClick={() => salvarEdicao(p)}>{salvando ? "Salvando…" : "Salvar"}</button>
+                          <button className="text-gray-500 hover:underline" onClick={() => setEditId(null)}>Cancelar</button>
+                        </>
+                      ) : (
+                        <button className={`text-brand-600 hover:underline ${eu ? "" : "mr-3"}`} onClick={() => iniciarEdicao(p)}>Editar</button>
+                      )}
+                      {!eu && !editando && (
                         <>
                           <button className="mr-3 text-brand-600 hover:underline" onClick={() => redefinirSenha(p)}>Redefinir senha</button>
                           <button className={ativo ? "text-red-500 hover:underline" : "text-green-600 hover:underline"}

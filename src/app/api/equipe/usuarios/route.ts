@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { carregarAcesso } from "@/lib/acessoServidor";
 import { getEmpresaAtiva } from "@/lib/empresaAtiva";
 
-// Gerência cria logins do próprio time e redefine senhas.
+// Gerência cria logins do próprio time, edita nome/e-mail e redefine senhas.
 // Papel/ativo são alterados direto pelo app (RLS + trigger proteger_perfil).
 const PAPEIS_PERMITIDOS = ["admin", "almoxarifado", "logistica"];
 
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   return NextResponse.json({ ok: true, id: created.user.id });
 }
 
-// redefine a senha de alguém do time
+// edita alguém do time: senha, nome e/ou e-mail de login
 export async function PATCH(req: Request) {
   const g = await exigirGerencia();
   if ("erro" in g) return g.erro;
@@ -55,14 +55,35 @@ export async function PATCH(req: Request) {
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido." }, { status: 400 }); }
   const id = String(body?.id ?? "");
-  const senha = String(body?.senha ?? "");
-  if (!id || senha.length < 6) return NextResponse.json({ error: "Informe o usuário e uma senha com 6+ caracteres." }, { status: 400 });
+  const senha = body?.senha != null ? String(body.senha) : null;
+  const nome = body?.nome != null ? String(body.nome).trim() : null;
+  const email = body?.email != null ? String(body.email).trim().toLowerCase() : null;
+  if (!id) return NextResponse.json({ error: "Informe o usuário." }, { status: 400 });
+  if (senha == null && nome == null && email == null) return NextResponse.json({ error: "Nada para alterar." }, { status: 400 });
+  if (senha != null && senha.length < 6) return NextResponse.json({ error: "A senha precisa de pelo menos 6 caracteres." }, { status: 400 });
+  if (nome != null && !nome) return NextResponse.json({ error: "O nome não pode ficar vazio." }, { status: 400 });
+  if (email != null && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "E-mail inválido." }, { status: 400 });
 
-  const { data: alvo } = await g.admin.from("perfis").select("empresa_consultora_id, papel").eq("id", id).maybeSingle();
+  const { data: alvo } = await g.admin.from("perfis").select("empresa_consultora_id, papel, email").eq("id", id).maybeSingle();
   if (!alvo || alvo.empresa_consultora_id !== g.empresaId || alvo.papel === "super") {
     return NextResponse.json({ error: "Usuário não pertence à sua empresa." }, { status: 403 });
   }
-  const { error } = await g.admin.auth.admin.updateUserById(id, { password: senha });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  const mudaEmail = email != null && email !== (alvo.email ?? "").toLowerCase();
+  if (senha != null || mudaEmail) {
+    const { error } = await g.admin.auth.admin.updateUserById(id, {
+      ...(senha != null ? { password: senha } : {}),
+      ...(mudaEmail ? { email, email_confirm: true } : {}),
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  if (nome != null || mudaEmail) {
+    const { error } = await g.admin.from("perfis").update({
+      ...(nome != null ? { nome } : {}),
+      ...(mudaEmail ? { email } : {}),
+    }).eq("id", id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  }
   return NextResponse.json({ ok: true });
 }
