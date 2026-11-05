@@ -448,7 +448,7 @@ export const ENTITIES: Record<string, EntityDef> = {
     titleField: "nome", searchField: "nome", orderBy: { column: "nome", ascending: true },
     listColumns: ["codigo", "nome", "secao", "tipo", "unidade", "custo_medio", "estoque_minimo", "ativo"],
     fields: [
-      { key: "codigo", label: "Código", type: "text" },
+      { key: "codigo", label: "Código", type: "text", hideInForm: true }, // gerado pelo sistema (PRD-0001) — migration 0068
       { key: "nome", label: "Nome", type: "text", required: true },
       { key: "secao", label: "Seção (almoxarifado)", type: "select", options: [
         { value: "epis", label: "EPIs" }, { value: "eletricos", label: "Elétricos" },
