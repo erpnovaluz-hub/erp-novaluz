@@ -10,7 +10,7 @@ export type EmpresaAtiva = {
 };
 
 export async function getEmpresaAtiva(): Promise<EmpresaAtiva> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

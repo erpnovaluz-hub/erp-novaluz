@@ -5,7 +5,7 @@ import { ehDonoDoAgente } from "@/lib/agente/donos";
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const sb = createClient();
+  const sb = await createClient();
   const {
     data: { user },
   } = await sb.auth.getUser();

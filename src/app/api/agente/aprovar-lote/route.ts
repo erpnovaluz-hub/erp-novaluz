@@ -9,7 +9,7 @@ import type { Contexto } from "@/lib/agente/tipos";
 // executada sob o RLS do usuário. Ação VERMELHA nunca entra aqui: é recusada,
 // garantindo o critério "vermelha nunca entra em aprovar tudo".
 export async function POST(req: Request) {
-  const sb = createClient();
+  const sb = await createClient();
   const {
     data: { user },
   } = await sb.auth.getUser();

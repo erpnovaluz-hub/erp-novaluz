@@ -8,7 +8,7 @@ import type { Contexto } from "@/lib/agente/tipos";
 // GET: recarrega uma conversa (texto + cartões ainda pendentes) para a tela
 // não começar vazia ao recarregar. Confere que a conversa é do próprio usuário.
 export async function GET(req: Request) {
-  const sb = createClient();
+  const sb = await createClient();
   const {
     data: { user },
   } = await sb.auth.getUser();
@@ -63,7 +63,7 @@ export async function GET(req: Request) {
 // Chat do Assistente. Roda com a identidade de quem conversa (RLS = trava).
 // O cliente admin só grava log/histórico (tabelas agente_* sem policy de escrita).
 export async function POST(req: Request) {
-  const sb = createClient();
+  const sb = await createClient();
   const {
     data: { user },
   } = await sb.auth.getUser();

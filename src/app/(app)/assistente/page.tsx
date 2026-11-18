@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const sb = createClient();
+  const sb = await createClient();
   const { data: prem } = await sb
     .from("premissas_agente")
     .select("valor")

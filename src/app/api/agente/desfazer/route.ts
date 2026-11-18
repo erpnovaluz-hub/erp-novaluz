@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // Desfaz uma ação verde recente. A reversão roda sob o RLS do usuário (ele só
 // desfaz o que pode tocar); o status em acoes_agente é marcado pelo servidor.
 export async function POST(req: Request) {
-  const sb = createClient();
+  const sb = await createClient();
   const {
     data: { user },
   } = await sb.auth.getUser();

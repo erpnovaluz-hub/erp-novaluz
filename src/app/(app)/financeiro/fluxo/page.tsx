@@ -8,8 +8,9 @@ import AjustarSaldo from "@/components/AjustarSaldo";
 export const dynamic = "force-dynamic";
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
-export default async function FluxoPage({ searchParams }: { searchParams: { ano?: string } }) {
-  const supabase = createClient();
+export default async function FluxoPage(props: { searchParams: Promise<{ ano?: string }> }) {
+  const searchParams = await props.searchParams;
+  const supabase = await createClient();
   const [{ data: fluxo }, { data: contas }] = await Promise.all([
     supabase.from("vw_fluxo_mensal").select("*"),
     supabase.from("contas_bancarias").select("id, nome, tipo, saldo_atual").eq("ativo", true).order("nome"),

@@ -8,7 +8,7 @@ import type { Contexto } from "@/lib/agente/tipos";
 // Decide uma ação amarela proposta: confirmar (executa sob o RLS do usuário),
 // editar (ajusta os parâmetros, segue pendente) ou cancelar (rejeita).
 export async function POST(req: Request) {
-  const sb = createClient();
+  const sb = await createClient();
   const {
     data: { user },
   } = await sb.auth.getUser();

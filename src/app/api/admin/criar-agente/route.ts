@@ -8,7 +8,7 @@ import { randomUUID } from "crypto";
 // nunca faz login (as rondas usam service role); o usuário existe só para ser
 // o dono dos registros e carregar o papel restrito.
 export async function POST(req: Request) {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
