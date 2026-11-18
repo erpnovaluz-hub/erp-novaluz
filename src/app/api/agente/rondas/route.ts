@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rodarRonda } from "@/lib/agente/rondas";
 import { rodarRondaFinanceira } from "@/lib/agente/financeiro";
+import { rodarBriefingPessoal } from "@/lib/agente/meudia";
 
 // Chamada pelo banco (pg_cron + pg_net) nos horários do briefing/resumo.
 // Protegida por segredo (RONDA_WEBHOOK_SECRET), não por login — o middleware
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
   } catch {
     body = {};
   }
-  const momento = ["resumo", "financeiro"].includes(body?.momento) ? body.momento : "briefing";
+  const momento = ["resumo", "financeiro", "meudia"].includes(body?.momento) ? body.momento : "briefing";
 
   try {
     const admin = createAdminClient();
@@ -28,6 +29,8 @@ export async function POST(req: Request) {
       try {
         const r = momento === "financeiro"
           ? await rodarRondaFinanceira(admin, empresaId)
+          : momento === "meudia"
+          ? await rodarBriefingPessoal(admin, empresaId)
           : await rodarRonda(admin, empresaId, momento);
         resultados.push({ empresa: empresaId, ...r });
       } catch (err: any) {
