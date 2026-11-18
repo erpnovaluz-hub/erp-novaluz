@@ -39,6 +39,13 @@ export async function executar(nome: string, input: any, ctx: Contexto): Promise
   const p = input || {};
   const sb = ctx.sb;
 
+  // Trava de tier (defesa em profundidade): modo consulta só executa leitura.
+  // Mesmo que o modelo tente, aqui é barrado — o RLS não limita (quase todos
+  // são admin), então a trava é esta.
+  if (!ctx.podeAgir && META[nome]?.faixa !== "leitura") {
+    return { ok: false, erro: "Modo consulta: aqui você só consulta dados. Ações (criar, alterar, propor) são feitas pelo administrador." };
+  }
+
   // Amarelas não executam no loop: viram uma proposta pendente (cartão).
   if (META[nome]?.faixa === "amarela") return proporAmarela(nome, p, ctx);
 

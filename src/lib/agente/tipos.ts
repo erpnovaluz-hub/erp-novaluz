@@ -13,6 +13,7 @@ export type Contexto = {
   empresaId: string;
   usuarioId: string;
   conversaId: string;
+  podeAgir: boolean; // dono do agente → executa ações; demais → só leitura (consulta)
 };
 
 // O que uma ferramenta devolve ao loop + ao resumo "o que eu preenchi".

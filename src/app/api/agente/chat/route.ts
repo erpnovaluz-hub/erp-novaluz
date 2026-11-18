@@ -81,7 +81,7 @@ export async function POST(req: Request) {
   // auth_empresa_id() usaria empresa_ativa; aqui usamos a empresa do perfil.
   const { data: perfil } = await sb
     .from("perfis")
-    .select("empresa_consultora_id")
+    .select("empresa_consultora_id,papel")
     .eq("id", user.id)
     .maybeSingle();
   const empresaId = perfil?.empresa_consultora_id;
@@ -89,10 +89,17 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient();
 
-  // premissas (modelo + nome) — o usuário lê as da própria empresa
-  const { data: prem } = await sb.from("premissas_agente").select("chave,valor").in("chave", ["modelo", "nome_assistente"]);
-  const modelo = prem?.find((x) => x.chave === "modelo")?.valor || MODELO_PADRAO;
-  const nome = prem?.find((x) => x.chave === "nome_assistente")?.valor || "Assistente";
+  // premissas (modelo + nome + donos) — o usuário lê as da própria empresa
+  const { data: prem } = await sb.from("premissas_agente").select("chave,valor").in("chave", ["modelo", "modelo_dono", "nome_assistente", "agente_donos"]);
+  const val = (k: string) => prem?.find((x) => x.chave === k)?.valor;
+  const nome = val("nome_assistente") || "Assistente";
+
+  // Tiering por login: dono (executa ações, conversa mais profunda) x consulta
+  // (só leitura). Dono = e-mail na premissa agente_donos; sem lista, cai no super.
+  const donos = String(val("agente_donos") || "").split(/[,;\s]+/).map((s: string) => s.toLowerCase().trim()).filter(Boolean);
+  const emailUser = (user.email || "").toLowerCase();
+  const ehDono = donos.length ? donos.includes(emailUser) : perfil?.papel === "super";
+  const modelo = (ehDono && val("modelo_dono")) || val("modelo") || MODELO_PADRAO;
 
   // conversa (nova ou existente)
   let conversaId = String(body?.conversa_id ?? "") || null;
@@ -127,11 +134,11 @@ export async function POST(req: Request) {
     conteudo: mensagem,
   });
 
-  const ctx: Contexto = { sb, admin, empresaId, usuarioId: user.id, conversaId: conversaId! };
+  const ctx: Contexto = { sb, admin, empresaId, usuarioId: user.id, conversaId: conversaId!, podeAgir: ehDono };
 
   let resultado;
   try {
-    resultado = await conversar({ ctx, modelo, nomeAssistente: nome, historico, mensagemUsuario: mensagem });
+    resultado = await conversar({ ctx, modelo, nomeAssistente: nome, podeAgir: ehDono, historico, mensagemUsuario: mensagem });
   } catch (e: any) {
     await admin.from("agente_execucoes").insert({
       empresa_consultora_id: empresaId, agente: "chat", origem: "chat", usuario_id: user.id,
