@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { conversar, MODELO_PADRAO } from "@/lib/agente/claude";
+import { calcDono } from "@/lib/agente/donos";
 import type { Contexto } from "@/lib/agente/tipos";
 
 // GET: recarrega uma conversa (texto + cartões ainda pendentes) para a tela
@@ -96,9 +97,7 @@ export async function POST(req: Request) {
 
   // Tiering por login: dono (executa ações, conversa mais profunda) x consulta
   // (só leitura). Dono = e-mail na premissa agente_donos; sem lista, cai no super.
-  const donos = String(val("agente_donos") || "").split(/[,;\s]+/).map((s: string) => s.toLowerCase().trim()).filter(Boolean);
-  const emailUser = (user.email || "").toLowerCase();
-  const ehDono = donos.length ? donos.includes(emailUser) : perfil?.papel === "super";
+  const ehDono = calcDono(val("agente_donos"), user.email, perfil?.papel);
   const modelo = (ehDono && val("modelo_dono")) || val("modelo") || MODELO_PADRAO;
 
   // conversa (nova ou existente)

@@ -59,6 +59,7 @@ export function nivelPadrao(papel: string, modulo: Modulo): Nivel {
 export type Acesso = {
   papel: Papel | null;
   gerencia: boolean;
+  dono?: boolean;              // dono do agente (login com poder de ação/aprovação)
   niveis: Record<Modulo, Nivel>;
   userId?: string;
   empresaId?: string | null;   // empresa em uso (modo suporte do super incluso)

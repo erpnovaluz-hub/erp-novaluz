@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { isGerencia, montarAcesso, type Acesso } from "@/lib/permissoes";
+import { ehDonoDoAgente } from "@/lib/agente/donos";
 
 // Acesso do usuário logado (server components / rotas de API).
 export async function carregarAcesso(): Promise<Acesso & { perfil: Record<string, any> | null }> {
@@ -16,5 +17,6 @@ export async function carregarAcesso(): Promise<Acesso & { perfil: Record<string
     const { data } = await supabase.from("permissoes_papel").select("modulo, nivel").eq("papel", papel);
     overrides = data ?? [];
   }
-  return { ...montarAcesso(papel, overrides), perfil: perfil as any };
+  const dono = await ehDonoDoAgente(supabase, user.email, papel);
+  return { ...montarAcesso(papel, overrides), dono, perfil: perfil as any };
 }

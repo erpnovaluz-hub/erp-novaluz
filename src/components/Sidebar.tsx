@@ -88,7 +88,7 @@ export default function Sidebar({ empresaNome, email, isSuper, acesso }: { empre
         <Link href="/assistente" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/assistente" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
           🤖 Assistente
         </Link>
-        {acesso.gerencia && (
+        {acesso.dono && (
           <Link href="/assistente/fila" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/assistente/fila" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
             🗂️ Fila de aprovação
           </Link>

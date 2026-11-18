@@ -118,6 +118,75 @@ export async function checagensFinanceiras(db: SupabaseClient, empresaId: string
   return achados;
 }
 
+// ==== F3 · Projeções e crescimento (leitura) =================================
+
+export type Ajustes = {
+  atraso_receber_dias?: number;    // empurra os recebíveis em N dias (atraso)
+  corte_receber_pct?: number;      // haircut nos recebíveis (inadimplência extra)
+  custo_fixo_novo_mensal?: number; // novo custo fixo por mês
+  investimento_pontual?: number;   // CAPEX único (saída agora)
+};
+export type Projecao = { caixa_hoje: number; saldo_30: number; saldo_60: number; saldo_90: number };
+
+// Projeção do saldo em 30/60/90 dias: caixa + títulos em aberto por janela de
+// vencimento. Com 'aj', vira cenário "e se" (atraso, corte, novo custo, CAPEX).
+export async function projecaoCaixa(db: SupabaseClient, empresaId: string, aj: Ajustes = {}): Promise<Projecao> {
+  const { data: contas } = await db.from("contas_bancarias").select("saldo_atual").eq("empresa_consultora_id", empresaId);
+  const caixa = (contas ?? []).reduce((s, c: any) => s + Number(c.saldo_atual || 0), 0);
+  const { data: tit } = await buscarTodos(
+    db.from("titulos_financeiros").select("tipo,valor,vencimento").eq("empresa_consultora_id", empresaId).eq("status", "aberto").not("vencimento", "is", null),
+    "id",
+  );
+
+  const atraso = Math.max(0, Number(aj.atraso_receber_dias || 0));
+  const corte = Math.min(100, Math.max(0, Number(aj.corte_receber_pct || 0))) / 100;
+  const novoCusto = Math.max(0, Number(aj.custo_fixo_novo_mensal || 0));
+  const capex = Math.max(0, Number(aj.investimento_pontual || 0));
+
+  const lim = (dias: number) => new Date(Date.now() + dias * 86400000).toISOString().slice(0, 10);
+  const l30 = lim(30), l60 = lim(60), l90 = lim(90);
+  const addDias = (iso: string, d: number) => new Date(new Date(iso).getTime() + d * 86400000).toISOString().slice(0, 10);
+
+  let r30 = 0, r60 = 0, r90 = 0, p30 = 0, p60 = 0, p90 = 0;
+  for (const t of (tit ?? []) as any[]) {
+    const v = Number(t.valor || 0);
+    if (t.tipo === "receber") {
+      const venc = atraso ? addDias(t.vencimento, atraso) : t.vencimento;
+      const vv = v * (1 - corte);
+      if (venc <= l30) r30 += vv;
+      if (venc <= l60) r60 += vv;
+      if (venc <= l90) r90 += vv;
+    } else {
+      if (t.vencimento <= l30) p30 += v;
+      if (t.vencimento <= l60) p60 += v;
+      if (t.vencimento <= l90) p90 += v;
+    }
+  }
+  return {
+    caixa_hoje: caixa,
+    saldo_30: caixa + r30 - p30 - novoCusto * 1 - capex,
+    saldo_60: caixa + r60 - p60 - novoCusto * 2 - capex,
+    saldo_90: caixa + r90 - p90 - novoCusto * 3 - capex,
+  };
+}
+
+export type MesFluxo = { mes: string; entradas: number; saidas: number; liquido: number };
+
+// Tendência: entradas/saídas realizadas (pagas) mês a mês, para ver trajetória.
+export async function tendenciaFinanceira(db: SupabaseClient, empresaId: string, meses = 6): Promise<MesFluxo[]> {
+  const primeiroDiaMes = new Date().toISOString().slice(0, 8) + "01";
+  const { data } = await db
+    .from("vw_fluxo_mensal")
+    .select("mes,entradas,saidas")
+    .eq("empresa_consultora_id", empresaId)
+    .lte("mes", primeiroDiaMes)
+    .order("mes", { ascending: false })
+    .limit(meses);
+  return (data ?? [])
+    .map((m: any) => ({ mes: m.mes, entradas: Number(m.entradas || 0), saidas: Number(m.saidas || 0), liquido: Number(m.entradas || 0) - Number(m.saidas || 0) }))
+    .reverse();
+}
+
 // Resumo financeiro semanal (reaproveita a infra de rondas). Só entrega texto
 // aos admins; não cria nada e não mexe em dinheiro. Admin = service role.
 export async function rodarRondaFinanceira(admin: SupabaseClient, empresaId: string) {
@@ -132,11 +201,12 @@ export async function rodarRondaFinanceira(admin: SupabaseClient, empresaId: str
 
   const ind = await indicadoresFinanceiros(admin, empresaId);
   const checks = await checagensFinanceiras(admin, empresaId);
+  const proj = await projecaoCaixa(admin, empresaId);
 
   const { data: ag } = await admin.from("perfis").select("id").eq("empresa_consultora_id", empresaId).eq("papel", "agente").eq("ativo", true).maybeSingle();
   const agenteId = ag?.id ?? null;
 
-  const texto = await redigirFinanceiro(modelo, nome, ind, checks, mesesAlerta);
+  const texto = await redigirFinanceiro(modelo, nome, ind, checks, proj, mesesAlerta);
 
   if (texto) {
     const { data: admins } = await admin.from("perfis").select("id").eq("empresa_consultora_id", empresaId).eq("papel", "admin").eq("ativo", true);
@@ -154,12 +224,13 @@ export async function rodarRondaFinanceira(admin: SupabaseClient, empresaId: str
   return { pulada: false, indicadores: ind, checagens: checks.length };
 }
 
-async function redigirFinanceiro(modelo: string, nome: string, ind: Indicadores, checks: AchadoFin[], mesesAlerta: number): Promise<string> {
+async function redigirFinanceiro(modelo: string, nome: string, ind: Indicadores, checks: AchadoFin[], proj: Projecao, mesesAlerta: number): Promise<string> {
   const linhas = [
     `Caixa atual: ${brl(ind.caixa_total)}`,
     `A receber em aberto: ${brl(ind.a_receber_aberto)} (vencido: ${brl(ind.vencidos_receber)})`,
     `A pagar em aberto: ${brl(ind.a_pagar_aberto)} (vencido: ${brl(ind.vencidos_pagar)})`,
     `Projeção de caixa em 30 dias: ${brl(ind.projecao_30d)}`,
+    `Projeção de caixa em 90 dias: ${brl(proj.saldo_90)}`,
     ind.runway_meses != null ? `Runway: ${ind.runway_meses.toFixed(1)} meses (queima ~${brl(ind.burn_mensal)}/mês)` : "Runway: sem saídas recentes para estimar",
     ind.inadimplencia_pct != null ? `Inadimplência (a receber vencido): ${ind.inadimplencia_pct.toFixed(0)}%` : null,
     ind.liquidez != null ? `Liquidez (caixa+receber)/pagar: ${ind.liquidez.toFixed(2)}` : null,

@@ -1,5 +1,6 @@
 import FilaAprovacao from "@/components/agente/FilaAprovacao";
 import { createClient } from "@/lib/supabase/server";
+import { ehDonoDoAgente } from "@/lib/agente/donos";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +10,8 @@ export default async function Page() {
     data: { user },
   } = await sb.auth.getUser();
   const { data: perfil } = await sb.from("perfis").select("papel").eq("id", user?.id ?? "").maybeSingle();
-  const ger = perfil?.papel === "admin" || perfil?.papel === "super";
-  if (!ger) return <div className="p-6 text-sm text-gray-500">Área restrita à gerência.</div>;
+  const dono = await ehDonoDoAgente(sb, user?.email, perfil?.papel);
+  if (!dono) return <div className="p-6 text-sm text-gray-500">Área restrita ao administrador do assistente.</div>;
 
   const { data: acoes } = await sb
     .from("acoes_agente")

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { executarAmarela, resumoAmarela } from "@/lib/agente/executor";
+import { ehDonoDoAgente } from "@/lib/agente/donos";
 import type { Contexto } from "@/lib/agente/tipos";
 
 // Decide uma ação amarela proposta: confirmar (executa sob o RLS do usuário),
@@ -12,6 +13,12 @@ export async function POST(req: Request) {
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+
+  // confirmar/editar/cancelar uma proposta é determinação → só o dono do agente
+  const { data: perfilU } = await sb.from("perfis").select("papel").eq("id", user.id).maybeSingle();
+  if (!(await ehDonoDoAgente(sb, user.email, perfilU?.papel))) {
+    return NextResponse.json({ error: "Só o administrador do assistente decide ações do assistente." }, { status: 403 });
+  }
 
   let body: any;
   try {

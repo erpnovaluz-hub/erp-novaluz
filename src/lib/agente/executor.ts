@@ -6,7 +6,7 @@
 // =============================================================================
 import type { Acao, Contexto, ResultadoFerramenta } from "./tipos";
 import { META } from "./ferramentas";
-import { indicadoresFinanceiros, checagensFinanceiras } from "./financeiro";
+import { indicadoresFinanceiros, checagensFinanceiras, projecaoCaixa, tendenciaFinanceira } from "./financeiro";
 
 const falta = (campo: string): ResultadoFerramenta => ({ ok: false, erro: `Falta o campo obrigatório: ${campo}` });
 const hojeStr = () => new Date().toISOString().slice(0, 10);
@@ -128,6 +128,25 @@ export async function executar(nome: string, input: any, ctx: Contexto): Promise
     }
     case "conferir_financeiro": {
       return { ok: true, dados: await checagensFinanceiras(sb, ctx.empresaId) };
+    }
+
+    // ---- FINANCEIRO · projeções e crescimento (F3) ---------------------------
+    case "projecao_caixa": {
+      return { ok: true, dados: await projecaoCaixa(sb, ctx.empresaId) };
+    }
+    case "cenario_caixa": {
+      const base = await projecaoCaixa(sb, ctx.empresaId);
+      const cenario = await projecaoCaixa(sb, ctx.empresaId, {
+        atraso_receber_dias: p.atraso_receber_dias,
+        corte_receber_pct: p.corte_receber_pct,
+        custo_fixo_novo_mensal: p.custo_fixo_novo_mensal,
+        investimento_pontual: p.investimento_pontual,
+      });
+      return { ok: true, dados: { base, cenario, impacto_90: cenario.saldo_90 - base.saldo_90 } };
+    }
+    case "tendencia_financeira": {
+      const meses = Math.min(24, Math.max(2, Number(p.meses) || 6));
+      return { ok: true, dados: await tendenciaFinanceira(sb, ctx.empresaId, meses) };
     }
 
     // ---- VERDES --------------------------------------------------------------

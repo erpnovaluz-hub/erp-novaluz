@@ -43,6 +43,10 @@ export const META: Record<string, { faixa: Faixa; reversivel: boolean }> = {
   indicadores_financeiros: { faixa: "leitura", reversivel: false },
   dre_resumo: { faixa: "leitura", reversivel: false },
   conferir_financeiro: { faixa: "leitura", reversivel: false },
+  // financeiro — projeções e crescimento (F3, leitura)
+  projecao_caixa: { faixa: "leitura", reversivel: false },
+  cenario_caixa: { faixa: "leitura", reversivel: false },
+  tendencia_financeira: { faixa: "leitura", reversivel: false },
   // financeiro — controle de caixa (F1). Verdes executam; amarelas viram cartão.
   criar_cobranca: { faixa: "verde", reversivel: true },
   salvar_cenario_caixa: { faixa: "verde", reversivel: true },
@@ -309,6 +313,31 @@ export const FERRAMENTAS: DefFerramenta[] = [
     name: "conferir_financeiro",
     description: "Checagens de compliance de dado: títulos sem categoria, sem vencimento e possíveis duplicidades.",
     input_schema: { type: "object", properties: {} },
+  },
+
+  // ---- FINANCEIRO · projeções e crescimento (F3, leitura) --------------------
+  {
+    name: "projecao_caixa",
+    description: "Projeta o saldo de caixa em 30, 60 e 90 dias a partir do caixa atual e dos títulos em aberto por vencimento.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "cenario_caixa",
+    description: "Simula um cenário 'e se' sobre a projeção de 90 dias e mostra o impacto vs. o cenário-base. Use os ajustes que o usuário pedir.",
+    input_schema: {
+      type: "object",
+      properties: {
+        atraso_receber_dias: { type: "number", description: "empurra os recebíveis em N dias" },
+        corte_receber_pct: { type: "number", description: "haircut nos recebíveis, 0 a 100 (inadimplência extra)" },
+        custo_fixo_novo_mensal: { type: "number", description: "novo custo fixo por mês" },
+        investimento_pontual: { type: "number", description: "um investimento/CAPEX único agora" },
+      },
+    },
+  },
+  {
+    name: "tendencia_financeira",
+    description: "Série mensal de entradas, saídas e líquido realizados (pagos), para ver a trajetória da empresa.",
+    input_schema: { type: "object", properties: { meses: { type: "number", description: "quantos meses (padrão 6)" } } },
   },
 
   // ---- FINANCEIRO · controle de caixa (F1) -----------------------------------

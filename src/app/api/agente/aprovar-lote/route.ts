@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { executarAmarela } from "@/lib/agente/executor";
+import { ehDonoDoAgente } from "@/lib/agente/donos";
 import type { Contexto } from "@/lib/agente/tipos";
 
 // Aprovação em lote de ações AMARELAS pendentes (a fila do dia). Cada uma é
@@ -13,6 +14,12 @@ export async function POST(req: Request) {
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+
+  // só o dono do agente aprova a fila
+  const { data: perfilU } = await sb.from("perfis").select("papel").eq("id", user.id).maybeSingle();
+  if (!(await ehDonoDoAgente(sb, user.email, perfilU?.papel))) {
+    return NextResponse.json({ error: "Só o administrador do assistente aprova a fila." }, { status: 403 });
+  }
 
   let body: any;
   try {
