@@ -6,8 +6,11 @@
 // =============================================================================
 import type { Acao, Contexto, ResultadoFerramenta } from "./tipos";
 import { META } from "./ferramentas";
+import { indicadoresFinanceiros, checagensFinanceiras } from "./financeiro";
 
 const falta = (campo: string): ResultadoFerramenta => ({ ok: false, erro: `Falta o campo obrigatório: ${campo}` });
+const hojeStr = () => new Date().toISOString().slice(0, 10);
+const brl = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 // grava a ação executada e devolve o id (para o Desfazer)
 async function registrar(ctx: Contexto, acao: Acao, parametros: any): Promise<string | undefined> {
@@ -73,6 +76,51 @@ export async function executar(nome: string, input: any, ctx: Contexto): Promise
     case "listar_modelos": {
       const { data, error } = await sb.from("modelos_projeto").select("id,nome,descricao").limit(50);
       return error ? { ok: false, erro: error.message } : { ok: true, dados: data };
+    }
+
+    // ---- FINANCEIRO · leitura (F0) -------------------------------------------
+    // Lê sob o RLS do usuário: quem não tem financeiro simplesmente não vê nada.
+    case "posicao_caixa": {
+      const { data: contas, error } = await sb.from("contas_bancarias").select("nome,saldo_atual").eq("empresa_consultora_id", ctx.empresaId);
+      if (error) return { ok: false, erro: error.message };
+      const ind = await indicadoresFinanceiros(sb, ctx.empresaId);
+      return { ok: true, dados: {
+        contas,
+        caixa_total: ind.caixa_total,
+        a_receber_aberto: ind.a_receber_aberto,
+        a_pagar_aberto: ind.a_pagar_aberto,
+        vencidos_receber: ind.vencidos_receber,
+        vencidos_pagar: ind.vencidos_pagar,
+      } };
+    }
+    case "buscar_titulos": {
+      let q = sb.from("titulos_financeiros")
+        .select("id,tipo,descricao,valor,vencimento,status,cliente_id,fornecedor_id,categoria_id")
+        .eq("empresa_consultora_id", ctx.empresaId)
+        .order("vencimento", { ascending: true, nullsFirst: false })
+        .limit(50);
+      if (p.tipo) q = q.eq("tipo", p.tipo);
+      if (p.vencidos) q = q.eq("status", "aberto").lt("vencimento", hojeStr());
+      else if (p.status) q = q.eq("status", p.status);
+      else q = q.neq("status", "cancelado");
+      if (p.texto) {
+        const termo = String(p.texto).replace(/[(),]/g, " ").trim();
+        if (termo) q = q.ilike("descricao", `%${termo}%`);
+      }
+      const { data, error } = await q;
+      return error ? { ok: false, erro: error.message } : { ok: true, dados: data };
+    }
+    case "indicadores_financeiros": {
+      return { ok: true, dados: await indicadoresFinanceiros(sb, ctx.empresaId) };
+    }
+    case "dre_resumo": {
+      let q = sb.from("vw_dre").select("competencia,grupo_dre,natureza,tipo,total").eq("empresa_consultora_id", ctx.empresaId).order("competencia", { ascending: false }).limit(200);
+      if (p.competencia) q = q.eq("competencia", p.competencia);
+      const { data, error } = await q;
+      return error ? { ok: false, erro: error.message } : { ok: true, dados: data };
+    }
+    case "conferir_financeiro": {
+      return { ok: true, dados: await checagensFinanceiras(sb, ctx.empresaId) };
     }
 
     // ---- VERDES --------------------------------------------------------------
@@ -181,6 +229,41 @@ export async function executar(nome: string, input: any, ctx: Contexto): Promise
       return { ok: true, dados: { projeto_id: data }, acao };
     }
 
+    // ---- FINANCEIRO · verdes (F1) --------------------------------------------
+    case "criar_cobranca": {
+      if (!p.titulo_id) return falta("titulo_id");
+      const { data: t } = await sb.from("titulos_financeiros").select("descricao,valor").eq("id", p.titulo_id).maybeSingle();
+      const { data, error } = await sb.from("tarefas").insert({
+        titulo: `Cobrar: ${t?.descricao ?? "título a receber"}`,
+        descricao: p.observacao ?? null,
+        responsavel_id: p.responsavel_id ?? null,
+        prioridade: "alta",
+        vinculo_tipo: "titulo",
+        vinculo_id: p.titulo_id,
+        vinculo_rotulo: t ? `${t.descricao} · ${brl(Number(t.valor))}` : null,
+      }).select("id,titulo").single();
+      if (error) return { ok: false, erro: error.message };
+      const acao: Acao = { ferramenta: nome, faixa: "verde", vinculo_tipo: "titulo", vinculo_id: p.titulo_id,
+        resumo: `Cobrança criada: ${data.titulo}`, link: `/tarefas/caixa?tarefa=${data.id}`, reversivel: true, resultado: { tarefa_id: data.id } };
+      acao.id = await registrar(ctx, acao, p);
+      return { ok: true, dados: { tarefa_id: data.id }, acao };
+    }
+    case "salvar_cenario_caixa": {
+      if (!p.nome) return falta("nome");
+      const { data, error } = await sb.from("simulacoes_caixa").insert({
+        nome: p.nome,
+        usar_saldo: p.usar_saldo ?? true,
+        filtro_de: p.de ?? null,
+        filtro_ate: p.ate ?? null,
+        titulo_ids: p.titulo_ids ?? [],
+      }).select("id,nome").single();
+      if (error) return { ok: false, erro: error.message };
+      const acao: Acao = { ferramenta: nome, faixa: "verde", resumo: `Cenário salvo: ${data.nome}`,
+        link: `/financeiro`, reversivel: true, resultado: { simulacao_id: data.id } };
+      acao.id = await registrar(ctx, acao, p);
+      return { ok: true, dados: { simulacao_id: data.id }, acao };
+    }
+
     default:
       return { ok: false, erro: `Ferramenta desconhecida: ${nome}` };
   }
@@ -204,6 +287,10 @@ export function resumoAmarela(nome: string, p: any): string {
       return `Lançar insumo: ${p.descricao} × ${p.quantidade ?? 1}`;
     case "concluir_os":
       return "Concluir a OS (abre a tarefa de faturar)";
+    case "criar_titulo":
+      return `Criar título a ${p.tipo === "receber" ? "receber" : "pagar"}: "${p.descricao}" · ${brl(Number(p.valor))}` + (p.vencimento ? ` · venc ${p.vencimento}` : "");
+    case "alterar_vencimento_titulo":
+      return `Reagendar o vencimento do título para ${p.vencimento}`;
     default:
       return nome;
   }
@@ -214,13 +301,17 @@ async function proporAmarela(nome: string, p: any, ctx: Contexto): Promise<Resul
   if (nome === "mudar_status_os" && p.status === "pausada" && !p.motivo_pausa) {
     return { ok: false, erro: "Para pausar a OS é obrigatório informar o motivo (campo motivo_pausa)." };
   }
-  const valor = typeof p.custo_estimado === "number" ? p.custo_estimado : typeof p.custo_unitario === "number" ? p.custo_unitario : null;
+  const valor =
+    typeof p.valor === "number" ? p.valor
+    : typeof p.custo_estimado === "number" ? p.custo_estimado
+    : typeof p.custo_unitario === "number" ? p.custo_unitario
+    : null;
   const acao: Acao = {
     ferramenta: nome,
     faixa: "amarela",
     status: "pendente",
-    vinculo_tipo: p.os_id ? "os" : null,
-    vinculo_id: p.os_id ?? null,
+    vinculo_tipo: p.os_id ? "os" : p.titulo_id ? "titulo" : null,
+    vinculo_id: p.os_id ?? p.titulo_id ?? null,
     resumo: resumoAmarela(nome, p),
     parametros: p,
     valor,
@@ -263,6 +354,13 @@ const ACAO_OS: Record<string, string> = {
   lancar_insumo_os: "insumo",
 };
 
+// Ferramentas amarelas financeiras → dispatcher agente_financeiro (NÃO mexem
+// em saldo: criar_titulo nasce 'aberto'; vencimento reagenda em aberto).
+const ACAO_FIN: Record<string, string> = {
+  criar_titulo: "criar_titulo",
+  alterar_vencimento_titulo: "vencimento",
+};
+
 // Executa a ação amarela já confirmada, sob o RLS do usuário (ctx.sb). Lê o
 // before-image para o Desfazer. Devolve a ação 'executada' com link e resultado.
 export async function executarAmarela(
@@ -271,6 +369,34 @@ export async function executarAmarela(
 ): Promise<ResultadoFerramenta> {
   const nome = row.ferramenta;
   const p = row.parametros || {};
+
+  // Financeiro: cria título 'aberto' ou reagenda vencimento (sob RLS do usuário).
+  const pAcaoFin = ACAO_FIN[nome];
+  if (pAcaoFin) {
+    let antesFin: Record<string, any> | undefined;
+    if (nome === "alterar_vencimento_titulo" && p.titulo_id) {
+      const { data: t } = await ctx.sb.from("titulos_financeiros").select("vencimento").eq("id", p.titulo_id).maybeSingle();
+      antesFin = t ?? undefined;
+    }
+    const { data, error } = await ctx.sb.rpc("agente_financeiro", { p_acao: pAcaoFin, p });
+    if (error) return { ok: false, erro: error.message };
+    const ids = (data as any) || {};
+    const titId = ids.titulo_id ?? p.titulo_id ?? null;
+    const acao: Acao = {
+      id: row.id,
+      ferramenta: nome,
+      faixa: "amarela",
+      status: "executada",
+      vinculo_tipo: titId ? "titulo" : null,
+      vinculo_id: titId,
+      resumo: resumoAmarela(nome, p),
+      link: "/financeiro",
+      reversivel: META[nome].reversivel,
+      resultado: { ...ids, antes: antesFin },
+    };
+    return { ok: true, dados: ids, acao };
+  }
+
   const pAcao = ACAO_OS[nome];
   if (!pAcao) return { ok: false, erro: `Ação amarela desconhecida: ${nome}` };
 

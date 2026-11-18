@@ -37,6 +37,17 @@ export const META: Record<string, { faixa: Faixa; reversivel: boolean }> = {
   lancar_apontamento: { faixa: "amarela", reversivel: true },
   lancar_insumo_os: { faixa: "amarela", reversivel: true },
   concluir_os: { faixa: "amarela", reversivel: true },
+  // financeiro — leitura (F0)
+  posicao_caixa: { faixa: "leitura", reversivel: false },
+  buscar_titulos: { faixa: "leitura", reversivel: false },
+  indicadores_financeiros: { faixa: "leitura", reversivel: false },
+  dre_resumo: { faixa: "leitura", reversivel: false },
+  conferir_financeiro: { faixa: "leitura", reversivel: false },
+  // financeiro — controle de caixa (F1). Verdes executam; amarelas viram cartão.
+  criar_cobranca: { faixa: "verde", reversivel: true },
+  salvar_cenario_caixa: { faixa: "verde", reversivel: true },
+  criar_titulo: { faixa: "amarela", reversivel: true },
+  alterar_vencimento_titulo: { faixa: "amarela", reversivel: true },
 };
 
 export const FERRAMENTAS: DefFerramenta[] = [
@@ -263,5 +274,96 @@ export const FERRAMENTAS: DefFerramenta[] = [
     name: "concluir_os",
     description: "Propõe concluir uma OS (dispara a tarefa 'Faturar OS' para a gerência).",
     input_schema: { type: "object", properties: { os_id: { type: "string" } }, required: ["os_id"] },
+  },
+
+  // ---- FINANCEIRO · leitura (F0) ---------------------------------------------
+  {
+    name: "posicao_caixa",
+    description: "Posição de caixa: saldo de cada conta + totais a receber/pagar em aberto e vencidos.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "buscar_titulos",
+    description: "Busca títulos financeiros (contas a pagar/receber) que o usuário pode ver.",
+    input_schema: {
+      type: "object",
+      properties: {
+        texto: { type: "string", description: "trecho da descrição" },
+        tipo: { type: "string", enum: ["pagar", "receber"] },
+        status: { type: "string", enum: ["aberto", "pago", "cancelado"] },
+        vencidos: { type: "boolean", description: "só abertos já vencidos" },
+      },
+    },
+  },
+  {
+    name: "indicadores_financeiros",
+    description: "Raio-x do caixa: runway, burn mensal, inadimplência, liquidez, projeção 30 dias, caixa livre.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "dre_resumo",
+    description: "Resumo do DRE por competência (grupo, natureza, receita/despesa). Opcional: uma competência (AAAA-MM-01).",
+    input_schema: { type: "object", properties: { competencia: { type: "string", description: "AAAA-MM-01" } } },
+  },
+  {
+    name: "conferir_financeiro",
+    description: "Checagens de compliance de dado: títulos sem categoria, sem vencimento e possíveis duplicidades.",
+    input_schema: { type: "object", properties: {} },
+  },
+
+  // ---- FINANCEIRO · controle de caixa (F1) -----------------------------------
+  {
+    name: "criar_cobranca",
+    description: "Cria uma tarefa de cobrança ligada a um título a receber. Use buscar_titulos para achar o título.",
+    input_schema: {
+      type: "object",
+      properties: {
+        titulo_id: { type: "string" },
+        responsavel_id: { type: "string" },
+        observacao: { type: "string" },
+      },
+      required: ["titulo_id"],
+    },
+  },
+  {
+    name: "salvar_cenario_caixa",
+    description: "Salva um cenário do simulador de caixa (só metadados; não altera títulos nem saldos).",
+    input_schema: {
+      type: "object",
+      properties: {
+        nome: { type: "string" },
+        usar_saldo: { type: "boolean" },
+        de: { type: "string", description: "AAAA-MM-DD" },
+        ate: { type: "string", description: "AAAA-MM-DD" },
+        titulo_ids: { type: "array", items: { type: "string" } },
+      },
+      required: ["nome"],
+    },
+  },
+  {
+    name: "criar_titulo",
+    description: "Propõe criar um título (previsão a pagar/receber), sempre 'aberto'. NÃO dá baixa nem mexe em saldo. Vira cartão de confirmação.",
+    input_schema: {
+      type: "object",
+      properties: {
+        tipo: { type: "string", enum: ["pagar", "receber"] },
+        descricao: { type: "string" },
+        valor: { type: "number" },
+        vencimento: { type: "string", description: "AAAA-MM-DD" },
+        categoria_id: { type: "string" },
+        cliente_id: { type: "string" },
+        fornecedor_id: { type: "string" },
+      },
+      required: ["tipo", "descricao", "valor"],
+    },
+  },
+  {
+    name: "alterar_vencimento_titulo",
+    description: "Propõe reagendar o vencimento de um título em aberto. Vira cartão de confirmação.",
+    input_schema: {
+      type: "object",
+      properties: { titulo_id: { type: "string" }, vencimento: { type: "string", description: "AAAA-MM-DD" } },
+      required: ["titulo_id", "vencimento"],
+    },
   },
 ];

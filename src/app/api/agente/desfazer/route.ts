@@ -72,6 +72,20 @@ export async function POST(req: Request) {
     case "lancar_insumo_os":
       ({ error: erro } = normalizar(await sb.from("insumos_os").delete().eq("id", res.insumo_id)));
       break;
+    // --- financeiro ---
+    case "criar_cobranca":
+      ({ error: erro } = normalizar(await sb.from("tarefas").delete().eq("id", res.tarefa_id)));
+      break;
+    case "salvar_cenario_caixa":
+      ({ error: erro } = normalizar(await sb.from("simulacoes_caixa").delete().eq("id", res.simulacao_id)));
+      break;
+    case "criar_titulo":
+      // só remove se ainda estiver em aberto (nunca mexe num título já pago/baixado)
+      ({ error: erro } = normalizar(await sb.from("titulos_financeiros").delete().eq("id", res.titulo_id).eq("status", "aberto")));
+      break;
+    case "alterar_vencimento_titulo":
+      ({ error: erro } = normalizar(await sb.from("titulos_financeiros").update({ vencimento: res.antes?.vencimento ?? null }).eq("id", res.titulo_id)));
+      break;
     default:
       return NextResponse.json({ error: "Esta ação não pode ser desfeita." }, { status: 400 });
   }

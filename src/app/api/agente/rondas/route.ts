@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { rodarRonda } from "@/lib/agente/rondas";
+import { rodarRondaFinanceira } from "@/lib/agente/financeiro";
 
 // Chamada pelo banco (pg_cron + pg_net) nos horários do briefing/resumo.
 // Protegida por segredo (RONDA_WEBHOOK_SECRET), não por login — o middleware
@@ -16,17 +17,21 @@ export async function POST(req: Request) {
   } catch {
     body = {};
   }
-  const momento = body?.momento === "resumo" ? "resumo" : "briefing";
+  const momento = ["resumo", "financeiro"].includes(body?.momento) ? body.momento : "briefing";
 
   try {
     const admin = createAdminClient();
     const { data: empresas } = await admin.from("empresas_consultoras").select("id").eq("ativo", true);
     const resultados = [];
     for (const e of empresas ?? []) {
+      const empresaId = (e as any).id;
       try {
-        resultados.push({ empresa: (e as any).id, ...(await rodarRonda(admin, (e as any).id, momento)) });
+        const r = momento === "financeiro"
+          ? await rodarRondaFinanceira(admin, empresaId)
+          : await rodarRonda(admin, empresaId, momento);
+        resultados.push({ empresa: empresaId, ...r });
       } catch (err: any) {
-        resultados.push({ empresa: (e as any).id, erro: err?.message ?? String(err) });
+        resultados.push({ empresa: empresaId, erro: err?.message ?? String(err) });
       }
     }
     return NextResponse.json({ ok: true, momento, resultados });
