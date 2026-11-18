@@ -84,6 +84,10 @@ export async function executar(nome: string, input: any, ctx: Contexto): Promise
       const { data, error } = await sb.from("modelos_projeto").select("id,nome,descricao").limit(50);
       return error ? { ok: false, erro: error.message } : { ok: true, dados: data };
     }
+    case "listar_empresas": {
+      const { data, error } = await sb.from("empresas_consultoras").select("id,nome").limit(50);
+      return error ? { ok: false, erro: error.message } : { ok: true, dados: data };
+    }
 
     // ---- FINANCEIRO · leitura (F0) -------------------------------------------
     // Lê sob o RLS do usuário: quem não tem financeiro simplesmente não vê nada.

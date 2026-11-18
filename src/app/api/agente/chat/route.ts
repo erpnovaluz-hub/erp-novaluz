@@ -78,15 +78,20 @@ export async function POST(req: Request) {
   const mensagem = String(body?.mensagem ?? "").trim();
   if (!mensagem) return NextResponse.json({ error: "Escreva uma mensagem." }, { status: 400 });
 
-  // empresa do usuário (perfil). Observação: para o super em modo suporte,
-  // auth_empresa_id() usaria empresa_ativa; aqui usamos a empresa do perfil.
+  // Quem está logado + em qual empresa. Para o super em modo suporte o RLS usa
+  // empresa_ativa — então usamos a MESMA aqui, senão o agente misturaria empresas.
   const { data: perfil } = await sb
     .from("perfis")
-    .select("empresa_consultora_id,papel")
+    .select("nome,papel,empresa_consultora_id,empresa_ativa")
     .eq("id", user.id)
     .maybeSingle();
-  const empresaId = perfil?.empresa_consultora_id;
+  const empresaId = (perfil?.papel === "super" && perfil?.empresa_ativa) ? perfil.empresa_ativa : perfil?.empresa_consultora_id;
   if (!empresaId) return NextResponse.json({ error: "Usuário sem empresa." }, { status: 403 });
+
+  // nome da empresa em uso (para o agente saber onde está e não misturar contas)
+  const { data: emp } = await sb.from("empresas_consultoras").select("nome").eq("id", empresaId).maybeSingle();
+  const empresaNome = emp?.nome || "—";
+  const usuario = { id: user.id, nome: perfil?.nome || user.email || "usuário", email: user.email || null, papel: perfil?.papel ?? null };
 
   const admin = createAdminClient();
 
@@ -137,7 +142,7 @@ export async function POST(req: Request) {
 
   let resultado;
   try {
-    resultado = await conversar({ ctx, modelo, nomeAssistente: nome, podeAgir: ehDono, historico, mensagemUsuario: mensagem });
+    resultado = await conversar({ ctx, modelo, nomeAssistente: nome, podeAgir: ehDono, usuario, empresaNome, historico, mensagemUsuario: mensagem });
   } catch (e: any) {
     await admin.from("agente_execucoes").insert({
       empresa_consultora_id: empresaId, agente: "chat", origem: "chat", usuario_id: user.id,

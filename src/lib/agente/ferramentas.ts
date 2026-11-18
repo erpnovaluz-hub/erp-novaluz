@@ -21,6 +21,7 @@ export const META: Record<string, { faixa: Faixa; reversivel: boolean }> = {
   listar_projetos: { faixa: "leitura", reversivel: false },
   listar_pessoas: { faixa: "leitura", reversivel: false },
   listar_modelos: { faixa: "leitura", reversivel: false },
+  listar_empresas: { faixa: "leitura", reversivel: false },
   // verdes
   criar_tarefa: { faixa: "verde", reversivel: true },
   atualizar_tarefa: { faixa: "verde", reversivel: false },
@@ -93,6 +94,11 @@ export const FERRAMENTAS: DefFerramenta[] = [
   {
     name: "listar_modelos",
     description: "Lista os modelos de projeto/checklist disponíveis.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "listar_empresas",
+    description: "Lista as empresas que o usuário pode ver (id e nome). Útil para saber em qual empresa você está e quais existem.",
     input_schema: { type: "object", properties: {} },
   },
   {
