@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatCurrency } from "@/lib/format";
 import PrintButton from "@/components/PrintButton";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
+import AjustarSaldo from "@/components/AjustarSaldo";
 
 export const dynamic = "force-dynamic";
 const MESES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -12,7 +13,7 @@ export default async function FluxoPage(props: { searchParams: Promise<{ ano?: s
   const supabase = await createClient();
   const [{ data: fluxo }, { data: contas }] = await Promise.all([
     supabase.from("vw_fluxo_mensal").select("*"),
-    supabase.from("contas_bancarias").select("nome, tipo, saldo_atual").eq("ativo", true).order("nome"),
+    supabase.from("contas_bancarias").select("id, nome, tipo, saldo_atual").eq("ativo", true).order("nome"),
   ]);
 
   const linhas = (fluxo ?? []) as any[];
@@ -113,10 +114,11 @@ export default async function FluxoPage(props: { searchParams: Promise<{ ano?: s
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Contas</h2>
         <div className="card divide-y divide-gray-100">
           {(contas ?? []).length === 0 ? <p className="p-4 text-sm text-gray-400">Nenhuma conta.</p> :
-            (contas ?? []).map((c: any, i: number) => (
-              <div key={i} className="flex items-center justify-between px-4 py-2 text-sm">
+            (contas ?? []).map((c: any) => (
+              <div key={c.id} className="flex flex-wrap items-center justify-between gap-x-3 px-4 py-2 text-sm">
                 <span className="text-gray-700">{c.nome} <span className="text-xs text-gray-400">({c.tipo})</span></span>
-                <span className="font-medium">{formatCurrency(c.saldo_atual)}</span>
+                <span className="ml-auto font-medium">{formatCurrency(c.saldo_atual)}</span>
+                <AjustarSaldo conta={c} />
               </div>
             ))}
         </div>

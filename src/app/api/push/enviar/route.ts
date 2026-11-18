@@ -13,6 +13,7 @@ const ACAO: Record<string, string> = {
   acompanhar: "incluiu você como acompanhante",
   os_atribuida: "passou para você a OS",
   os_status: "atualizou a OS",
+  agente: "avisou (via assistente)",
 };
 
 export async function POST(req: Request) {
@@ -43,9 +44,12 @@ export async function POST(req: Request) {
       : (n as any).tarefas?.titulo ?? "uma tarefa";
     const trecho = (n.tipo === "mencao" || n.tipo === "comentario") && n.texto ? `\n“${n.texto}”`
       : n.tipo === "os_status" && n.texto?.includes("→") ? ` → ${rotuloMudancaStatus(n.texto)}` : "";
+    // Avisos do assistente (incl. "o meu dia" e o briefing do Maestro) carregam o
+    // próprio texto no push — não têm tarefa/OS para resumir.
+    const ehAgente = n.tipo === "agente";
     const r = await enviarParaPerfil(admin, n.destinatario_id, {
-      title: `${ator} ${ACAO[n.tipo] ?? "atualizou"}`,
-      body: `${titulo}${trecho}`,
+      title: ehAgente ? (n.ator_id ? ator : "Assistente") : `${ator} ${ACAO[n.tipo] ?? "atualizou"}`,
+      body: ehAgente ? (n.texto || "Você tem um novo aviso.") : `${titulo}${trecho}`,
       url: n.os_id ? `/os/${n.os_id}` : n.tarefa_id ? `/tarefas/caixa?tarefa=${n.tarefa_id}` : "/tarefas/caixa",
       tag: n.os_id ?? n.tarefa_id ?? n.id,
     }, new URL(req.url).origin);

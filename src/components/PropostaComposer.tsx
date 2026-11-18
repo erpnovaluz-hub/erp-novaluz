@@ -101,7 +101,10 @@ export default function PropostaComposer({ id }: { id: string }) {
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-sm">
           <Info rot="Emissão" val={formatDate(prop.data)} />
           <Info rot="Válido até" val={formatDate(prop.validade)} />
-          <Info rot="Valor total" val={formatCurrency(prop.valor_total)} />
+          <Info rot="Valor total" val={<>
+            {formatCurrency(prop.valor_total)}
+            {Number(prop.desconto_valor) > 0 && <span className="ml-2 rounded bg-green-50 px-1.5 py-0.5 text-xs font-medium text-green-700">com desconto de {formatCurrency(prop.desconto_valor)}</span>}
+          </>} />
           <Info rot="Pagamento" val={prop.pagamento} />
         </div>
       </div>
@@ -134,12 +137,23 @@ export default function PropostaComposer({ id }: { id: string }) {
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
-                <tr><td className="px-4 py-2" colSpan={4}>Valor total</td><td className="px-4 py-2 text-right tabular-nums text-brand-600">{formatCurrency(prop.valor_total)}</td><td /></tr>
+              <tfoot className="border-t-2 border-gray-300 bg-gray-50">
+                {Number(prop.desconto_valor) > 0 && (<>
+                  <tr className="text-gray-600"><td className="px-4 py-1.5" colSpan={4}>Subtotal</td><td className="px-4 py-1.5 text-right tabular-nums">{formatCurrency(prop.subtotal)}</td><td /></tr>
+                  <tr className="text-green-700">
+                    <td className="px-4 py-1.5" colSpan={4}>
+                      Desconto{prop.desconto_tipo === "percentual" ? ` (${Number(prop.desconto)}%)` : ""}
+                      {prop.desconto_motivo && <span className="ml-2 text-xs text-gray-500">— {prop.desconto_motivo}</span>}
+                    </td>
+                    <td className="px-4 py-1.5 text-right tabular-nums">− {formatCurrency(prop.desconto_valor)}</td><td />
+                  </tr>
+                </>)}
+                <tr className="font-semibold"><td className="px-4 py-2" colSpan={4}>{Number(prop.desconto_valor) > 0 ? "Valor final" : "Valor total"}</td><td className="px-4 py-2 text-right tabular-nums text-brand-600">{formatCurrency(prop.valor_total)}</td><td /></tr>
               </tfoot>
             </table>
           )}
         </div>
+        {itens.length > 0 && <DescontoEditor prop={prop} onSaved={carregar} />}
       </section>
 
       <button className="text-sm text-red-500 hover:underline" onClick={excluirProp}>Excluir esta proposta</button>
@@ -167,6 +181,73 @@ export default function PropostaComposer({ id }: { id: string }) {
 
       <TarefasVinculadas tipo="proposta" id={id}
         rotulo={[prop.numero, cliNome[prop.cliente_id]].filter(Boolean).join(" · ")} />
+    </div>
+  );
+}
+
+function DescontoEditor({ prop, onSaved }: { prop: Row; onSaved: () => void }) {
+  const supabase = useMemo(() => createClient(), []);
+  const temDesconto = Number(prop.desconto) > 0;
+  const [aberto, setAberto] = useState(false);
+  const [tipo, setTipo] = useState<"valor" | "percentual">(prop.desconto_tipo ?? "valor");
+  const [valor, setValor] = useState(temDesconto ? String(Number(prop.desconto)) : "");
+  const [motivo, setMotivo] = useState(prop.desconto_motivo ?? "");
+  const [salvando, setSalvando] = useState(false);
+
+  const subtotal = Number(prop.subtotal) || 0;
+  const n = Math.max(0, Number(String(valor).replace(",", ".")) || 0);
+  const descCalc = tipo === "percentual" ? Math.round(subtotal * Math.min(n, 100)) / 100 : Math.min(n, subtotal);
+
+  async function salvar(zerar = false) {
+    setSalvando(true);
+    const { error } = await supabase.from("propostas").update(zerar
+      ? { desconto: 0, desconto_tipo: "valor", desconto_motivo: null }
+      : { desconto: n, desconto_tipo: tipo, desconto_motivo: motivo.trim() || null }).eq("id", prop.id);
+    setSalvando(false);
+    if (error) { alert(error.message); return; }
+    if (zerar) { setValor(""); setMotivo(""); setTipo("valor"); }
+    setAberto(false); onSaved();
+  }
+
+  if (!aberto) return (
+    <div className="mt-2 text-right">
+      <button className="btn-ghost text-sm text-green-700" onClick={() => setAberto(true)}>
+        {temDesconto ? "✎ Alterar desconto" : "% Aplicar desconto"}
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="card mt-2 space-y-3 border-green-200 bg-green-50/40 p-4 text-sm">
+      <p className="font-semibold text-green-800">Desconto na proposta</p>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="inline-flex overflow-hidden rounded-lg ring-1 ring-gray-300">
+          {(["valor", "percentual"] as const).map((t) => (
+            <button key={t} type="button" onClick={() => setTipo(t)}
+              className={`px-3 py-2 ${tipo === t ? "bg-green-600 text-white" : "bg-white text-gray-600"}`}>
+              {t === "valor" ? "R$" : "%"}
+            </button>
+          ))}
+        </div>
+        <label className="block w-40">
+          <span className="lbl">{tipo === "valor" ? "Valor do desconto (R$)" : "Percentual (%)"}</span>
+          <input className="inp" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} autoFocus />
+        </label>
+        <label className="block min-w-[220px] flex-1">
+          <span className="lbl">Motivo (opcional — aparece no documento)</span>
+          <input className="inp" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="ex.: pagamento à vista, cliente recorrente" />
+        </label>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white p-3 ring-1 ring-gray-200">
+        <span className="tabular-nums text-gray-600">
+          Subtotal {formatCurrency(subtotal)} <span className="text-green-700">− {formatCurrency(descCalc)}</span> = <b className="text-gray-900">{formatCurrency(subtotal - descCalc)}</b>
+        </span>
+        <div className="flex gap-2">
+          {temDesconto && <button className="btn-ghost text-sm text-red-500" disabled={salvando} onClick={() => salvar(true)}>Remover desconto</button>}
+          <button className="btn-ghost text-sm" onClick={() => setAberto(false)}>Cancelar</button>
+          <button className="btn-primary text-sm" disabled={salvando} onClick={() => salvar()}>Salvar desconto</button>
+        </div>
+      </div>
     </div>
   );
 }

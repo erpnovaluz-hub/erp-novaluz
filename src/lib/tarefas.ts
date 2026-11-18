@@ -40,14 +40,14 @@ export type VinculoTipo = "os" | "obra" | "cliente" | "oportunidade" | "proposta
 
 type VinculoDef = {
   tipo: VinculoTipo; label: string; icon: string; modulo: Modulo;
-  tabela: string; colunas: string; busca: string; ordem: string;
+  tabela: string; colunas: string; busca: string | string[]; ordem: string;
   rotulo: (r: any) => string;
   href: (id: string) => string;
 };
 
 export const VINCULOS: VinculoDef[] = [
   { tipo: "os", label: "Ordem de serviço", icon: "🧷", modulo: "os", tabela: "ordens_servico", colunas: "id, numero, titulo",
-    busca: "titulo", ordem: "numero", rotulo: (r) => [r.numero, r.titulo].filter(Boolean).join(" · "), href: (id) => `/os/${id}` },
+    busca: ["numero", "titulo", "local"], ordem: "numero", rotulo: (r) => [r.numero, r.titulo].filter(Boolean).join(" · "), href: (id) => `/os/${id}` },
   { tipo: "obra", label: "Obra", icon: "🏗️", modulo: "os", tabela: "obras_servicos", colunas: "id, local, tipo_servico",
     busca: "local", ordem: "local", rotulo: (r) => [r.local, r.tipo_servico].filter(Boolean).join(" · "), href: () => `/e/obras_servicos` },
   { tipo: "cliente", label: "Cliente", icon: "🏢", modulo: "comercial", tabela: "clientes", colunas: "id, nome",
@@ -63,6 +63,18 @@ export const VINCULOS: VinculoDef[] = [
   { tipo: "pedido", label: "Pedido de compra", icon: "🛒", modulo: "compras", tabela: "pedidos_compra", colunas: "id, numero, observacao",
     busca: "numero", ordem: "numero", rotulo: (r) => [r.numero, r.observacao].filter(Boolean).join(" · "), href: (id) => `/compras/pedido/${id}` },
 ];
+
+// Tarefas da OS e da obra ligada a ela, para relatórios impressos.
+// Só tarefas principais; projeto privado não sai no papel.
+export async function tarefasDaOS(sb: any, os: { id: string; obra_id?: string | null }) {
+  const alvos = [`and(vinculo_tipo.eq.os,vinculo_id.eq.${os.id})`];
+  if (os.obra_id) alvos.push(`and(vinculo_tipo.eq.obra,vinculo_id.eq.${os.obra_id})`);
+  const { data } = await sb.from("tarefas").select("id, titulo, prazo, concluida, responsavel_id, projetos(privado)")
+    .or(alvos.join(",")).is("parent_id", null)
+    .order("concluida").order("prazo", { ascending: true, nullsFirst: false });
+  return ((data ?? []) as any[]).filter((t) => !t.projetos?.privado) as
+    { id: string; titulo: string; prazo: string | null; concluida: boolean; responsavel_id: string | null }[];
+}
 
 export function vinculoDef(tipo: string | null | undefined): VinculoDef | undefined {
   return VINCULOS.find((v) => v.tipo === tipo);

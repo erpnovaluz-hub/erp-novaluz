@@ -7,6 +7,7 @@ import { useEmissora } from "@/lib/useEmissora";
 import DocHeader from "@/components/DocHeader";
 import PrintButton from "@/components/PrintButton";
 import { formatDate } from "@/lib/format";
+import { tarefasDaOS } from "@/lib/tarefas";
 
 const ETAPAS: [string, string][] = [["antes", "Antes"], ["durante", "Durante a execução"], ["depois", "Depois / entrega"]];
 
@@ -20,7 +21,7 @@ export default function RelatorioExecucao({ id }: { id: string }) {
     (async () => {
       const { data: os } = await supabase.from("ordens_servico").select("*").eq("id", id).maybeSingle();
       if (!os) { setD({ vazio: true }); return; }
-      const [cli, resp, ativ, ins, chk, fot, hist, apont, equipe, prods] = await Promise.all([
+      const [cli, resp, ativ, ins, chk, fot, hist, apont, equipe, prods, tarefas] = await Promise.all([
         os.cliente_id ? supabase.from("clientes").select("nome, cnpj").eq("id", os.cliente_id).maybeSingle() : Promise.resolve({ data: null }),
         os.responsavel_id ? supabase.from("perfis").select("nome").eq("id", os.responsavel_id).maybeSingle() : Promise.resolve({ data: null }),
         supabase.from("atividades_os").select("descricao, conclusao_pct, colaborador_id").eq("os_id", id).order("data_inicio", { ascending: true, nullsFirst: false }),
@@ -31,6 +32,7 @@ export default function RelatorioExecucao({ id }: { id: string }) {
         supabase.from("os_apontamentos").select("colaborador_id").eq("os_id", id).range(0, 4999),
         supabase.from("vw_equipe").select("id, nome").range(0, 4999),
         supabase.from("produtos").select("id, unidade").range(0, 19999),
+        tarefasDaOS(supabase, os),
       ]);
       const fotos = (fot.data ?? []) as any[];
       let urls: Record<string, string> = {};
@@ -56,7 +58,7 @@ export default function RelatorioExecucao({ id }: { id: string }) {
         agg.set(k, x);
       }
       const materiais = Array.from(agg.values()).filter((m) => m.qtd > 0).sort((a, b) => a.nome.localeCompare(b.nome));
-      setD({ materiais,
+      setD({ materiais, tarefas,
         os, cliente: cli.data, resp: (resp.data as any)?.nome ?? os.responsavel, atividades: ativ.data ?? [],
         insumos: ins.data ?? [], unidade: Object.fromEntries(((prods.data ?? []) as any[]).map((p) => [p.id, p.unidade])),
         checklist: chk.data ?? [], fotos, urls, inicio, equipe: Array.from(idsEquipe).map((i) => nomeEq[i]).filter(Boolean).sort(),
@@ -106,6 +108,16 @@ export default function RelatorioExecucao({ id }: { id: string }) {
             <ul className="space-y-0.5">
               {d.atividades.map((a: any, k: number) => (
                 <li key={k} className="flex gap-2"><span>{Number(a.conclusao_pct) >= 100 ? "✔" : "◻"}</span><span className="flex-1">{a.descricao}</span><span className="text-gray-500">{Number(a.conclusao_pct || 0)}%</span></li>
+              ))}
+            </ul>
+          </Bloco>
+        )}
+
+        {d.tarefas.length > 0 && (
+          <Bloco t={`Tarefas · ${d.tarefas.filter((t: any) => t.concluida).length}/${d.tarefas.length} concluídas`}>
+            <ul className="space-y-0.5">
+              {d.tarefas.map((t: any) => (
+                <li key={t.id} className="flex gap-2"><span>{t.concluida ? "✔" : "◻"}</span><span className="flex-1">{t.titulo}</span>{t.prazo && <span className="text-gray-500">{formatDate(t.prazo)}</span>}</li>
               ))}
             </ul>
           </Bloco>

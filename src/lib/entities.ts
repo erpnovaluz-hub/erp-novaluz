@@ -448,7 +448,7 @@ export const ENTITIES: Record<string, EntityDef> = {
     titleField: "nome", searchField: "nome", orderBy: { column: "nome", ascending: true },
     listColumns: ["codigo", "nome", "secao", "tipo", "unidade", "custo_medio", "estoque_minimo", "ativo"],
     fields: [
-      { key: "codigo", label: "Código", type: "text" },
+      { key: "codigo", label: "Código", type: "text", hideInForm: true }, // gerado pelo sistema (PRD-0001) — migration 0068
       { key: "nome", label: "Nome", type: "text", required: true },
       { key: "secao", label: "Seção (almoxarifado)", type: "select", options: [
         { value: "epis", label: "EPIs" }, { value: "eletricos", label: "Elétricos" },
@@ -859,6 +859,7 @@ export const ENTITIES: Record<string, EntityDef> = {
       { key: "motivo_pausa", label: "Motivo da pausa (se pausada)", type: "select", options: MOTIVOS_PAUSA },
       { key: "pausa_obs", label: "Detalhe da pausa", type: "text" },
       { key: "is_obra", label: "É obra? (aparece no painel de obras)", type: "boolean" },
+      { key: "obra_id", label: "Obra (cadastro) — tarefas da obra aparecem aqui", type: "ref", ref: { table: "obras_servicos", labelField: "local" } },
       { key: "gargalos", label: "Gargalos / atenção", type: "textarea" },
       { key: "orientacoes", label: "Principais cuidados / orientações", type: "textarea" },
     ],
