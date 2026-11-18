@@ -88,7 +88,7 @@ export const FERRAMENTAS: DefFerramenta[] = [
   },
   {
     name: "listar_pessoas",
-    description: "Lista as pessoas da empresa (id e nome) para atribuir responsável ou notificar.",
+    description: "Lista as pessoas da empresa (id, nome, e-mail e papel) para atribuir responsável ou notificar. Use e-mail e papel para diferenciar pessoas de mesmo nome.",
     input_schema: { type: "object", properties: {} },
   },
   {

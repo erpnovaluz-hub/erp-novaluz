@@ -77,8 +77,23 @@ export async function executar(nome: string, input: any, ctx: Contexto): Promise
       return error ? { ok: false, erro: error.message } : { ok: true, dados: data };
     }
     case "listar_pessoas": {
-      const { data, error } = await sb.from("perfis").select("id,nome,papel,ativo").eq("ativo", true).limit(100);
-      return error ? { ok: false, erro: error.message } : { ok: true, dados: data };
+      // e-mail e papel entram para desambiguar homônimos (dois "Pedro" na empresa).
+      // Exclui o próprio usuário-agente (não é responsável de tarefa/OS).
+      const { data, error } = await sb.from("perfis").select("id,nome,email,papel").eq("ativo", true).neq("papel", "agente").limit(100);
+      if (error) return { ok: false, erro: error.message };
+      const pessoas = (data ?? []) as any[];
+      // e-mail antigo pode estar em branco em perfis — completa pelo auth (sempre tem)
+      if (pessoas.some((x) => !x.email)) {
+        try {
+          const { data: lu } = await ctx.admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+          const m = new Map<string, string>();
+          for (const u of lu?.users ?? []) if (u.email) m.set(u.id, u.email);
+          for (const x of pessoas) if (!x.email) x.email = m.get(x.id) ?? null;
+        } catch {
+          /* sem e-mail do auth: segue com o que houver em perfis */
+        }
+      }
+      return { ok: true, dados: pessoas };
     }
     case "listar_modelos": {
       const { data, error } = await sb.from("modelos_projeto").select("id,nome,descricao").limit(50);
