@@ -4,6 +4,61 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { conversar, MODELO_PADRAO } from "@/lib/agente/claude";
 import type { Contexto } from "@/lib/agente/tipos";
 
+// GET: recarrega uma conversa (texto + cartões ainda pendentes) para a tela
+// não começar vazia ao recarregar. Confere que a conversa é do próprio usuário.
+export async function GET(req: Request) {
+  const sb = createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+
+  const conversaId = new URL(req.url).searchParams.get("conversa_id");
+  if (!conversaId) return NextResponse.json({ error: "Falta conversa_id." }, { status: 400 });
+
+  const admin = createAdminClient();
+  const { data: conv } = await admin
+    .from("agente_conversas")
+    .select("id,usuario_id")
+    .eq("id", conversaId)
+    .maybeSingle();
+  if (!conv || conv.usuario_id !== user.id) {
+    return NextResponse.json({ error: "Conversa não encontrada." }, { status: 404 });
+  }
+
+  const { data: msgs } = await admin
+    .from("agente_mensagens")
+    .select("papel,conteudo")
+    .eq("conversa_id", conversaId)
+    .in("papel", ["user", "assistant"])
+    .order("criado_em", { ascending: true });
+
+  const { data: pend } = await admin
+    .from("acoes_agente")
+    .select("id,ferramenta,faixa,justificativa,parametros")
+    .eq("conversa_id", conversaId)
+    .eq("status", "pendente")
+    .order("criado_em", { ascending: true });
+
+  const valorDe = (p: any): number | null =>
+    typeof p?.custo_estimado === "number" ? p.custo_estimado : typeof p?.custo_unitario === "number" ? p.custo_unitario : null;
+
+  return NextResponse.json({
+    conversa_id: conversaId,
+    mensagens: (msgs ?? []).filter((m) => m.conteudo).map((m) => ({ papel: m.papel, texto: m.conteudo })),
+    pendentes: (pend ?? []).map((a) => ({
+      id: a.id,
+      ferramenta: a.ferramenta,
+      faixa: a.faixa,
+      status: "pendente",
+      resumo: a.justificativa ?? a.ferramenta,
+      parametros: a.parametros,
+      valor: valorDe(a.parametros),
+      reversivel: false,
+    })),
+  });
+}
+
 // Chat do Assistente. Roda com a identidade de quem conversa (RLS = trava).
 // O cliente admin só grava log/histórico (tabelas agente_* sem policy de escrita).
 export async function POST(req: Request) {

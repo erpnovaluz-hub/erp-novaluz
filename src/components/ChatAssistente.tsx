@@ -19,6 +19,7 @@ type Msg = { papel: "user" | "assistant"; texto: string; acoes?: Acao[] };
 // campos que o usuário pode ajustar no cartão (os demais: cancelar e repedir)
 const EDITAVEIS = ["titulo", "prazo", "motivo", "local", "motivo_pausa", "pausa_obs", "horas", "quantidade", "custo_estimado", "custo_unitario", "descricao", "observacao"];
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const CHAVE = "assistente:conversa"; // id da conversa aberta, por navegador
 
 export default function ChatAssistente({ nome }: { nome: string }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -32,6 +33,44 @@ export default function ChatAssistente({ nome }: { nome: string }) {
   useEffect(() => {
     fim.current?.scrollIntoView({ behavior: "smooth" });
   }, [msgs, carregando]);
+
+  // Persistência da conversa: ao abrir, recarrega a última (texto + cartões
+  // pendentes). O conteúdo real sempre esteve no banco; aqui a tela reabre.
+  useEffect(() => {
+    let id: string | null = null;
+    try { id = localStorage.getItem(CHAVE); } catch {}
+    if (!id) return;
+    (async () => {
+      try {
+        const r = await fetch(`/api/agente/chat?conversa_id=${encodeURIComponent(id!)}`);
+        if (!r.ok) { try { localStorage.removeItem(CHAVE); } catch {} return; }
+        const data = await r.json();
+        const carregadas: Msg[] = (data.mensagens ?? []).map((m: any) => ({ papel: m.papel, texto: m.texto }));
+        const pend: Acao[] = data.pendentes ?? [];
+        if (pend.length) {
+          const ultimo = [...carregadas].reverse().find((m) => m.papel === "assistant");
+          if (ultimo) ultimo.acoes = [...(ultimo.acoes ?? []), ...pend];
+          else carregadas.push({ papel: "assistant", texto: "", acoes: pend });
+        }
+        setMsgs(carregadas);
+        setConversaId(data.conversa_id ?? id);
+      } catch {}
+    })();
+  }, []);
+
+  // guarda o id da conversa para reabrir depois
+  useEffect(() => {
+    try {
+      if (conversaId) localStorage.setItem(CHAVE, conversaId);
+    } catch {}
+  }, [conversaId]);
+
+  function novaConversa() {
+    setMsgs([]);
+    setConversaId(null);
+    setEditando(null);
+    try { localStorage.removeItem(CHAVE); } catch {}
+  }
 
   // atualiza uma ação específica (por id) em qualquer mensagem
   function patchAcao(id: string, patch: Partial<Acao>) {
@@ -102,6 +141,11 @@ export default function ChatAssistente({ nome }: { nome: string }) {
 
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col md:h-[calc(100vh-3rem)]">
+      {msgs.length > 0 && (
+        <div className="flex justify-end pb-1">
+          <button onClick={novaConversa} className="text-xs text-gray-500 hover:text-brand-600">+ Nova conversa</button>
+        </div>
+      )}
       <div className="flex-1 space-y-3 overflow-y-auto px-1 pb-4">
         {msgs.length === 0 && (
           <div className="mt-6 rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-500">
