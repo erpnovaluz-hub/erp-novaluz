@@ -28,11 +28,48 @@ export default function ChatAssistente({ nome }: { nome: string }) {
   const [conversaId, setConversaId] = useState<string | null>(null);
   const [editando, setEditando] = useState<string | null>(null); // acao.id em edição
   const [form, setForm] = useState<Record<string, any>>({});
+  const [suportaVoz, setSuportaVoz] = useState(false); // Web Speech disponível neste navegador
+  const [ouvindo, setOuvindo] = useState(false);
   const fim = useRef<HTMLDivElement>(null);
+  const recRef = useRef<any>(null); // instância do SpeechRecognition
 
   useEffect(() => {
     fim.current?.scrollIntoView({ behavior: "smooth" });
   }, [msgs, carregando]);
+
+  // Ditado por voz: só habilita se o navegador suporta (define em efeito para não
+  // divergir entre SSR e cliente). iPhone/Safari pode não ter — aí o botão some e
+  // o campo de texto continua normal. A transcrição é do navegador: não passa
+  // pelo nosso servidor nem pelo banco.
+  useEffect(() => {
+    setSuportaVoz(!!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition));
+    return () => { try { recRef.current?.stop(); } catch {} };
+  }, []);
+
+  function pararMic() {
+    try { recRef.current?.stop(); } catch {}
+  }
+
+  function alternarMic() {
+    if (ouvindo) return pararMic();
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    const rec = new SR();
+    rec.lang = "pt-BR";
+    rec.continuous = true;
+    rec.interimResults = true;
+    const base = input.trim() ? input.trim() + " " : "";
+    rec.onresult = (e: any) => {
+      let txt = "";
+      for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
+      setInput(base + txt);
+    };
+    rec.onerror = () => setOuvindo(false);
+    rec.onend = () => setOuvindo(false);
+    recRef.current = rec;
+    setOuvindo(true);
+    try { rec.start(); } catch { setOuvindo(false); }
+  }
 
   // Persistência da conversa: ao abrir, recarrega a última (texto + cartões
   // pendentes). O conteúdo real sempre esteve no banco; aqui a tela reabre.
@@ -81,6 +118,7 @@ export default function ChatAssistente({ nome }: { nome: string }) {
     e.preventDefault();
     const texto = input.trim();
     if (!texto || carregando) return;
+    pararMic();
     setInput("");
     setMsgs((m) => [...m, { papel: "user", texto }]);
     setCarregando(true);
@@ -232,9 +270,21 @@ export default function ChatAssistente({ nome }: { nome: string }) {
             }
           }}
           rows={1}
-          placeholder={`Peça algo ao ${nome}…`}
+          placeholder={ouvindo ? "Ouvindo… pode falar" : `Peça algo ao ${nome}…`}
           className="flex-1 resize-none rounded-lg border px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
         />
+        {suportaVoz && (
+          <button
+            type="button"
+            onClick={alternarMic}
+            disabled={carregando}
+            aria-label={ouvindo ? "Parar ditado" : "Ditar por voz"}
+            title={ouvindo ? "Parar ditado" : "Ditar por voz"}
+            className={`rounded-lg px-3 py-2 text-lg disabled:opacity-40 ${ouvindo ? "animate-pulse bg-red-100 text-red-600" : "border text-gray-500 hover:bg-gray-50"}`}
+          >
+            {ouvindo ? "⏹" : "🎤"}
+          </button>
+        )}
         <button type="submit" disabled={carregando || !input.trim()} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">
           Enviar
         </button>
