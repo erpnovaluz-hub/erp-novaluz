@@ -13,6 +13,7 @@ const ACAO: Record<string, string> = {
   acompanhar: "incluiu você como acompanhante",
   os_atribuida: "passou para você a OS",
   os_status: "atualizou a OS",
+  agente: "avisou (via assistente)",
 };
 
 export async function POST(req: Request) {

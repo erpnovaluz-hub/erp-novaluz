@@ -85,6 +85,14 @@ export default function Sidebar({ empresaNome, email, isSuper, acesso }: { empre
         <Link href="/tarefas/projetos" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname.startsWith("/tarefas/projetos") ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
           📁 Projetos
         </Link>
+        <Link href="/assistente" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/assistente" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
+          🤖 Assistente
+        </Link>
+        {acesso.gerencia && (
+          <Link href="/assistente/fila" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/assistente/fila" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
+            🗂️ Fila de aprovação
+          </Link>
+        )}
         {acesso.gerencia && (
           <Link href="/tarefas/painel" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/tarefas/painel" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
             📊 Painel do time

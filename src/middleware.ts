@@ -32,7 +32,7 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAuthRoute = path.startsWith("/login");
   // /api/push/enviar é chamado pelo banco (pg_net) sem login; a rota exige o segredo PUSH_WEBHOOK_SECRET
-  const isPublicRoute = path.startsWith("/publico") || path === "/api/push/enviar";
+  const isPublicRoute = path.startsWith("/publico") || path === "/api/push/enviar" || path === "/api/agente/rondas";
 
   if (isPublicRoute) return response;
 

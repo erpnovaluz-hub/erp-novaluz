@@ -4,7 +4,7 @@
 // mostrar no menu e quais rotas abrir. Mantenha nivelPadrao() igual ao SQL.
 // =============================================================================
 
-export type Papel = "super" | "admin" | "almoxarifado" | "logistica";
+export type Papel = "super" | "admin" | "almoxarifado" | "logistica" | "agente";
 export type Nivel = "nenhum" | "ver" | "editar";
 export type Modulo =
   | "comercial" | "financeiro" | "rh" | "estoque" | "requisicoes" | "compras" | "os" | "producao";
@@ -34,6 +34,7 @@ export const PAPEIS_CONFIGURAVEIS: Papel[] = ["almoxarifado", "logistica"];
 
 export function papelLabel(p?: string | null): string {
   if (p === "super") return "Admin central";
+  if (p === "agente") return "Assistente (IA)";
   return PAPEIS.find((x) => x.key === p)?.label ?? p ?? "—";
 }
 
@@ -48,6 +49,9 @@ export function nivelPadrao(papel: string, modulo: Modulo): Nivel {
   }
   if (papel === "logistica") {
     return ({ os: "editar", requisicoes: "editar", estoque: "ver", producao: "ver" } as Partial<Record<Modulo, Nivel>>)[modulo] ?? "nenhum";
+  }
+  if (papel === "agente") {
+    return ({ os: "ver", producao: "ver" } as Partial<Record<Modulo, Nivel>>)[modulo] ?? "nenhum";
   }
   return "nenhum";
 }
@@ -103,6 +107,7 @@ const ROTAS: [string, Area][] = [
   ["/impacto", "producao"],
   ["/producao/custos", "gerencia"], ["/gerencial", "gerencia"], ["/relatorios", "gerencia"],
   ["/equipe", "gerencia"], ["/tarefas/automacoes", "gerencia"], ["/tarefas/painel", "gerencia"], ["/os/indicadores", "gerencia"],
+  ["/assistente/fila", "gerencia"],
 ];
 
 export function areaDaRota(pathname: string): Area | null {
