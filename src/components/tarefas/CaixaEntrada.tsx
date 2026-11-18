@@ -12,7 +12,7 @@ import TarefaDrawer from "@/components/tarefas/TarefaDrawer";
 import AtivarNotificacoes from "@/components/pwa/AtivarNotificacoes";
 
 type Notificacao = {
-  id: string; ator_id: string | null; tipo: "atribuida" | "mencao" | "comentario" | "concluida" | "acompanhar" | "os_atribuida" | "os_status";
+  id: string; ator_id: string | null; tipo: "atribuida" | "mencao" | "comentario" | "concluida" | "acompanhar" | "os_atribuida" | "os_status" | "agente";
   tarefa_id: string | null; os_id?: string | null; texto: string | null; lida: boolean; criado_em: string;
   ordens_servico?: { numero: string | null; titulo: string } | null;
   tarefas: { titulo: string } | null;
@@ -26,6 +26,7 @@ const ACAO: Record<Notificacao["tipo"], string> = {
   acompanhar: "incluiu você como acompanhante de",
   os_atribuida: "passou para você a OS",
   os_status: "mudou o status da OS",
+  agente: "",
 };
 
 // avisa o menu para recontar as não lidas
@@ -106,7 +107,7 @@ export default function CaixaEntrada() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">🔔 Caixa de entrada</h1>
-          <p className="text-sm text-gray-500">Atribuições, menções e comentários nas suas tarefas</p>
+          <p className="text-sm text-gray-500">Atribuições, menções, comentários e avisos do assistente</p>
         </div>
         <div className="flex items-center gap-2 text-sm">
           {naoLidas > 0 && <button className="btn-ghost ring-1 ring-gray-200" onClick={marcarTodas}>✓ Marcar todas como lidas</button>}
@@ -146,6 +147,25 @@ export default function CaixaEntrada() {
           <div className="card mt-3 divide-y overflow-hidden">
             {itens.map((n) => {
               const ator = n.ator_id ? porId[n.ator_id] : null;
+              // aviso do assistente ("o meu dia", briefing do Maestro, chat): o conteúdo é o próprio texto
+              if (n.tipo === "agente") {
+                const sobre = n.os_id
+                  ? [n.ordens_servico?.numero, n.ordens_servico?.titulo].filter(Boolean).join(" · ") || "uma OS"
+                  : n.tarefas?.titulo ?? null;
+                return (
+                  <button key={n.id} onClick={() => abrir(n)}
+                    className={`flex w-full items-start gap-3 px-4 py-3 text-left text-sm hover:bg-gray-50 ${n.lida ? "" : "bg-brand-50/40"}`}>
+                    <span className="inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-brand-100 text-base" aria-hidden>🤖</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-gray-900">{ator?.nome || "Assistente"}</p>
+                      <p className="mt-0.5 whitespace-pre-line text-gray-700">{n.texto || "Você tem um novo aviso."}</p>
+                      {sobre && <p className="mt-0.5 truncate text-xs text-brand-700">↳ {sobre}</p>}
+                      <p className="mt-0.5 text-[11px] text-gray-400">{quando(n.criado_em)}</p>
+                    </div>
+                    {!n.lida && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-600" aria-label="não lida" />}
+                  </button>
+                );
+              }
               return (
                 <button key={n.id} onClick={() => abrir(n)}
                   className={`flex w-full items-start gap-3 px-4 py-3 text-left text-sm hover:bg-gray-50 ${n.lida ? "" : "bg-brand-50/40"}`}>
