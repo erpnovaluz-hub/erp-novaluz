@@ -13,7 +13,8 @@ export type Contexto = {
   empresaId: string;
   usuarioId: string;
   conversaId: string;
-  podeAgir: boolean; // dono do agente → executa ações; demais → só leitura (consulta)
+  podeAgir: boolean; // dono do agente → executa TODAS as ações (determinações)
+  podeTarefas: boolean; // gerência (ou dono) → pode criar/manter tarefas e projetos
 };
 
 // O que uma ferramenta devolve ao loop + ao resumo "o que eu preenchi".

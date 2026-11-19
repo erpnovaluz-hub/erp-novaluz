@@ -5,7 +5,7 @@
 // com status 'executada', para o log e o Desfazer. Idempotência pela chave.
 // =============================================================================
 import type { Acao, Contexto, ResultadoFerramenta } from "./tipos";
-import { META } from "./ferramentas";
+import { META, FERRAMENTAS_TAREFA } from "./ferramentas";
 import { indicadoresFinanceiros, checagensFinanceiras, projecaoCaixa, tendenciaFinanceira } from "./financeiro";
 
 const falta = (campo: string): ResultadoFerramenta => ({ ok: false, erro: `Falta o campo obrigatório: ${campo}` });
@@ -39,11 +39,19 @@ export async function executar(nome: string, input: any, ctx: Contexto): Promise
   const p = input || {};
   const sb = ctx.sb;
 
-  // Trava de tier (defesa em profundidade): modo consulta só executa leitura.
-  // Mesmo que o modelo tente, aqui é barrado — o RLS não limita (quase todos
-  // são admin), então a trava é esta.
-  if (!ctx.podeAgir && META[nome]?.faixa !== "leitura") {
-    return { ok: false, erro: "Modo consulta: aqui você só consulta dados. Ações (criar, alterar, propor) são feitas pelo administrador." };
+  // Trava de tier (defesa em profundidade; o RLS não limita, pois quase todos
+  // são admin). Três níveis: dono executa tudo; gerência cria/mantém tarefas;
+  // consulta só leitura. Mesmo que o modelo tente, aqui é barrado.
+  if (META[nome]?.faixa !== "leitura" && !ctx.podeAgir) {
+    const ehTarefa = ctx.podeTarefas && FERRAMENTAS_TAREFA.has(nome);
+    if (!ehTarefa) {
+      return {
+        ok: false,
+        erro: ctx.podeTarefas
+          ? "Esta ação (OS/financeiro) é uma determinação do administrador. No seu acesso eu crio e organizo tarefas; OS e caixa são para consulta."
+          : "Modo consulta: aqui você só consulta dados. Criar/alterar é feito pelo administrador ou pela gerência.",
+      };
+    }
   }
 
   // Amarelas não executam no loop: viram uma proposta pendente (cartão).

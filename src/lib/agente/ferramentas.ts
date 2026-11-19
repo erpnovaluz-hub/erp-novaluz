@@ -55,6 +55,19 @@ export const META: Record<string, { faixa: Faixa; reversivel: boolean }> = {
   alterar_vencimento_titulo: { faixa: "amarela", reversivel: true },
 };
 
+// Ferramentas que a GERÊNCIA (não-dono) pode usar: criar e manter tarefas,
+// projetos e avisos. OS e financeiro continuam determinação do dono. Cada uma
+// executa sob o RLS da própria pessoa (ela já pode fazer isso no app).
+export const FERRAMENTAS_TAREFA = new Set([
+  "criar_tarefa",
+  "atualizar_tarefa",
+  "vincular_tarefa",
+  "concluir_tarefa",
+  "comentar_tarefa",
+  "notificar_usuario",
+  "criar_projeto_de_modelo",
+]);
+
 export const FERRAMENTAS: DefFerramenta[] = [
   {
     name: "buscar_tarefas",

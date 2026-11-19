@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { conversar, MODELO_PADRAO } from "@/lib/agente/claude";
 import { calcDono } from "@/lib/agente/donos";
+import { isGerencia } from "@/lib/permissoes";
 import type { Contexto } from "@/lib/agente/tipos";
 
 // GET: recarrega uma conversa (texto + cartões ainda pendentes) para a tela
@@ -103,6 +104,9 @@ export async function POST(req: Request) {
   // Tiering por login: dono (executa ações, conversa mais profunda) x consulta
   // (só leitura). Dono = e-mail na premissa agente_donos; sem lista, cai no super.
   const ehDono = calcDono(val("agente_donos"), user.email, perfil?.papel);
+  // Gerência (super/admin) que não é dono pode criar/manter tarefas pelo agente;
+  // OS e financeiro continuam determinação do dono.
+  const podeTarefas = ehDono || isGerencia(perfil?.papel);
   const modelo = (ehDono && val("modelo_dono")) || val("modelo") || MODELO_PADRAO;
 
   // conversa (nova ou existente)
@@ -138,11 +142,11 @@ export async function POST(req: Request) {
     conteudo: mensagem,
   });
 
-  const ctx: Contexto = { sb, admin, empresaId, usuarioId: user.id, conversaId: conversaId!, podeAgir: ehDono };
+  const ctx: Contexto = { sb, admin, empresaId, usuarioId: user.id, conversaId: conversaId!, podeAgir: ehDono, podeTarefas };
 
   let resultado;
   try {
-    resultado = await conversar({ ctx, modelo, nomeAssistente: nome, podeAgir: ehDono, usuario, empresaNome, historico, mensagemUsuario: mensagem });
+    resultado = await conversar({ ctx, modelo, nomeAssistente: nome, podeAgir: ehDono, podeTarefas, usuario, empresaNome, historico, mensagemUsuario: mensagem });
   } catch (e: any) {
     await admin.from("agente_execucoes").insert({
       empresa_consultora_id: empresaId, agente: "chat", origem: "chat", usuario_id: user.id,

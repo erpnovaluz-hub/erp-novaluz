@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
   // confirmar — executa sob o RLS do usuário
   // Confirmar/editar uma ação já proposta por um dono é determinação → podeAgir.
-  const ctx: Contexto = { sb, admin, empresaId, usuarioId: user.id, conversaId: acao.conversa_id, podeAgir: true };
+  const ctx: Contexto = { sb, admin, empresaId, usuarioId: user.id, conversaId: acao.conversa_id, podeAgir: true, podeTarefas: true };
   const r = await executarAmarela({ id: acaoId, ferramenta: acao.ferramenta, parametros: acao.parametros }, ctx);
   if (!r.ok) return NextResponse.json({ error: r.erro }, { status: 400 });
 

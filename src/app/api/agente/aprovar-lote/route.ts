@@ -48,7 +48,7 @@ export async function POST(req: Request) {
       resultados.push({ id, status: acao.status });
       continue;
     }
-    const ctx: Contexto = { sb, admin, empresaId: acao.empresa_consultora_id, usuarioId: user.id, conversaId: acao.conversa_id, podeAgir: true };
+    const ctx: Contexto = { sb, admin, empresaId: acao.empresa_consultora_id, usuarioId: user.id, conversaId: acao.conversa_id, podeAgir: true, podeTarefas: true };
     const r = await executarAmarela({ id, ferramenta: acao.ferramenta, parametros: acao.parametros }, ctx);
     if (!r.ok) {
       resultados.push({ id, status: "falhou", erro: r.erro });
