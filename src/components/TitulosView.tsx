@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import Badge from "@/components/Badge";
@@ -9,6 +9,7 @@ import PrintButton from "@/components/PrintButton";
 import ReportPrintHeader from "@/components/ReportPrintHeader";
 import { buscarTodos } from "@/lib/supabase/buscarTodos";
 import { FORMA_PAGAMENTO } from "@/lib/entities";
+import ReciboPagamento, { agruparPorMes, nomeMes } from "@/components/ReciboPagamento";
 
 type Row = Record<string, any>;
 type Tipo = "pagar" | "receber";
@@ -35,6 +36,7 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
   const [baseData, setBaseData] = useState<"competencia" | "vencimento">("competencia");
   const [ano, setAno] = useState("");
   const [mes, setMes] = useState("");
+  const [mesFim, setMesFim] = useState(""); // vazio = só o mês inicial
   const [diaIni, setDiaIni] = useState("");
   const [diaFim, setDiaFim] = useState("");
   const [categoria, setCategoria] = useState("");
@@ -51,6 +53,7 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [editando, setEditando] = useState<Row | null>(null);
+  const [recibo, setRecibo] = useState(false);
   // marcação para somar valores (ex.: o que vai ser pago hoje)
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const marcar = (id: string) => setMarcados((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -81,20 +84,19 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
     if (subcategoria) q = q.eq("subcategoria_id", subcategoria);
     if (buscaAtiva.trim()) q = q.ilike("descricao", `%${buscaAtiva.trim()}%`);
     if (ano) {
-      if (mes && (diaIni || diaFim)) {
-        const ultimo = new Date(parseInt(ano), parseInt(mes), 0).getDate();
-        let dIni = diaIni || "01";
-        let dFim = diaFim || String(ultimo).padStart(2, "0");
-        if (parseInt(dIni) > parseInt(dFim)) [dIni, dFim] = [dFim, dIni];
-        const inicio = `${ano}-${mes}-${dIni}`;
-        const d = new Date(`${ano}-${mes}-${dFim}T00:00:00`);
-        d.setDate(d.getDate() + 1);
-        const prox = d.toISOString().slice(0, 10);
+      if (mes) {
+        // período de mês (inicial) até mês (final), com dia inicial no 1º mês e dia final no último
+        let mIni = parseInt(mes), mFim = parseInt(mesFim || mes);
+        if (mFim < mIni) [mIni, mFim] = [mFim, mIni];
+        const y = parseInt(ano);
+        const ultimo = new Date(y, mFim, 0).getDate();
+        const dIni = Math.min(parseInt(diaIni || "1"), new Date(y, mIni, 0).getDate());
+        const dFim = Math.min(parseInt(diaFim || String(ultimo)), ultimo);
+        const p2 = (n: number) => String(n).padStart(2, "0");
+        const inicio = `${ano}-${p2(mIni)}-${p2(dIni)}`;
+        const fimDia = new Date(y, mFim - 1, dFim + 1); // dia seguinte ao fim
+        const prox = `${fimDia.getFullYear()}-${p2(fimDia.getMonth() + 1)}-${p2(fimDia.getDate())}`;
         q = q.gte(baseData, inicio).lt(baseData, prox);
-      } else if (mes) {
-        const m = parseInt(mes), y = parseInt(ano);
-        const prox = m === 12 ? `${y + 1}-01-01` : `${ano}-${String(m + 1).padStart(2, "0")}-01`;
-        q = q.gte(baseData, `${ano}-${mes}-01`).lt(baseData, prox);
       } else {
         q = q.gte(baseData, `${ano}-01-01`).lt(baseData, `${parseInt(ano) + 1}-01-01`);
       }
@@ -102,7 +104,7 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
     const { data, error } = await buscarTodos(q.order(baseData, { ascending: false }));
     if (error) setErro(error.message);
     setRows(data ?? []); setCarregando(false);
-  }, [supabase, tipo, chip, categoria, subcategoria, buscaAtiva, ano, mes, diaIni, diaFim, hoje, baseData]);
+  }, [supabase, tipo, chip, categoria, subcategoria, buscaAtiva, ano, mes, mesFim, diaIni, diaFim, hoje, baseData]);
 
   useEffect(() => { carregarRefs(); }, [carregarRefs]);
   useEffect(() => { carregar(); }, [carregar]);
@@ -118,13 +120,26 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
   const titulo = tipo === "pagar" ? "Contas a Pagar" : "Contas a Receber";
   const icon = tipo === "pagar" ? "🔴" : "🟢";
   const anos = ["", "2025", "2026", String(anoAtual)].filter((v, i, a) => a.indexOf(v) === i);
-  const diasNoMes = ano && mes ? new Date(parseInt(ano), parseInt(mes), 0).getDate() : 31;
+  const mesUlt = mesFim && mesFim > mes ? mesFim : mes;
+  const diasNoMes = ano && mesUlt ? new Date(parseInt(ano), parseInt(mesUlt), 0).getDate() : 31;
   const dias = Array.from({ length: diasNoMes }, (_, i) => String(i + 1).padStart(2, "0"));
+  const diasIni = Array.from({ length: ano && mes ? new Date(parseInt(ano), parseInt(mes), 0).getDate() : 31 }, (_, i) => String(i + 1).padStart(2, "0"));
+  const variosMeses = !!mes && !!mesFim && mesFim !== mes;
+  const grupos = agruparPorMes(rows, baseData);
+  const separarMeses = grupos.length > 1;
+  const periodo = ano
+    ? mes
+      ? variosMeses
+        ? `${MESES[parseInt(mes) - 1]} a ${MESES[parseInt(mesFim) - 1]}/${ano}`
+        : `${MESES[parseInt(mes) - 1]}/${ano}`
+      : `Ano ${ano}`
+    : undefined;
   const filtrando = chip !== "todos" || !!ano || !!categoria || !!subcategoria || !!buscaAtiva;
 
   return (
-    <div>
-      <ReportPrintHeader titulo={titulo} />
+    <>
+    <div className={recibo ? "no-print" : ""}>
+      <ReportPrintHeader titulo={titulo} periodo={periodo ? `Período (${baseData === "competencia" ? "competência" : "vencimento"}): ${periodo}` : undefined} />
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="flex items-center gap-2 text-xl font-semibold text-gray-900">{icon} {titulo}</h1>
         <div className="flex items-center gap-2">
@@ -155,18 +170,27 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
           por {baseData === "competencia" ? "competência" : "vencimento"} ⇄
         </button>
         {/* período */}
-        <select className="inp !w-auto py-1.5" value={ano} onChange={(e) => { setAno(e.target.value); if (!e.target.value) { setMes(""); setDiaIni(""); setDiaFim(""); } }}>
+        <select className="inp !w-auto py-1.5" value={ano} onChange={(e) => { setAno(e.target.value); if (!e.target.value) { setMes(""); setMesFim(""); setDiaIni(""); setDiaFim(""); } }}>
           {anos.map((a) => <option key={a} value={a}>{a === "" ? "Qualquer ano" : a}</option>)}
         </select>
-        <select className="inp !w-auto py-1.5" value={mes} onChange={(e) => { setMes(e.target.value); setDiaIni(""); setDiaFim(""); }} disabled={!ano}>
+        <select className="inp !w-auto py-1.5" value={mes} onChange={(e) => { setMes(e.target.value); if (!e.target.value || e.target.value >= mesFim) setMesFim(""); setDiaIni(""); setDiaFim(""); }} disabled={!ano}>
           <option value="">Ano todo</option>
           {MESES.map((m, i) => <option key={i} value={String(i + 1).padStart(2, "0")}>{m}</option>)}
         </select>
+        {mes && (
+          <div className="flex items-center gap-1 text-xs text-gray-400">
+            <span>até</span>
+            <select className="inp !w-auto py-1.5" value={mesFim} onChange={(e) => { setMesFim(e.target.value); setDiaFim(""); }} title="Mês final (para pegar vários meses)">
+              <option value="">{MESES[parseInt(mes) - 1]}</option>
+              {MESES.map((m, i) => ({ m, v: String(i + 1).padStart(2, "0") })).filter((o) => o.v > mes).map((o) => <option key={o.v} value={o.v}>{o.m}</option>)}
+            </select>
+          </div>
+        )}
         <div className="flex items-center gap-1 text-xs text-gray-400">
           <span>dia</span>
           <select className="inp !w-auto py-1.5" value={diaIni} onChange={(e) => setDiaIni(e.target.value)} disabled={!mes} title="Dia inicial">
             <option value="">1</option>
-            {dias.map((d) => <option key={d} value={d}>{parseInt(d)}</option>)}
+            {diasIni.map((d) => <option key={d} value={d}>{parseInt(d)}</option>)}
           </select>
           <span>até</span>
           <select className="inp !w-auto py-1.5" value={diaFim} onChange={(e) => setDiaFim(e.target.value)} disabled={!mes} title="Dia final">
@@ -190,7 +214,7 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
           <input className="inp !w-44 py-1.5" placeholder="Buscar descrição…" value={busca} onChange={(e) => setBusca(e.target.value)} />
         </form>
         {filtrando && (
-          <button className="text-sm text-gray-400 hover:text-gray-700" onClick={() => { setChip("todos"); setAno(""); setMes(""); setDiaIni(""); setDiaFim(""); setCategoria(""); setSubcategoria(""); setBusca(""); setBuscaAtiva(""); }}>
+          <button className="text-sm text-gray-400 hover:text-gray-700" onClick={() => { setChip("todos"); setAno(""); setMes(""); setMesFim(""); setDiaIni(""); setDiaFim(""); setCategoria(""); setSubcategoria(""); setBusca(""); setBuscaAtiva(""); }}>
             limpar filtros
           </button>
         )}
@@ -206,6 +230,11 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
             ☑ {selecionados.length} marcado(s): <b>{formatCurrency(somaMarcados)}</b>
             <button className="no-print ml-2 text-xs text-brand-600 underline" onClick={() => setMarcados(new Set())}>desmarcar</button>
           </span>
+        )}
+        {selecionados.length > 0 && tipo === "pagar" && (
+          <button className="no-print btn-primary !py-1 text-sm" onClick={() => setRecibo(true)}>
+            🧾 Gerar recibo{selecionados.some((r) => r.status === "aberto") ? " e dar baixa" : ""}
+          </button>
         )}
       </div>
 
@@ -224,33 +253,43 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
                 onChange={() => setMarcados(todosMarcados ? new Set() : new Set(rows.map((r) => r.id)))} />
               <span>{todosMarcados ? "desmarcar todos" : "marcar todos"}</span>
             </li>
-            {rows.map((r) => {
-              const vencido = r.status === "aberto" && r.vencimento && r.vencimento < hoje;
-              return (
-                <li key={r.id} className={`flex items-center ${marcados.has(r.id) ? "bg-brand-50/60" : ""}`}>
-                  <label className="no-print flex cursor-pointer items-center self-stretch pl-4 pr-1">
-                    <input type="checkbox" className="h-4 w-4" checked={marcados.has(r.id)} onChange={() => marcar(r.id)}
-                      aria-label={`Marcar ${r.descricao}`} />
-                  </label>
-                  <button onClick={() => setEditando(r)} className="linha-lista flex min-w-0 flex-1 items-center gap-4 px-3 py-3 text-left hover:bg-gray-50">
-                    <div className="linha-principal min-w-0 flex-1">
-                      <p className="truncate font-medium text-gray-900">{r.descricao}</p>
-                      <p className="truncate text-xs text-gray-400">
-                        {catNome[r.categoria_id] ?? "sem categoria"}
-                        {r.subcategoria_id && subNome[r.subcategoria_id] ? ` › ${subNome[r.subcategoria_id]}` : ""}
-                        {r.forma_pagamento && ` · ${FORMA_PAGAMENTO.find((o) => o.value === r.forma_pagamento)?.label ?? r.forma_pagamento}`}
-                        {r.forma_pagamento && !r.dados_pagamento && r.forma_pagamento !== "dinheiro" && r.forma_pagamento !== "cartao" && " (sem dados)"}
-                      </p>
-                    </div>
-                    <div className="w-28 shrink-0 text-right font-medium tabular-nums text-gray-900">{formatCurrency(r.valor)}</div>
-                    <div className={`w-24 shrink-0 text-right text-sm ${vencido ? "font-medium text-red-600" : "text-gray-500"}`}>
-                      {formatDate(r.vencimento)}
-                    </div>
-                    <div className="w-24 shrink-0 text-right"><Badge value={r.status} options={STATUS} /></div>
-                  </button>
-                </li>
-              );
-            })}
+            {grupos.map((g) => (
+              <Fragment key={g.chave}>
+                {separarMeses && (
+                  <li className="flex items-center justify-between bg-gray-100 px-4 py-1.5 text-sm font-semibold text-gray-700">
+                    <span>{nomeMes(g.chave)} <span className="font-normal text-gray-400">· {g.itens.length} lançamento(s)</span></span>
+                    <span className="tabular-nums">{formatCurrency(g.total)}</span>
+                  </li>
+                )}
+              {g.itens.map((r) => {
+                const vencido = r.status === "aberto" && r.vencimento && r.vencimento < hoje;
+                return (
+                  <li key={r.id} className={`flex items-center ${marcados.has(r.id) ? "bg-brand-50/60" : ""}`}>
+                    <label className="no-print flex cursor-pointer items-center self-stretch pl-4 pr-1">
+                      <input type="checkbox" className="h-4 w-4" checked={marcados.has(r.id)} onChange={() => marcar(r.id)}
+                        aria-label={`Marcar ${r.descricao}`} />
+                    </label>
+                    <button onClick={() => setEditando(r)} className="linha-lista flex min-w-0 flex-1 items-center gap-4 px-3 py-3 text-left hover:bg-gray-50">
+                      <div className="linha-principal min-w-0 flex-1">
+                        <p className="truncate font-medium text-gray-900">{r.descricao}</p>
+                        <p className="truncate text-xs text-gray-400">
+                          {catNome[r.categoria_id] ?? "sem categoria"}
+                          {r.subcategoria_id && subNome[r.subcategoria_id] ? ` › ${subNome[r.subcategoria_id]}` : ""}
+                          {r.forma_pagamento && ` · ${FORMA_PAGAMENTO.find((o) => o.value === r.forma_pagamento)?.label ?? r.forma_pagamento}`}
+                          {r.forma_pagamento && !r.dados_pagamento && r.forma_pagamento !== "dinheiro" && r.forma_pagamento !== "cartao" && " (sem dados)"}
+                        </p>
+                      </div>
+                      <div className="w-28 shrink-0 text-right font-medium tabular-nums text-gray-900">{formatCurrency(r.valor)}</div>
+                      <div className={`w-24 shrink-0 text-right text-sm ${vencido ? "font-medium text-red-600" : "text-gray-500"}`}>
+                        {formatDate(r.vencimento)}
+                      </div>
+                      <div className="w-24 shrink-0 text-right"><Badge value={r.status} options={STATUS} /></div>
+                    </button>
+                  </li>
+                );
+              })}
+              </Fragment>
+            ))}
           </ul>
         )}
       </div>
@@ -269,5 +308,18 @@ export default function TitulosView({ tipo }: { tipo: Tipo }) {
         />
       )}
     </div>
+    {recibo && (
+      <ReciboPagamento
+        titulos={selecionados}
+        campoMes={baseData}
+        contas={contas}
+        fornecedores={fornecedores}
+        catNome={catNome}
+        subNome={subNome}
+        onClose={() => setRecibo(false)}
+        onBaixado={() => { setRecibo(false); setMarcados(new Set()); carregar(); }}
+      />
+    )}
+    </>
   );
 }
