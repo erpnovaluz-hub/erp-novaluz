@@ -15,6 +15,8 @@ export type Contexto = {
   conversaId: string;
   podeAgir: boolean; // dono do agente → executa TODAS as ações (determinações)
   podeTarefas: boolean; // gerência (ou dono) → pode criar/manter tarefas e projetos
+  podeConduzir?: boolean; // Ritmo de Gestão: espelha pode_conduzir() (0070)
+  modo?: "geral" | "gestao"; // chat de gestão (Bloco 3)
 };
 
 // O que uma ferramenta devolve ao loop + ao resumo "o que eu preenchi".

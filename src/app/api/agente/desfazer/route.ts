@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { desfazerGestao } from "@/lib/agente/gestao";
 
 // Desfaz uma ação verde recente. A reversão roda sob o RLS do usuário (ele só
 // desfaz o que pode tocar); o status em acoes_agente é marcado pelo servidor.
@@ -27,6 +28,15 @@ export async function POST(req: Request) {
 
   const res = acao.resultado ?? {};
   let erro: string | null = null;
+
+  // Ritmo de Gestão (Bloco 3)
+  const g = await desfazerGestao(acao.ferramenta, res, sb);
+  if (g !== undefined) {
+    if (g) return NextResponse.json({ error: g }, { status: 400 });
+    await createAdminClient().from("acoes_agente")
+      .update({ status: "desfeita", decidido_por: user.id, decidido_em: new Date().toISOString() }).eq("id", acaoId);
+    return NextResponse.json({ ok: true });
+  }
 
   switch (acao.ferramenta) {
     case "criar_tarefa":

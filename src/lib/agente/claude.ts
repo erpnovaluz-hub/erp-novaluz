@@ -7,6 +7,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { FERRAMENTAS, META, FERRAMENTAS_TAREFA } from "./ferramentas";
 import { executar } from "./executor";
+import { FERRAMENTAS_GESTAO, PERSONA_GESTAO } from "./gestao";
 import { papelLabel } from "@/lib/permissoes";
 import type { Acao, Contexto } from "./tipos";
 
@@ -31,6 +32,31 @@ const CONHECIMENTO = [
   "- É direto e honesto: aponta o risco mesmo quando desagrada. Mas quem decide o negócio é a pessoa, não você.",
   "Limites: não dá conselho de investimento (analisa só o próprio negócio) e nunca mexe em dinheiro — pagar, dar baixa, transferir ou conciliar é feito por uma pessoa.",
 ].join("\n");
+
+// Chat de gestão (Bloco 3): persona Gestão + nível de acesso de quem conversa.
+function sistemaGestao(nome: string, podeAgir: boolean, podeTarefas: boolean, podeConduzir: boolean, usuario: UsuarioChat, empresaNome: string): string {
+  const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Fortaleza" });
+  const nivel = podeConduzir
+    ? "Esta pessoa CONDUZ reuniões: pode anotar decisões e encaminhamentos na ata aberta, incluir itens na pauta e propor reuniões (cartão)."
+    : podeTarefas
+      ? "Esta pessoa é da GERÊNCIA mas NÃO conduz reuniões: consulta tudo, sugere itens de pauta, registra causa dos indicadores e cria/mantém tarefas. Anotar na ata e criar reunião são de quem conduz."
+      : "Esta pessoa está em modo CONSULTA: vê os próprios encaminhamentos e indicadores, sugere itens de pauta nas reuniões de que participa e registra a causa dos indicadores pelos quais responde. Não altera mais nada.";
+  return [
+    `Você é ${nome}, no chat de gestão do ERP Novaluz. Hoje é ${hoje} (fuso de Fortaleza).`,
+    contexto(usuario, empresaNome),
+    ...((podeAgir || podeTarefas) ? [CONHECIMENTO] : []),
+    PERSONA_GESTAO,
+    nivel,
+    "",
+    "Regras invioláveis:",
+    "1. Nunca invente responsável, prazo, valor ou número. Se faltar, PERGUNTE.",
+    "2. Para atribuir dono/responsável, descubra o id com listar_pessoas. Havendo homônimos, diferencie por e-mail e papel; NUNCA mostre id/UUID.",
+    "3. Trabalhe só com o que as ferramentas retornam. Se não achou, diga que não achou.",
+    "4. Antes de criar tarefa, use buscar_tarefas para não duplicar.",
+    "",
+    "Responda em português, direto. Ao analisar, termine com 1 a 3 próximos passos priorizados (com dono, prazo e evidência quando couber).",
+  ].join("\n");
+}
 
 function sistema(nome: string, podeAgir: boolean, podeTarefas: boolean, usuario: UsuarioChat, empresaNome: string): string {
   const hoje = new Date().toISOString().slice(0, 10);
@@ -100,6 +126,8 @@ export async function conversar(opts: {
   nomeAssistente: string;
   podeAgir: boolean;
   podeTarefas: boolean;
+  podeConduzir?: boolean;
+  modo?: "geral" | "gestao";
   usuario: UsuarioChat;
   empresaNome: string;
   historico: Anthropic.MessageParam[];
@@ -108,9 +136,18 @@ export async function conversar(opts: {
   const client = new Anthropic(); // ANTHROPIC_API_KEY do ambiente
   // Dono recebe todas; gerência recebe leitura + ferramentas de tarefa; consulta
   // só leitura.
-  const tools = opts.podeAgir
+  const gestao = opts.modo === "gestao";
+  const baseTools = opts.podeAgir
     ? FERRAMENTAS
     : FERRAMENTAS.filter((f) => META[f.name]?.faixa === "leitura" || (opts.podeTarefas && FERRAMENTAS_TAREFA.has(f.name)));
+  // Gestão: ferramentas de gestão + leituras + tarefas (sem as ações de OS e
+  // financeiro, que são do chat geral do administrador).
+  const tools = gestao
+    ? [...FERRAMENTAS_GESTAO, ...baseTools.filter((f) => META[f.name]?.faixa === "leitura" || FERRAMENTAS_TAREFA.has(f.name))]
+    : baseTools;
+  const prompt = gestao
+    ? sistemaGestao(opts.nomeAssistente, opts.podeAgir, opts.podeTarefas, !!opts.podeConduzir, opts.usuario, opts.empresaNome)
+    : sistema(opts.nomeAssistente, opts.podeAgir, opts.podeTarefas, opts.usuario, opts.empresaNome);
   const messages: Anthropic.MessageParam[] = [
     ...opts.historico,
     { role: "user", content: opts.mensagemUsuario },
@@ -124,7 +161,7 @@ export async function conversar(opts: {
     const resp = await client.messages.create({
       model: opts.modelo,
       max_tokens: 4096,
-      system: sistema(opts.nomeAssistente, opts.podeAgir, opts.podeTarefas, opts.usuario, opts.empresaNome),
+      system: prompt,
       tools: tools as any,
       messages,
     });
