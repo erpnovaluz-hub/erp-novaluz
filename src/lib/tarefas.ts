@@ -4,7 +4,7 @@
 // subtarefas). Visibilidade no RLS (migration 0041).
 // =============================================================================
 import type { Option } from "@/lib/entities";
-import type { Modulo } from "@/lib/permissoes";
+import type { Area } from "@/lib/permissoes";
 
 export type Projeto = {
   id: string; nome: string; descricao: string | null; cor: string;
@@ -36,10 +36,11 @@ export const CORES: Record<string, string> = {
 };
 
 // ---- vínculo com registros do ERP ------------------------------------------------
-export type VinculoTipo = "os" | "obra" | "cliente" | "oportunidade" | "proposta" | "titulo" | "requisicao" | "pedido";
+export type VinculoTipo = "os" | "obra" | "cliente" | "oportunidade" | "proposta" | "titulo" | "requisicao" | "pedido" | "reuniao";
 
 type VinculoDef = {
-  tipo: VinculoTipo; label: string; icon: string; modulo: Modulo;
+  // modulo null = livre (o RLS decide); escolhivel false = não aparece no seletor de vínculo
+  tipo: VinculoTipo; label: string; icon: string; modulo: Area | null; escolhivel?: boolean;
   tabela: string; colunas: string; busca: string | string[]; ordem: string;
   rotulo: (r: any) => string;
   href: (id: string) => string;
@@ -62,6 +63,9 @@ export const VINCULOS: VinculoDef[] = [
     busca: "numero", ordem: "numero", rotulo: (r) => [r.numero, r.observacao].filter(Boolean).join(" · "), href: (id) => `/compras/requisicao/${id}` },
   { tipo: "pedido", label: "Pedido de compra", icon: "🛒", modulo: "compras", tabela: "pedidos_compra", colunas: "id, numero, observacao",
     busca: "numero", ordem: "numero", rotulo: (r) => [r.numero, r.observacao].filter(Boolean).join(" · "), href: (id) => `/compras/pedido/${id}` },
+  // encaminhamento de ata (Ritmo de Gestão, 0070): nasce pela ata, não pelo seletor
+  { tipo: "reuniao", label: "Reunião", icon: "📅", modulo: null, escolhivel: false, tabela: "reunioes", colunas: "id, titulo, data_hora",
+    busca: "titulo", ordem: "data_hora", rotulo: (r) => r.titulo, href: (id) => `/gestao/reunioes/${id}` },
 ];
 
 // Tarefas da OS e da obra ligada a ela, para relatórios impressos.

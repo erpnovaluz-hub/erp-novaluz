@@ -18,5 +18,7 @@ export async function carregarAcesso(): Promise<Acesso & { perfil: Record<string
     overrides = data ?? [];
   }
   const dono = await ehDonoDoAgente(supabase, user.email, papel);
-  return { ...montarAcesso(papel, overrides), dono, perfil: perfil as any };
+  // espelha pode_conduzir() (0070): super, ou gerência com a flag conduz_reunioes
+  const conduz = papel === "super" || (isGerencia(papel) && (perfil as any)?.conduz_reunioes === true);
+  return { ...montarAcesso(papel, overrides), dono, conduz, perfil: perfil as any };
 }

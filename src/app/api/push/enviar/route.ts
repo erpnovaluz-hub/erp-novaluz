@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   try {
     const admin = createAdminClient();
     const { data: n } = await admin.from("notificacoes")
-      .select("id, destinatario_id, ator_id, tipo, tarefa_id, os_id, texto, lida, tarefas(titulo), ordens_servico(numero, titulo)").eq("id", id).maybeSingle();
+      .select("id, destinatario_id, ator_id, tipo, tarefa_id, os_id, reuniao_id, texto, lida, tarefas(titulo), ordens_servico(numero, titulo)").eq("id", id).maybeSingle();
     if (!n || n.lida) return NextResponse.json({ ok: true, pulado: true });
 
     let ator = "🤖 Automação";
@@ -47,11 +47,14 @@ export async function POST(req: Request) {
     // Avisos do assistente (incl. "o meu dia" e o briefing do Maestro) carregam o
     // próprio texto no push — não têm tarefa/OS para resumir.
     const ehAgente = n.tipo === "agente";
+    // Avisos de reunião (convite, ata fechada, sugestão de pauta) também levam o próprio texto.
+    const ehReuniao = n.tipo === "reuniao";
+    const reuniaoId = (n as any).reuniao_id as string | null;
     const r = await enviarParaPerfil(admin, n.destinatario_id, {
-      title: ehAgente ? (n.ator_id ? ator : "Assistente") : `${ator} ${ACAO[n.tipo] ?? "atualizou"}`,
-      body: ehAgente ? (n.texto || "Você tem um novo aviso.") : `${titulo}${trecho}`,
-      url: n.os_id ? `/os/${n.os_id}` : n.tarefa_id ? `/tarefas/caixa?tarefa=${n.tarefa_id}` : "/tarefas/caixa",
-      tag: n.os_id ?? n.tarefa_id ?? n.id,
+      title: ehReuniao ? `📅 Reunião · ${ator}` : ehAgente ? (n.ator_id ? ator : "Assistente") : `${ator} ${ACAO[n.tipo] ?? "atualizou"}`,
+      body: ehAgente || ehReuniao ? (n.texto || "Você tem um novo aviso.") : `${titulo}${trecho}`,
+      url: reuniaoId ? `/gestao/reunioes/${reuniaoId}` : n.os_id ? `/os/${n.os_id}` : n.tarefa_id ? `/tarefas/caixa?tarefa=${n.tarefa_id}` : "/tarefas/caixa",
+      tag: reuniaoId ?? n.os_id ?? n.tarefa_id ?? n.id,
     }, new URL(req.url).origin);
     return NextResponse.json({ ok: true, ...r });
   } catch (e: any) {
