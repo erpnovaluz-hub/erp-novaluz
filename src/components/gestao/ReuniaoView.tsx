@@ -127,6 +127,7 @@ export default function ReuniaoView({ id }: { id: string }) {
               <h1 className="text-xl font-bold text-gray-900">{r.titulo}</h1>
               <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_REUNIAO[r.status].cls}`}>{STATUS_REUNIAO[r.status].label}</span>
               {r.confidencial && <span className="rounded bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700">🔒 CONFIDENCIAL</span>}
+              {r.recorrencia_id && <Link href="/gestao/reunioes#recorrentes" className="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 hover:underline">🔁 recorrente</Link>}
             </div>
             <p className="mt-1 text-sm text-gray-600">
               {tipoLabel(r.tipo)} · {dataHoraCurta(r.data_hora)} · {r.duracao_min} min{r.local ? ` · ${r.local}` : ""}
@@ -422,7 +423,7 @@ function Pauta({ d, porId, editavel, gerir, modo, rodar, supabase }: Base & {
   const setStatus = (p: ItemPauta, status: ItemPauta["status"], extra: Partial<ItemPauta> = {}) =>
     rodar(() => supabase.from("reuniao_pauta").update({ status, ...extra }).eq("id", p.id));
 
-  const ORIGEM: Record<ItemPauta["origem"], string> = { manual: "", sugestao: "💡 sugestão", pendencia: "↩︎ veio da anterior" };
+  const ORIGEM: Record<ItemPauta["origem"], string> = { manual: "", sugestao: "💡 sugestão", pendencia: "↩︎ veio da anterior", indicador: "📊 indicador fora da faixa" };
   const COR: Record<ItemPauta["status"], string> = {
     proposto: "bg-amber-100 text-amber-700", aceito: "bg-blue-100 text-blue-700", recusado: "bg-gray-200 text-gray-500 line-through",
     discutido: "bg-green-100 text-green-700", adiado: "bg-purple-100 text-purple-700",

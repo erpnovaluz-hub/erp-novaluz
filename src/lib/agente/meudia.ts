@@ -23,6 +23,8 @@ const primeiroNome = (n: string | null) => (n || "").trim().split(/\s+/)[0] || "
 
 type ContTarefas = { total: number; vencidas: number; hoje: number };
 type ContOS = { total: number; vencidas: number; pausadas: number };
+// Ritmo de Gestão (Bloco 4): só contagens — nunca títulos (reunião pode ser confidencial)
+type ContRitmo = { encAtrasados: number; encVencendo: number; atasCiencia: number };
 
 export async function rodarBriefingPessoal(admin: SupabaseClient, empresaId: string) {
   // premissas da empresa
@@ -69,11 +71,12 @@ export async function rodarBriefingPessoal(admin: SupabaseClient, empresaId: str
   for (const p of pessoas as any[]) {
     const t = await contarTarefas(admin, empresaId, p.id, hoje);
     const os = await contarOS(admin, empresaId, p.id, hoje);
+    const extras = frasesRitmo(await contarRitmo(admin, empresaId, p.id, hoje));
     const dono = calcDono(prem["agente_donos"], emailPorId.get(p.id) ?? null, p.papel);
 
     const texto = dono
-      ? await briefDono(modelo, nome, primeiroNome(p.nome), t, os, { riscosAlto, filaPend: filaPend ?? 0, titVenc: titVenc ?? 0 })
-      : briefPessoal(primeiroNome(p.nome), t, os);
+      ? await briefDono(modelo, nome, primeiroNome(p.nome), t, os, { riscosAlto, filaPend: filaPend ?? 0, titVenc: titVenc ?? 0 }, extras)
+      : briefPessoal(primeiroNome(p.nome), t, os, extras);
     if (!texto) continue; // nada para hoje → não enche a pessoa de notificação
 
     await admin.from("notificacoes").insert({
@@ -135,8 +138,38 @@ function frasesTarefasOS(t: ContTarefas, os: ContOS): string[] {
   return partes;
 }
 
-function briefPessoal(nome: string, t: ContTarefas, os: ContOS): string | null {
-  const partes = frasesTarefasOS(t, os);
+async function contarRitmo(admin: SupabaseClient, empresaId: string, pid: string, hoje: string): Promise<ContRitmo> {
+  const limite = new Date(new Date(hoje + "T12:00:00-03:00").getTime() + 2 * 86400000).toISOString().slice(0, 10);
+  const [enc, cien] = await Promise.all([
+    admin.from("vw_encaminhamentos").select("status,prazo_efetivo")
+      .eq("empresa_consultora_id", empresaId).eq("dono_id", pid).in("status", ["aberto", "atrasado"]).limit(500),
+    admin.from("reuniao_participantes").select("reuniao_id, reunioes!inner(status)")
+      .eq("empresa_consultora_id", empresaId).eq("perfil_id", pid).eq("presenca", "presente").is("ciencia_em", null)
+      .eq("reunioes.status", "realizada").limit(100),
+  ]);
+  const lista = (enc.data ?? []) as any[];
+  return {
+    encAtrasados: lista.filter((e) => e.status === "atrasado").length,
+    encVencendo: lista.filter((e) => e.status === "aberto" && e.prazo_efetivo && e.prazo_efetivo <= limite).length,
+    atasCiencia: (cien.data ?? []).length,
+  };
+}
+
+function frasesRitmo(r: ContRitmo): string[] {
+  const partes: string[] = [];
+  const enc = r.encAtrasados + r.encVencendo;
+  if (enc > 0) {
+    const det: string[] = [];
+    if (r.encAtrasados) det.push(`${r.encAtrasados} atrasado${r.encAtrasados > 1 ? "s" : ""}`);
+    if (r.encVencendo) det.push(`${r.encVencendo} vence${r.encVencendo > 1 ? "m" : ""} em até 2 dias`);
+    partes.push(`${enc} encaminhamento${enc > 1 ? "s" : ""} de reunião (${det.join(", ")})`);
+  }
+  if (r.atasCiencia > 0) partes.push(`${r.atasCiencia} ata${r.atasCiencia > 1 ? "s" : ""} para dar ciência`);
+  return partes;
+}
+
+function briefPessoal(nome: string, t: ContTarefas, os: ContOS, extras: string[] = []): string | null {
+  const partes = [...frasesTarefasOS(t, os), ...extras];
   if (partes.length === 0) return null;
   return `Bom dia, ${nome}! Hoje: ${partes.join(" · ")}.`;
 }
@@ -145,8 +178,9 @@ async function briefDono(
   modelo: string, nomeAssist: string, nome: string,
   t: ContTarefas, os: ContOS,
   g: { riscosAlto: number; filaPend: number; titVenc: number },
+  extras: string[] = [],
 ): Promise<string | null> {
-  const meu = frasesTarefasOS(t, os);
+  const meu = [...frasesTarefasOS(t, os), ...extras];
   const gestao: string[] = [];
   if (g.filaPend > 0) gestao.push(`${g.filaPend} ação(ões) esperando sua aprovação na fila`);
   if (g.riscosAlto > 0) gestao.push(`${g.riscosAlto} risco(s) alto(s) em OS`);
