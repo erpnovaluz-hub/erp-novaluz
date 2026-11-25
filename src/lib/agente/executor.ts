@@ -7,6 +7,7 @@
 import type { Acao, Contexto, ResultadoFerramenta } from "./tipos";
 import { META, FERRAMENTAS_TAREFA } from "./ferramentas";
 import { indicadoresFinanceiros, checagensFinanceiras, projecaoCaixa, tendenciaFinanceira } from "./financeiro";
+import { ehGestao, executarGestao, executarAmarelaGestao, resumoAmarelaGestao, AMARELAS_GESTAO } from "./gestao";
 
 const falta = (campo: string): ResultadoFerramenta => ({ ok: false, erro: `Falta o campo obrigatório: ${campo}` });
 const hojeStr = () => new Date().toISOString().slice(0, 10);
@@ -38,6 +39,13 @@ async function registrar(ctx: Contexto, acao: Acao, parametros: any): Promise<st
 export async function executar(nome: string, input: any, ctx: Contexto): Promise<ResultadoFerramenta> {
   const p = input || {};
   const sb = ctx.sb;
+
+  // Ritmo de Gestão (Bloco 3): trava própria (requisito por ferramenta) + RLS/RPCs.
+  // Só existe no chat de gestão.
+  if (ehGestao(nome)) {
+    if (ctx.modo !== "gestao") return { ok: false, erro: "Ferramenta disponível só no chat de gestão." };
+    return executarGestao(nome, p, ctx);
+  }
 
   // Trava de tier (defesa em profundidade; o RLS não limita, pois quase todos
   // são admin). Três níveis: dono executa tudo; gerência cria/mantém tarefas;
@@ -325,6 +333,7 @@ export async function executar(nome: string, input: any, ctx: Contexto): Promise
 // ---- AMARELAS: propor (pendente) e executar (no confirmar) -------------------
 
 export function resumoAmarela(nome: string, p: any): string {
+  if (AMARELAS_GESTAO.has(nome)) return resumoAmarelaGestao(nome, p);
   switch (nome) {
     case "criar_os":
       return `Criar OS: "${p.titulo}"` + (p.prazo ? ` · prazo ${p.prazo}` : "") + (p.custo_estimado ? ` · R$ ${p.custo_estimado}` : "");
@@ -422,6 +431,8 @@ export async function executarAmarela(
 ): Promise<ResultadoFerramenta> {
   const nome = row.ferramenta;
   const p = row.parametros || {};
+
+  if (AMARELAS_GESTAO.has(nome)) return executarAmarelaGestao(row, ctx);
 
   // Financeiro: cria título 'aberto' ou reagenda vencimento (sob RLS do usuário).
   const pAcaoFin = ACAO_FIN[nome];

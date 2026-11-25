@@ -154,6 +154,7 @@ export default function ReuniaoView({ id }: { id: string }) {
               <button className="btn-ghost text-sm ring-1 ring-gray-200" onClick={() => rodar(() => supabase.from("reunioes").update({ status: "agendada" }).eq("id", id))}>Reativar</button>
             )}
             <Link href={`/gestao/reunioes/${id}/imprimir`} className="btn-ghost text-sm ring-1 ring-gray-200">🖨️ Ata</Link>
+            <Link href={`/gestao/chat?sobre=${encodeURIComponent(`Sobre a reunião "${r.titulo}" de ${dataLonga(r.data_hora)}:`)}`} className="btn-ghost text-sm ring-1 ring-gray-200">💬 Pedir ajuda</Link>
             {editavel && <button className="btn-ghost text-sm" onClick={() => setEditando((v) => !v)}>✏️ Editar</button>}
             {gerir && r.status === "agendada" && (
               <button className="btn-ghost text-sm text-gray-500" onClick={() => confirm("Cancelar esta reunião?") && rodar(() => supabase.from("reunioes").update({ status: "cancelada" }).eq("id", id))}>Cancelar</button>

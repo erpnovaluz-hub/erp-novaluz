@@ -17,13 +17,16 @@ type Acao = {
 type Msg = { papel: "user" | "assistant"; texto: string; acoes?: Acao[] };
 
 // campos que o usuário pode ajustar no cartão (os demais: cancelar e repedir)
-const EDITAVEIS = ["titulo", "prazo", "motivo", "local", "motivo_pausa", "pausa_obs", "horas", "quantidade", "custo_estimado", "custo_unitario", "descricao", "observacao"];
+const EDITAVEIS = ["titulo", "data_hora", "valor", "causa", "prazo", "motivo", "local", "motivo_pausa", "pausa_obs", "horas", "quantidade", "custo_estimado", "custo_unitario", "descricao", "observacao"];
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const CHAVE = "assistente:conversa"; // id da conversa aberta, por navegador
-
-export default function ChatAssistente({ nome }: { nome: string }) {
+// Chat de gestão (Ritmo de Gestão · Bloco 3): mesmo componente, outra persona
+// no servidor (modo "gestao"), conversa guardada em chave própria.
+export default function ChatAssistente({ nome, modo = "geral", atalhos = [], inicial = "", vazio }: {
+  nome: string; modo?: "geral" | "gestao"; atalhos?: string[]; inicial?: string; vazio?: string;
+}) {
+  const CHAVE = modo === "gestao" ? "gestao:conversa" : "assistente:conversa"; // id da conversa aberta, por navegador
   const [msgs, setMsgs] = useState<Msg[]>([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(inicial);
   const [carregando, setCarregando] = useState(false);
   const [conversaId, setConversaId] = useState<string | null>(null);
   const [editando, setEditando] = useState<string | null>(null); // acao.id em edição
@@ -82,6 +85,7 @@ export default function ChatAssistente({ nome }: { nome: string }) {
         const r = await fetch(`/api/agente/chat?conversa_id=${encodeURIComponent(id!)}`);
         if (!r.ok) { try { localStorage.removeItem(CHAVE); } catch {} return; }
         const data = await r.json();
+        if ((data.modo ?? "geral") !== modo) { try { localStorage.removeItem(CHAVE); } catch {} return; }
         const carregadas: Msg[] = (data.mensagens ?? []).map((m: any) => ({ papel: m.papel, texto: m.texto }));
         const pend: Acao[] = data.pendentes ?? [];
         if (pend.length) {
@@ -93,6 +97,7 @@ export default function ChatAssistente({ nome }: { nome: string }) {
         setConversaId(data.conversa_id ?? id);
       } catch {}
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // guarda o id da conversa para reabrir depois
@@ -100,7 +105,7 @@ export default function ChatAssistente({ nome }: { nome: string }) {
     try {
       if (conversaId) localStorage.setItem(CHAVE, conversaId);
     } catch {}
-  }, [conversaId]);
+  }, [conversaId, CHAVE]);
 
   function novaConversa() {
     setMsgs([]);
@@ -114,9 +119,9 @@ export default function ChatAssistente({ nome }: { nome: string }) {
     setMsgs((m) => m.map((msg) => ({ ...msg, acoes: msg.acoes?.map((a) => (a.id === id ? { ...a, ...patch } : a)) })));
   }
 
-  async function enviar(e: React.FormEvent) {
+  async function enviar(e: React.FormEvent, textoDireto?: string) {
     e.preventDefault();
-    const texto = input.trim();
+    const texto = (textoDireto ?? input).trim();
     if (!texto || carregando) return;
     pararMic();
     setInput("");
@@ -126,7 +131,7 @@ export default function ChatAssistente({ nome }: { nome: string }) {
       const r = await fetch("/api/agente/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mensagem: texto, conversa_id: conversaId }),
+        body: JSON.stringify({ mensagem: texto, conversa_id: conversaId, modo }),
       });
       const data = await r.json();
       if (!r.ok) setMsgs((m) => [...m, { papel: "assistant", texto: "⚠️ " + (data?.error ?? "Falha ao responder.") }]);
@@ -187,8 +192,19 @@ export default function ChatAssistente({ nome }: { nome: string }) {
       <div className="flex-1 space-y-3 overflow-y-auto px-1 pb-4">
         {msgs.length === 0 && (
           <div className="mt-6 rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-500">
-            Peça em linguagem natural. Ex.: “Abra uma OS de manutenção para o cliente X, responsável Carlos, prazo sexta.”
-            Ações de OS aparecem como cartão para você confirmar.
+            {vazio ?? <>Peça em linguagem natural. Ex.: “Abra uma OS de manutenção para o cliente X, responsável Carlos, prazo sexta.”
+            Ações de OS aparecem como cartão para você confirmar.</>}
+            {atalhos.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {atalhos.map((a) => (
+                  <button key={a} type="button" disabled={carregando}
+                    onClick={(e) => (a.endsWith("…") ? setInput(a.slice(0, -1) + " ") : enviar(e as any, a))}
+                    className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:border-brand-400 hover:text-brand-700">
+                    {a}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {msgs.map((m, i) => (

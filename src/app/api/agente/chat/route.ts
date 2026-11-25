@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   const admin = createAdminClient();
   const { data: conv } = await admin
     .from("agente_conversas")
-    .select("id,usuario_id")
+    .select("id,usuario_id,modo")
     .eq("id", conversaId)
     .maybeSingle();
   if (!conv || conv.usuario_id !== user.id) {
@@ -47,6 +47,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     conversa_id: conversaId,
+    modo: (conv as any).modo ?? "geral",
     mensagens: (msgs ?? []).filter((m) => m.conteudo).map((m) => ({ papel: m.papel, texto: m.conteudo })),
     pendentes: (pend ?? []).map((a) => ({
       id: a.id,
@@ -78,12 +79,14 @@ export async function POST(req: Request) {
   }
   const mensagem = String(body?.mensagem ?? "").trim();
   if (!mensagem) return NextResponse.json({ error: "Escreva uma mensagem." }, { status: 400 });
+  // chat de gestão (Ritmo de Gestão · Bloco 3): outra persona e outras ferramentas
+  const modo: "geral" | "gestao" = body?.modo === "gestao" ? "gestao" : "geral";
 
   // Quem está logado + em qual empresa. Para o super em modo suporte o RLS usa
   // empresa_ativa — então usamos a MESMA aqui, senão o agente misturaria empresas.
   const { data: perfil } = await sb
     .from("perfis")
-    .select("nome,papel,empresa_consultora_id,empresa_ativa")
+    .select("*")
     .eq("id", user.id)
     .maybeSingle();
   const empresaId = (perfil?.papel === "super" && perfil?.empresa_ativa) ? perfil.empresa_ativa : perfil?.empresa_consultora_id;
@@ -97,7 +100,7 @@ export async function POST(req: Request) {
   const admin = createAdminClient();
 
   // premissas (modelo + nome + donos) — o usuário lê as da própria empresa
-  const { data: prem } = await sb.from("premissas_agente").select("chave,valor").in("chave", ["modelo", "modelo_dono", "nome_assistente", "agente_donos"]);
+  const { data: prem } = await sb.from("premissas_agente").select("chave,valor").in("chave", ["modelo", "modelo_dono", "modelo_gestao", "nome_assistente", "agente_donos"]);
   const val = (k: string) => prem?.find((x) => x.chave === k)?.valor;
   const nome = val("nome_assistente") || "Assistente";
 
@@ -107,14 +110,21 @@ export async function POST(req: Request) {
   // Gerência (super/admin) que não é dono pode criar/manter tarefas pelo agente;
   // OS e financeiro continuam determinação do dono.
   const podeTarefas = ehDono || isGerencia(perfil?.papel);
-  const modelo = (ehDono && val("modelo_dono")) || val("modelo") || MODELO_PADRAO;
+  // espelha pode_conduzir() (0070): super, ou gerência marcada "Conduz reuniões"
+  const podeConduzir = perfil?.papel === "super" || (isGerencia(perfil?.papel) && (perfil as any)?.conduz_reunioes === true);
+  const modelo = (modo === "gestao" && val("modelo_gestao")) || (ehDono && val("modelo_dono")) || val("modelo") || MODELO_PADRAO;
 
   // conversa (nova ou existente)
   let conversaId = String(body?.conversa_id ?? "") || null;
+  if (conversaId) {
+    // a conversa precisa ser do próprio usuário e do mesmo modo (gestão não mistura com o geral)
+    const { data: conv } = await admin.from("agente_conversas").select("usuario_id,modo").eq("id", conversaId).maybeSingle();
+    if (!conv || conv.usuario_id !== user.id || ((conv as any).modo ?? "geral") !== modo) conversaId = null;
+  }
   if (!conversaId) {
     const { data: c, error } = await admin
       .from("agente_conversas")
-      .insert({ empresa_consultora_id: empresaId, usuario_id: user.id, titulo: mensagem.slice(0, 60) })
+      .insert({ empresa_consultora_id: empresaId, usuario_id: user.id, titulo: mensagem.slice(0, 60), modo })
       .select("id")
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -124,7 +134,7 @@ export async function POST(req: Request) {
   // histórico (só texto de user/assistant) ANTES de gravar a mensagem atual
   const { data: hist } = await admin
     .from("agente_mensagens")
-    .select("papel,conteudo")
+    .select("papel,conteudo,payload")
     .eq("conversa_id", conversaId)
     .in("papel", ["user", "assistant"])
     .order("criado_em", { ascending: false })
@@ -132,7 +142,15 @@ export async function POST(req: Request) {
   // vêm do mais novo p/ o mais antigo; invertemos p/ ordem cronológica no prompt
   const historico = [...(hist ?? [])].reverse()
     .filter((m) => m.conteudo)
-    .map((m) => ({ role: m.papel as "user" | "assistant", content: m.conteudo as string }));
+    // O histórico guarda só texto; sem a marca abaixo o modelo, na volta seguinte,
+    // não vê que consultou dados e passa a "desconfiar" da própria resposta.
+    .map((m) => {
+      const usadas = (m as any).payload?.ferramentas as string[] | undefined;
+      const marca = m.papel === "assistant" && usadas?.length
+        ? `[Nesta resposta os dados vieram das ferramentas: ${[...new Set(usadas)].join(", ")}.]\n`
+        : "";
+      return { role: m.papel as "user" | "assistant", content: marca + (m.conteudo as string) };
+    });
 
   // grava a mensagem do usuário
   await admin.from("agente_mensagens").insert({
@@ -142,11 +160,11 @@ export async function POST(req: Request) {
     conteudo: mensagem,
   });
 
-  const ctx: Contexto = { sb, admin, empresaId, usuarioId: user.id, conversaId: conversaId!, podeAgir: ehDono, podeTarefas };
+  const ctx: Contexto = { sb, admin, empresaId, usuarioId: user.id, conversaId: conversaId!, podeAgir: ehDono, podeTarefas, podeConduzir, modo };
 
   let resultado;
   try {
-    resultado = await conversar({ ctx, modelo, nomeAssistente: nome, podeAgir: ehDono, podeTarefas, usuario, empresaNome, historico, mensagemUsuario: mensagem });
+    resultado = await conversar({ ctx, modelo, nomeAssistente: nome, podeAgir: ehDono, podeTarefas, podeConduzir, modo, usuario, empresaNome, historico, mensagemUsuario: mensagem });
   } catch (e: any) {
     await admin.from("agente_execucoes").insert({
       empresa_consultora_id: empresaId, agente: "chat", origem: "chat", usuario_id: user.id,
@@ -158,6 +176,7 @@ export async function POST(req: Request) {
   // grava resposta + log de execução
   await admin.from("agente_mensagens").insert({
     empresa_consultora_id: empresaId, conversa_id: conversaId, papel: "assistant", conteudo: resultado.texto,
+    payload: resultado.ferramentas.length ? { ferramentas: resultado.ferramentas } : null,
   });
   await admin.from("agente_conversas").update({ atualizado_em: new Date().toISOString() }).eq("id", conversaId);
   await admin.from("agente_execucoes").insert({

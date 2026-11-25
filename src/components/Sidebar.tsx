@@ -88,11 +88,14 @@ export default function Sidebar({ empresaNome, email, isSuper, acesso }: { empre
         <Link href="/assistente" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/assistente" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
           🤖 Assistente
         </Link>
-        <Link href="/gestao" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname.startsWith("/gestao") && !pathname.startsWith("/gestao/indicadores") ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
+        <Link href="/gestao" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname.startsWith("/gestao") && !pathname.startsWith("/gestao/indicadores") && !pathname.startsWith("/gestao/chat") ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
           🧭 Ritmo de Gestão
         </Link>
         <Link href="/gestao/indicadores" className={`flex items-center gap-2 rounded-lg px-3 py-2 pl-8 text-sm ${pathname.startsWith("/gestao/indicadores") ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
           📊 Indicadores
+        </Link>
+        <Link href="/gestao/chat" className={`flex items-center gap-2 rounded-lg px-3 py-2 pl-8 text-sm ${pathname.startsWith("/gestao/chat") ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>
+          💬 Conversa de gestão
         </Link>
         {acesso.dono && (
           <Link href="/assistente/fila" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${pathname === "/assistente/fila" ? "bg-brand-600 text-white" : "text-gray-700 hover:bg-gray-100"}`}>

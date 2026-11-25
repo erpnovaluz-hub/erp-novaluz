@@ -66,6 +66,7 @@ export default function GestaoHub() {
           <p className="text-sm text-gray-500">Reunião → decisão → encaminhamento com dono e prazo → a próxima reunião cobra.</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/gestao/chat" className="btn-ghost text-sm ring-1 ring-gray-200">💬 Conversar sobre gestão</Link>
           <Link href="/gestao/reunioes" className="btn-ghost text-sm ring-1 ring-gray-200">📚 Todas as reuniões</Link>
           {acesso.conduz && <button className="btn-primary text-sm" onClick={() => setNova(true)}>+ Nova reunião</button>}
         </div>
