@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAcesso } from "@/components/AcessoProvider";
 import { Avatar, useEquipe } from "@/components/tarefas/comum";
 import TarefaDrawer from "@/components/tarefas/TarefaDrawer";
+import KpisForaDaFaixa from "@/components/gestao/KpisForaDaFaixa";
 import { formatDateTime } from "@/lib/format";
 import { nomeCurto, rotuloPrazo, hojeISO, type Pessoa } from "@/lib/tarefas";
 import {
@@ -180,6 +181,7 @@ export default function ReuniaoView({ id }: { id: string }) {
         {aba === "pauta" && (
           <>
             <Participantes d={d} pessoas={pessoas} porId={porId} editavel={editavel} modo="lista" rodar={rodar} supabase={supabase} />
+            {acesso.gerencia && <KpisForaDaFaixa r={r} pauta={d.pauta} editavel={editavel} onLevou={carregar} />}
             <Pauta d={d} porId={porId} editavel={editavel} gerir={gerir} modo="pauta" rodar={rodar} supabase={supabase} />
           </>
         )}
@@ -190,6 +192,7 @@ export default function ReuniaoView({ id }: { id: string }) {
             )}
             <Participantes d={d} pessoas={pessoas} porId={porId} editavel={editavel} modo="presenca" rodar={rodar} supabase={supabase} />
             <Pendencias d={d} porId={porId} editavel={editavel} rodar={rodar} supabase={supabase} onAbrir={setTarefa} />
+            {acesso.gerencia && editavel && <KpisForaDaFaixa r={r} pauta={d.pauta} editavel={editavel} onLevou={carregar} />}
             <Pauta d={d} porId={porId} editavel={editavel} gerir={gerir} modo="ata" rodar={rodar} supabase={supabase} />
             <Decisoes d={d} editavel={editavel} rodar={rodar} supabase={supabase} />
             <Encaminhamentos d={d} pessoas={pessoas} porId={porId} editavel={editavel} rodar={rodar} supabase={supabase} onAbrir={setTarefa} />
@@ -435,7 +438,7 @@ function Pauta({ d, porId, editavel, gerir, modo, rodar, supabase }: Base & {
             <span className="w-5 text-right text-gray-400">{i + 1}.</span>
             <div className="min-w-0 flex-1">
               <p className="font-medium text-gray-900">{p.titulo}</p>
-              {p.descricao && <p className="text-xs text-gray-500">{p.descricao}</p>}
+              {p.descricao && <p className="whitespace-pre-line text-xs text-gray-500">{p.descricao}</p>}
               <p className="text-[11px] text-gray-400">
                 {ORIGEM[p.origem]}{p.sugerido_por && <> por {nomeCurto(porId[p.sugerido_por])}</>}
                 {p.motivo_recusa && <> · recusado: “{p.motivo_recusa}”</>}
