@@ -268,7 +268,7 @@ function VinculoPicker({ onEscolher, onCancelar }: {
 }) {
   const supabase = useMemo(() => createClient(), []);
   const acesso = useAcesso();
-  const tipos = VINCULOS.filter((v) => podeArea(acesso, v.modulo));
+  const tipos = VINCULOS.filter((v) => v.escolhivel !== false && podeArea(acesso, v.modulo));
   const [tipo, setTipo] = useState<VinculoTipo>(tipos[0]?.tipo ?? "os");
   const [busca, setBusca] = useState("");
   const [itens, setItens] = useState<any[]>([]);

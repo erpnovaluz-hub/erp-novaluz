@@ -7,7 +7,7 @@ import {
   type Modulo, type Nivel, type Papel,
 } from "@/lib/permissoes";
 
-type Perfil = { id: string; nome: string | null; email: string | null; papel: string; ativo: boolean | null };
+type Perfil = { id: string; nome: string | null; email: string | null; papel: string; ativo: boolean | null; conduz_reunioes?: boolean | null };
 type Override = { papel: string; modulo: string; nivel: Nivel };
 
 const NIVEIS: { value: Nivel; label: string; cor: string }[] = [
@@ -41,7 +41,8 @@ export default function EquipeAcessos({ empresaId, empresaNome, meuId }: { empre
     if (!empresaId) return;
     setCarregando(true);
     const [p, o] = await Promise.all([
-      supabase.from("perfis").select("id, nome, email, papel, ativo").eq("empresa_consultora_id", empresaId).neq("papel", "super").order("nome"),
+      // select * : tolera banco ainda sem a coluna conduz_reunioes (0070)
+      supabase.from("perfis").select("*").eq("empresa_consultora_id", empresaId).neq("papel", "super").order("nome"),
       supabase.from("permissoes_papel").select("papel, modulo, nivel").eq("empresa_consultora_id", empresaId),
     ]);
     if (p.error) setErro(p.error.message);
@@ -154,12 +155,13 @@ export default function EquipeAcessos({ empresaId, empresaNome, meuId }: { empre
                 <th className="px-4 py-3">E-mail</th>
                 <th className="px-4 py-3">Perfil</th>
                 <th className="px-4 py-3">Situação</th>
+                <th className="px-4 py-3" title="Ritmo de Gestão: pode criar, conduzir e fechar atas de reunião">Conduz reuniões</th>
                 <th className="px-4 py-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {carregando ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Carregando…</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Carregando…</td></tr>
               ) : perfis.map((p) => {
                 const eu = p.id === meuId;
                 const ativo = p.ativo !== false;
@@ -187,6 +189,17 @@ export default function EquipeAcessos({ empresaId, empresaNome, meuId }: { empre
                       <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${ativo ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>
                         {ativo ? "Ativo" : "Desativado"}
                       </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      {p.papel !== "admin" ? <span className="text-xs text-gray-300">só gerência</span>
+                        : eu ? <span className="text-xs text-gray-500">{p.conduz_reunioes ? "Sim" : "Não"}</span>
+                        : (
+                          <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs">
+                            <input type="checkbox" checked={!!p.conduz_reunioes} disabled={!ativo}
+                              onChange={(e) => alterar(p, { conduz_reunioes: e.target.checked })} />
+                            {p.conduz_reunioes ? "Sim" : "Não"}
+                          </label>
+                        )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-2 text-right">
                       {editando ? (

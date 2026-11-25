@@ -12,8 +12,8 @@ import TarefaDrawer from "@/components/tarefas/TarefaDrawer";
 import AtivarNotificacoes from "@/components/pwa/AtivarNotificacoes";
 
 type Notificacao = {
-  id: string; ator_id: string | null; tipo: "atribuida" | "mencao" | "comentario" | "concluida" | "acompanhar" | "os_atribuida" | "os_status" | "agente";
-  tarefa_id: string | null; os_id?: string | null; texto: string | null; lida: boolean; criado_em: string;
+  id: string; ator_id: string | null; tipo: "atribuida" | "mencao" | "comentario" | "concluida" | "acompanhar" | "os_atribuida" | "os_status" | "agente" | "reuniao";
+  tarefa_id: string | null; os_id?: string | null; reuniao_id?: string | null; texto: string | null; lida: boolean; criado_em: string;
   ordens_servico?: { numero: string | null; titulo: string } | null;
   tarefas: { titulo: string } | null;
 };
@@ -27,6 +27,7 @@ const ACAO: Record<Notificacao["tipo"], string> = {
   os_atribuida: "passou para você a OS",
   os_status: "mudou o status da OS",
   agente: "",
+  reuniao: "",
 };
 
 // avisa o menu para recontar as não lidas
@@ -84,6 +85,7 @@ export default function CaixaEntrada() {
       await supabase.from("notificacoes").update({ lida: true }).eq("id", n.id);
       avisarMenu();
     }
+    if (n.reuniao_id) { router.push(`/gestao/reunioes/${n.reuniao_id}`); return; }
     if (n.os_id) { router.push(`/os/${n.os_id}`); return; }
     if (n.tarefa_id) setAberta(n.tarefa_id);
   }
@@ -147,6 +149,21 @@ export default function CaixaEntrada() {
           <div className="card mt-3 divide-y overflow-hidden">
             {itens.map((n) => {
               const ator = n.ator_id ? porId[n.ator_id] : null;
+              // aviso de reunião (convite, ata fechada, sugestão de pauta): o conteúdo é o próprio texto
+              if (n.tipo === "reuniao") {
+                return (
+                  <button key={n.id} onClick={() => abrir(n)}
+                    className={`flex w-full items-start gap-3 px-4 py-3 text-left text-sm hover:bg-gray-50 ${n.lida ? "" : "bg-brand-50/40"}`}>
+                    <span className="inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-purple-100 text-base" aria-hidden>📅</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-gray-900">{ator?.nome || "Ritmo de Gestão"}</p>
+                      <p className="mt-0.5 text-gray-700">{n.texto || "Aviso de reunião."}</p>
+                      <p className="mt-0.5 text-[11px] text-gray-400">{quando(n.criado_em)}</p>
+                    </div>
+                    {!n.lida && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-600" aria-label="não lida" />}
+                  </button>
+                );
+              }
               // aviso do assistente ("o meu dia", briefing do Maestro, chat): o conteúdo é o próprio texto
               if (n.tipo === "agente") {
                 const sobre = n.os_id

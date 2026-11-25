@@ -60,6 +60,7 @@ export type Acesso = {
   papel: Papel | null;
   gerencia: boolean;
   dono?: boolean;              // dono do agente (login com poder de ação/aprovação)
+  conduz?: boolean;            // Ritmo de Gestão: cria/conduz reuniões (super ou gerência marcada)
   niveis: Record<Modulo, Nivel>;
   userId?: string;
   empresaId?: string | null;   // empresa em uso (modo suporte do super incluso)
