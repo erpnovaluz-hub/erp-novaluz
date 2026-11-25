@@ -24,6 +24,7 @@ export default function GestaoHub() {
   const { userId } = acesso;
   const { porId } = useEquipe();
   const [proximas, setProximas] = useState<Reuniao[]>([]);
+  const [previstas, setPrevistas] = useState<{ recorrencia_id: string; titulo: string; data_prevista: string; hora: string; criada: boolean }[]>([]);
   const [meusEnc, setMeusEnc] = useState<Encaminhamento[]>([]);
   const [ciencia, setCiencia] = useState<Reuniao[]>([]);
   const [sugestoes, setSugestoes] = useState<(ItemPauta & { reunioes: { titulo: string; data_hora: string } | null })[]>([]);
@@ -53,8 +54,12 @@ export default function GestaoHub() {
     setMeusEnc((e.data ?? []) as Encaminhamento[]);
     setCiencia(((c.data ?? []) as any[]).map((x) => x.reunioes as Reuniao));
     setSugestoes((s.data ?? []) as any);
+    if (acesso.gerencia) {
+      const pv = await supabase.rpc("ritmo_previstas");
+      setPrevistas(((pv.data ?? []) as any[]).filter((x) => x.data_prevista && !x.criada));
+    }
     setCarregado(true);
-  }, [supabase, userId, acesso.conduz]);
+  }, [supabase, userId, acesso.conduz, acesso.gerencia]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -81,7 +86,7 @@ export default function GestaoHub() {
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <section className="card p-4">
           <h2 className="font-semibold text-gray-800">📅 Próximas reuniões</h2>
-          {carregado && proximas.length === 0 && <p className="mt-3 text-sm text-gray-400">Nenhuma reunião agendada.</p>}
+          {carregado && proximas.length === 0 && previstas.length === 0 && <p className="mt-3 text-sm text-gray-400">Nenhuma reunião agendada.</p>}
           <div className="mt-2 divide-y">
             {proximas.map((r) => (
               <Link key={r.id} href={`/gestao/reunioes/${r.id}`} className="flex items-center gap-3 py-2.5 text-sm hover:bg-gray-50">
@@ -92,6 +97,15 @@ export default function GestaoHub() {
                   <p className="text-xs text-gray-500">{dataHoraCurta(r.data_hora)}{r.local ? ` · ${r.local}` : ""}</p>
                 </div>
                 <span className={`shrink-0 rounded px-2 py-0.5 text-[11px] font-medium ${STATUS_REUNIAO[r.status].cls}`}>{STATUS_REUNIAO[r.status].label}</span>
+              </Link>
+            ))}
+            {previstas.map((p) => (
+              <Link key={p.recorrencia_id} href="/gestao/reunioes#recorrentes" className="flex items-center gap-3 py-2.5 text-sm text-gray-400 hover:bg-gray-50">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate">🔁 {p.titulo}</p>
+                  <p className="text-xs">{dataLonga(p.data_prevista + "T12:00:00")} · {p.hora.slice(0, 5)}</p>
+                </div>
+                <span className="shrink-0 rounded bg-gray-100 px-2 py-0.5 text-[11px]">prevista</span>
               </Link>
             ))}
           </div>

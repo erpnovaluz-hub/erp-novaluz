@@ -17,11 +17,36 @@ export type Reuniao = {
   ata_fechada_em: string | null; ata_fechada_por: string | null;
   reaberturas: { por: string; em: string; motivo: string }[];
   observacoes: string | null; criado_por: string | null; criado_em: string;
+  recorrencia_id?: string | null;
 };
+
+// Bloco 4 — molde de reunião recorrente (0073)
+export type Frequencia = "semanal" | "quinzenal" | "mensal" | "trimestral";
+export type Recorrencia = {
+  id: string; titulo: string; tipo: TipoReuniao; frequencia: Frequencia; dia_semana: number;
+  semana_do_mes: number | null; hora: string; duracao_min: number; local: string | null;
+  conduzida_por: string | null; participantes: string[]; antecedencia_dias: number; ativo: boolean;
+};
+export const FREQUENCIAS: { key: Frequencia; label: string; antecedencia: number }[] = [
+  { key: "semanal", label: "Toda semana", antecedencia: 6 },
+  { key: "quinzenal", label: "A cada 2 semanas", antecedencia: 6 },
+  { key: "mensal", label: "Todo mês", antecedencia: 10 },
+  { key: "trimestral", label: "A cada 3 meses", antecedencia: 10 },
+];
+export const DIAS_SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+export const SEMANAS_MES = ["1ª", "2ª", "3ª", "4ª", "última"];
+export function descreverRecorrencia(r: Pick<Recorrencia, "frequencia" | "dia_semana" | "semana_do_mes" | "hora">): string {
+  const h = r.hora.slice(0, 5);
+  const dia = DIAS_SEMANA[r.dia_semana];
+  if (r.frequencia === "semanal") return `toda ${dia} às ${h}`;
+  if (r.frequencia === "quinzenal") return `${dia} sim, ${dia} não, às ${h}`;
+  const sem = SEMANAS_MES[(r.semana_do_mes ?? 1) - 1];
+  return `${sem} ${dia} ${r.frequencia === "mensal" ? "de cada mês" : "a cada 3 meses"} às ${h}`;
+}
 export type Participante = { reuniao_id: string; perfil_id: string; presenca: Presenca; ciencia_em: string | null };
 export type ItemPauta = {
   id: string; reuniao_id: string; titulo: string; descricao: string | null;
-  origem: "manual" | "sugestao" | "pendencia"; status: StatusPauta;
+  origem: "manual" | "sugestao" | "pendencia" | "indicador"; status: StatusPauta;
   sugerido_por: string | null; motivo_recusa: string | null; ordem: number;
 };
 export type Decisao = { id: string; reuniao_id: string; pauta_id: string | null; texto: string; ordem: number };

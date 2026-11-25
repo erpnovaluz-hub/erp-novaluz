@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAcesso } from "@/components/AcessoProvider";
 import NovaReuniao from "@/components/gestao/NovaReuniao";
+import Recorrencias from "@/components/gestao/Recorrencias";
 import { STATUS_REUNIAO, TIPOS, dataHoraCurta, tipoLabel, type Reuniao, type StatusReuniao, type TipoReuniao } from "@/lib/ritmo";
 
 // /gestao/reunioes — histórico. O RLS já filtra: gerência vê as normais,
@@ -34,6 +35,8 @@ export default function ReunioesLista() {
         </div>
         {acesso.conduz && <button className="btn-primary text-sm" onClick={() => setNova(true)}>+ Nova reunião</button>}
       </div>
+
+      <Recorrencias />
 
       <div className="mt-3 flex flex-wrap gap-2">
         <select className="inp w-auto" value={tipo} onChange={(e) => setTipo(e.target.value as any)}>
