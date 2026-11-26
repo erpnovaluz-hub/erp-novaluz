@@ -15,6 +15,23 @@ export function calcDono(
   return donos.length ? donos.includes(e) : papel === "super";
 }
 
+// Lista de e-mails de uma premissa ("a@x.com, b@y.com" → ["a@x.com","b@y.com"]).
+export function listaEmails(valor: string | null | undefined): string[] {
+  return String(valor || "").split(/[,;\s]+/).map((s) => s.toLowerCase().trim()).filter(Boolean);
+}
+
+// Lançador = e-mail na premissa agente_lancadores (0075): pode lançar no
+// financeiro pelo chat (cartões de título/baixa) e confirmar os próprios cartões.
+export function calcLancador(valor: string | null | undefined, email: string | null | undefined): boolean {
+  const e = (email || "").toLowerCase();
+  return !!e && listaEmails(valor).includes(e);
+}
+
+export async function ehLancadorDoAgente(sb: SupabaseClient, email: string | null | undefined): Promise<boolean> {
+  const { data } = await sb.from("premissas_agente").select("valor").eq("chave", "agente_lancadores").limit(1).maybeSingle();
+  return calcLancador((data as any)?.valor, email);
+}
+
 // Versão que lê a premissa (para quando o chamador ainda não a tem).
 export async function ehDonoDoAgente(
   sb: SupabaseClient,

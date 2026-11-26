@@ -1,5 +1,6 @@
 import ChatAssistente from "@/components/ChatAssistente";
 import { createClient } from "@/lib/supabase/server";
+import { ehDonoDoAgente, ehLancadorDoAgente } from "@/lib/agente/donos";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,8 @@ export default async function Page() {
   const { data: perfil } = user
     ? await sb.from("perfis").select("papel,empresa_ativa,empresa_consultora_id").eq("id", user.id).maybeSingle()
     : { data: null };
+  // o 📎 aparece só para quem pode lançar (dono ou lançador autorizado)
+  const podeLancar = (await ehDonoDoAgente(sb, user?.email, perfil?.papel)) || (await ehLancadorDoAgente(sb, user?.email));
   const empresaId = (perfil?.papel === "super" && perfil?.empresa_ativa) ? perfil.empresa_ativa : perfil?.empresa_consultora_id ?? "";
 
   return (
@@ -26,7 +29,7 @@ export default async function Page() {
       <p className="mb-3 text-xs text-gray-500">
         Preenche e mantém tarefas a seu pedido. Age com as suas permissões e mostra o que fez.
       </p>
-      <ChatAssistente nome={nome} empresaId={empresaId} />
+      <ChatAssistente nome={nome} empresaId={podeLancar ? empresaId : undefined} />
     </div>
   );
 }

@@ -5,7 +5,7 @@
 // fica só no servidor.
 // =============================================================================
 import Anthropic from "@anthropic-ai/sdk";
-import { FERRAMENTAS, META, FERRAMENTAS_TAREFA } from "./ferramentas";
+import { FERRAMENTAS, META, FERRAMENTAS_TAREFA, FERRAMENTAS_LANCAMENTO } from "./ferramentas";
 import { executar } from "./executor";
 import { FERRAMENTAS_GESTAO, PERSONA_GESTAO } from "./gestao";
 import { papelLabel } from "@/lib/permissoes";
@@ -72,8 +72,33 @@ function sistemaGestao(nome: string, podeAgir: boolean, podeTarefas: boolean, po
   ].join("\n");
 }
 
-function sistema(nome: string, podeAgir: boolean, podeTarefas: boolean, usuario: UsuarioChat, empresaNome: string): string {
+function sistema(nome: string, podeAgir: boolean, podeTarefas: boolean, usuario: UsuarioChat, empresaNome: string, podeLancar = false): string {
   const hoje = new Date().toISOString().slice(0, 10);
+
+  // Modo LANÇAMENTOS (não-dono autorizado pelo dono): lança no financeiro por
+  // cartão; tarefas só se também for gerência; OS e o resto, consulta.
+  if (!podeAgir && podeLancar) {
+    return [
+      `Você é ${nome}, o assistente do ERP Novaluz. Hoje é ${hoje}.`,
+      contexto(usuario, empresaNome),
+      "Esta pessoa foi AUTORIZADA pelo administrador a LANÇAR NO FINANCEIRO pelo chat: anexando comprovante, boleto ou NF, ou pedindo por texto (ex.: 'lança uma saída de R$ 300 de energia, paga hoje, competência 11/2026').",
+      "Lançamentos viram CARTÃO que a própria pessoa confirma: criar_titulo e alterar_vencimento_titulo (amarelos, não mexem no saldo); baixar_titulo e lancar_pago (VERMELHOS, mexem no saldo). Chame cada proposta UMA vez e explique o que propôs.",
+      podeTarefas
+        ? "Ela também cria e mantém TAREFAS (executam na hora). OS: só consulta — abrir/alterar OS é do administrador."
+        : "Fora do financeiro ela só CONSULTA: tarefas, OS e o resto são do administrador ou da gerência.",
+      "Consulta e análise do caixa estão liberadas (posição, títulos, indicadores, projeções). Você NUNCA paga nem transfere dinheiro e não dá conselho de investimento.",
+      "",
+      LANCAMENTOS,
+      "- Pedido só por TEXTO (sem anexo) segue o mesmo roteiro: já pago → candidatos_baixa e depois baixar_titulo ou lancar_pago; a vencer → criar_titulo.",
+      "",
+      "Regras invioláveis:",
+      "1. Nunca invente valor, data, conta, fornecedor ou categoria. Se faltar um dado obrigatório, PERGUNTE.",
+      "2. Antes de criar tarefa, use buscar_tarefas; para atribuir, listar_pessoas (diferencie homônimos por e-mail/papel; NUNCA mostre id/UUID).",
+      "3. Trabalhe só com o que as ferramentas retornam. Se não achou, diga que não achou.",
+      "",
+      "Ao terminar, responda em português, curto, dizendo o que propôs/preencheu.",
+    ].join("\n");
+  }
 
   // Modo CONSULTA (sem ação): só leitura, nunca altera nem propõe.
   if (!podeAgir && !podeTarefas) {
@@ -114,7 +139,7 @@ function sistema(nome: string, podeAgir: boolean, podeTarefas: boolean, usuario:
     contexto(usuario, empresaNome),
     CONHECIMENTO,
     "Você fala com o ADMINISTRADOR, que decide o negócio. Vá fundo: cruze dados, aponte riscos e oportunidades, sugira prioridades e, quando fizer sentido, proponha o próximo passo — além de executar as ações disponíveis.",
-    "Você preenche e mantém TAREFAS, ORDENS DE SERVIÇO (OS) e o FINANCEIRO (caixa) a pedido do usuário, no chat.",
+    "Você preenche e mantém TAREFAS, ORDENS DE SERVIÇO (OS) e o FINANCEIRO (caixa) a pedido do usuário, no chat — inclusive lançamentos pedidos só por texto (mesmo roteiro dos documentos abaixo).",
     "",
     "Tarefas: ações diretas (criar, vincular, comentar, concluir) — executam na hora.",
     "OS: ações de criar/atribuir/prazo/status/apontamento/insumo/concluir são PROPOSTAS — ao chamá-las, elas NÃO executam; viram um cartão para o usuário confirmar. Chame cada proposta UMA vez, explique o que propôs e siga; nunca repita a mesma proposta nem assuma que já foi feita.",
@@ -143,6 +168,7 @@ export async function conversar(opts: {
   podeAgir: boolean;
   podeTarefas: boolean;
   podeConduzir?: boolean;
+  podeLancar?: boolean;
   modo?: "geral" | "gestao";
   usuario: UsuarioChat;
   empresaNome: string;
@@ -155,7 +181,10 @@ export async function conversar(opts: {
   const gestao = opts.modo === "gestao";
   const baseTools = opts.podeAgir
     ? FERRAMENTAS
-    : FERRAMENTAS.filter((f) => META[f.name]?.faixa === "leitura" || (opts.podeTarefas && FERRAMENTAS_TAREFA.has(f.name)));
+    : FERRAMENTAS.filter((f) =>
+        META[f.name]?.faixa === "leitura" ||
+        (opts.podeTarefas && FERRAMENTAS_TAREFA.has(f.name)) ||
+        (opts.podeLancar && FERRAMENTAS_LANCAMENTO.has(f.name)));
   // Gestão: ferramentas de gestão + leituras + tarefas (sem as ações de OS e
   // financeiro, que são do chat geral do administrador).
   const tools = gestao
@@ -163,7 +192,7 @@ export async function conversar(opts: {
     : baseTools;
   const prompt = gestao
     ? sistemaGestao(opts.nomeAssistente, opts.podeAgir, opts.podeTarefas, !!opts.podeConduzir, opts.usuario, opts.empresaNome)
-    : sistema(opts.nomeAssistente, opts.podeAgir, opts.podeTarefas, opts.usuario, opts.empresaNome);
+    : sistema(opts.nomeAssistente, opts.podeAgir, opts.podeTarefas, opts.usuario, opts.empresaNome, !!opts.podeLancar);
   const messages: Anthropic.MessageParam[] = [
     ...opts.historico,
     { role: "user", content: opts.mensagemUsuario },

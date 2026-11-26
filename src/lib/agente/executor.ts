@@ -5,7 +5,7 @@
 // com status 'executada', para o log e o Desfazer. Idempotência pela chave.
 // =============================================================================
 import type { Acao, Contexto, ResultadoFerramenta } from "./tipos";
-import { META, FERRAMENTAS_TAREFA } from "./ferramentas";
+import { META, FERRAMENTAS_TAREFA, FERRAMENTAS_LANCAMENTO } from "./ferramentas";
 import { indicadoresFinanceiros, checagensFinanceiras, projecaoCaixa, tendenciaFinanceira } from "./financeiro";
 import { ehGestao, executarGestao, executarAmarelaGestao, resumoAmarelaGestao, AMARELAS_GESTAO } from "./gestao";
 
@@ -52,7 +52,8 @@ export async function executar(nome: string, input: any, ctx: Contexto): Promise
   // consulta só leitura. Mesmo que o modelo tente, aqui é barrado.
   if (META[nome]?.faixa !== "leitura" && !ctx.podeAgir) {
     const ehTarefa = ctx.podeTarefas && FERRAMENTAS_TAREFA.has(nome);
-    if (!ehTarefa) {
+    const ehLancamento = !!ctx.podeLancar && FERRAMENTAS_LANCAMENTO.has(nome);
+    if (!ehTarefa && !ehLancamento) {
       return {
         ok: false,
         erro: ctx.podeTarefas

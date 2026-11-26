@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { conversar, MODELO_PADRAO } from "@/lib/agente/claude";
-import { calcDono } from "@/lib/agente/donos";
+import { calcDono, calcLancador } from "@/lib/agente/donos";
 import { isGerencia } from "@/lib/permissoes";
 import type { Contexto } from "@/lib/agente/tipos";
 import type Anthropic from "@anthropic-ai/sdk";
@@ -111,7 +111,7 @@ export async function POST(req: Request) {
   const admin = createAdminClient();
 
   // premissas (modelo + nome + donos) — o usuário lê as da própria empresa
-  const { data: prem } = await sb.from("premissas_agente").select("chave,valor").in("chave", ["modelo", "modelo_dono", "modelo_gestao", "nome_assistente", "agente_donos"]);
+  const { data: prem } = await sb.from("premissas_agente").select("chave,valor").in("chave", ["modelo", "modelo_dono", "modelo_gestao", "nome_assistente", "agente_donos", "agente_lancadores"]);
   const val = (k: string) => prem?.find((x) => x.chave === k)?.valor;
   const nome = val("nome_assistente") || "Assistente";
 
@@ -121,6 +121,8 @@ export async function POST(req: Request) {
   // Gerência (super/admin) que não é dono pode criar/manter tarefas pelo agente;
   // OS e financeiro continuam determinação do dono.
   const podeTarefas = ehDono || isGerencia(perfil?.papel);
+  // Lançador (0075): autorizado pelo dono a lançar no financeiro pelo chat.
+  const podeLancar = ehDono || calcLancador(val("agente_lancadores"), user.email);
   // espelha pode_conduzir() (0070): super, ou gerência marcada "Conduz reuniões"
   const podeConduzir = perfil?.papel === "super" || (isGerencia(perfil?.papel) && (perfil as any)?.conduz_reunioes === true);
   const modelo = (modo === "gestao" && val("modelo_gestao")) || (ehDono && val("modelo_dono")) || val("modelo") || MODELO_PADRAO;
@@ -193,11 +195,11 @@ export async function POST(req: Request) {
     conteudo: textoUsuario,
   });
 
-  const ctx: Contexto = { sb, admin, empresaId, usuarioId: user.id, conversaId: conversaId!, podeAgir: ehDono, podeTarefas, podeConduzir, modo };
+  const ctx: Contexto = { sb, admin, empresaId, usuarioId: user.id, conversaId: conversaId!, podeAgir: ehDono, podeTarefas, podeConduzir, podeLancar, modo };
 
   let resultado;
   try {
-    resultado = await conversar({ ctx, modelo, nomeAssistente: nome, podeAgir: ehDono, podeTarefas, podeConduzir, modo, usuario, empresaNome, historico, mensagemUsuario: conteudoAtual });
+    resultado = await conversar({ ctx, modelo, nomeAssistente: nome, podeAgir: ehDono, podeTarefas, podeConduzir, podeLancar, modo, usuario, empresaNome, historico, mensagemUsuario: conteudoAtual });
   } catch (e: any) {
     await admin.from("agente_execucoes").insert({
       empresa_consultora_id: empresaId, agente: "chat", origem: "chat", usuario_id: user.id,

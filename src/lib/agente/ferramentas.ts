@@ -77,6 +77,15 @@ export const FERRAMENTAS_TAREFA = new Set([
   "criar_projeto_de_modelo",
 ]);
 
+// Ferramentas do LANÇADOR (0075): quem o dono autorizou a lançar no financeiro
+// pelo chat. Todas viram cartão (amarela/vermelha) que a própria pessoa confirma.
+export const FERRAMENTAS_LANCAMENTO = new Set([
+  "criar_titulo",
+  "alterar_vencimento_titulo",
+  "baixar_titulo",
+  "lancar_pago",
+]);
+
 export const FERRAMENTAS: DefFerramenta[] = [
   {
     name: "buscar_tarefas",
