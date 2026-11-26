@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { executarAmarela, resumoAmarela } from "@/lib/agente/executor";
-import { ehDonoDoAgente } from "@/lib/agente/donos";
+import { ehDonoDoAgente, ehLancadorDoAgente } from "@/lib/agente/donos";
+import { FERRAMENTAS_LANCAMENTO } from "@/lib/agente/ferramentas";
 import { AMARELAS_GESTAO } from "@/lib/agente/gestao";
 import { isGerencia } from "@/lib/permissoes";
 import type { Contexto } from "@/lib/agente/tipos";
@@ -37,11 +38,16 @@ export async function POST(req: Request) {
   // RLS: o usuário só enxerga as próprias ações (ou gerência)
   const { data: acao } = await sb.from("acoes_agente").select("*").eq("id", acaoId).maybeSingle();
   if (!acao) return NextResponse.json({ error: "Ação não encontrada." }, { status: 404 });
-  if (acao.faixa !== "amarela") return NextResponse.json({ error: "Só ações amarelas passam por confirmação." }, { status: 400 });
+  // vermelha (baixa/lançamento pago) também passa aqui — sempre um cartão por vez,
+  // nunca pelo aprovar-lote — e só o dono decide (cartaoGestao é só amarela).
+  if (acao.faixa !== "amarela" && acao.faixa !== "vermelha") return NextResponse.json({ error: "Só propostas (amarela/vermelha) passam por confirmação." }, { status: 400 });
   if (acao.status !== "pendente") return NextResponse.json({ error: `Ação já ${acao.status}.` }, { status: 409 });
 
   const cartaoGestao = AMARELAS_GESTAO.has(acao.ferramenta) && acao.solicitante_id === user.id;
-  if (!ehDono && !cartaoGestao) {
+  // Lançador (0075): decide os PRÓPRIOS cartões de lançamento financeiro.
+  const cartaoLancamento = !ehDono && FERRAMENTAS_LANCAMENTO.has(acao.ferramenta) && acao.solicitante_id === user.id
+    && (await ehLancadorDoAgente(sb, user.email));
+  if (!ehDono && !cartaoGestao && !cartaoLancamento) {
     return NextResponse.json({ error: "Só o administrador do assistente decide ações do assistente." }, { status: 403 });
   }
   const podeConduzir = perfilU?.papel === "super" || (isGerencia(perfilU?.papel) && (perfilU as any)?.conduz_reunioes === true);
@@ -62,7 +68,9 @@ export async function POST(req: Request) {
 
   // confirmar — executa sob o RLS do usuário
   // Confirmar/editar uma ação já proposta por um dono é determinação → podeAgir.
-  const ctx: Contexto = cartaoGestao && !ehDono
+  const ctx: Contexto = cartaoLancamento
+    ? { sb, admin, empresaId, usuarioId: user.id, conversaId: acao.conversa_id, podeAgir: false, podeTarefas: false, podeLancar: true, modo: "geral" }
+    : cartaoGestao && !ehDono
     ? { sb, admin, empresaId, usuarioId: user.id, conversaId: acao.conversa_id, podeAgir: false, podeTarefas: isGerencia(perfilU?.papel), podeConduzir, modo: "gestao" }
     : { sb, admin, empresaId, usuarioId: user.id, conversaId: acao.conversa_id, podeAgir: true, podeTarefas: true, podeConduzir, modo: "gestao" };
   if (acao.ferramenta === "criar_reuniao" && !podeConduzir) {

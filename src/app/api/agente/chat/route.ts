@@ -2,9 +2,14 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { conversar, MODELO_PADRAO } from "@/lib/agente/claude";
-import { calcDono } from "@/lib/agente/donos";
+import { calcDono, calcLancador } from "@/lib/agente/donos";
 import { isGerencia } from "@/lib/permissoes";
 import type { Contexto } from "@/lib/agente/tipos";
+import type Anthropic from "@anthropic-ai/sdk";
+
+export const maxDuration = 120; // documentos/comprovantes anexados levam mais tempo
+
+const IMAGENS = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 // GET: recarrega uma conversa (texto + cartões ainda pendentes) para a tela
 // não começar vazia ao recarregar. Confere que a conversa é do próprio usuário.
@@ -43,7 +48,8 @@ export async function GET(req: Request) {
     .order("criado_em", { ascending: true });
 
   const valorDe = (p: any): number | null =>
-    typeof p?.custo_estimado === "number" ? p.custo_estimado : typeof p?.custo_unitario === "number" ? p.custo_unitario : null;
+    typeof p?.valor === "number" ? p.valor
+    : typeof p?.custo_estimado === "number" ? p.custo_estimado : typeof p?.custo_unitario === "number" ? p.custo_unitario : null;
 
   return NextResponse.json({
     conversa_id: conversaId,
@@ -77,7 +83,12 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "JSON inválido." }, { status: 400 });
   }
-  const mensagem = String(body?.mensagem ?? "").trim();
+  // anexos (boleto, NF, comprovante): já subiram para o bucket "anexos"; aqui
+  // chega só o caminho (o corpo da requisição na Vercel é limitado).
+  const anexosPedidos: { caminho: string; tipo: string; nome: string }[] = Array.isArray(body?.anexos)
+    ? body.anexos.slice(0, 8).map((a: any) => ({ caminho: String(a?.caminho ?? ""), tipo: String(a?.tipo ?? ""), nome: String(a?.nome ?? "anexo").slice(0, 80) }))
+    : [];
+  const mensagem = String(body?.mensagem ?? "").trim() || (anexosPedidos.length ? "Lance este(s) documento(s)." : "");
   if (!mensagem) return NextResponse.json({ error: "Escreva uma mensagem." }, { status: 400 });
   // chat de gestão (Ritmo de Gestão · Bloco 3): outra persona e outras ferramentas
   const modo: "geral" | "gestao" = body?.modo === "gestao" ? "gestao" : "geral";
@@ -100,7 +111,7 @@ export async function POST(req: Request) {
   const admin = createAdminClient();
 
   // premissas (modelo + nome + donos) — o usuário lê as da própria empresa
-  const { data: prem } = await sb.from("premissas_agente").select("chave,valor").in("chave", ["modelo", "modelo_dono", "modelo_gestao", "nome_assistente", "agente_donos"]);
+  const { data: prem } = await sb.from("premissas_agente").select("chave,valor").in("chave", ["modelo", "modelo_dono", "modelo_gestao", "nome_assistente", "agente_donos", "agente_lancadores"]);
   const val = (k: string) => prem?.find((x) => x.chave === k)?.valor;
   const nome = val("nome_assistente") || "Assistente";
 
@@ -110,6 +121,8 @@ export async function POST(req: Request) {
   // Gerência (super/admin) que não é dono pode criar/manter tarefas pelo agente;
   // OS e financeiro continuam determinação do dono.
   const podeTarefas = ehDono || isGerencia(perfil?.papel);
+  // Lançador (0075): autorizado pelo dono a lançar no financeiro pelo chat.
+  const podeLancar = ehDono || calcLancador(val("agente_lancadores"), user.email);
   // espelha pode_conduzir() (0070): super, ou gerência marcada "Conduz reuniões"
   const podeConduzir = perfil?.papel === "super" || (isGerencia(perfil?.papel) && (perfil as any)?.conduz_reunioes === true);
   const modelo = (modo === "gestao" && val("modelo_gestao")) || (ehDono && val("modelo_dono")) || val("modelo") || MODELO_PADRAO;
@@ -152,19 +165,41 @@ export async function POST(req: Request) {
       return { role: m.papel as "user" | "assistant", content: marca + (m.conteudo as string) };
     });
 
+  // anexos: só arquivos da própria empresa (1ª pasta do caminho), lidos com o
+  // JWT do usuário (policy do bucket). Imagem → bloco image; PDF → document.
+  const blocos: Anthropic.ContentBlockParam[] = [];
+  const listaAnexos: string[] = [];
+  for (const [i, a] of anexosPedidos.entries()) {
+    if (!a.caminho.startsWith(`${empresaId}/`)) continue;
+    const { data: blob, error } = await sb.storage.from("anexos").download(a.caminho);
+    if (error || !blob) { listaAnexos.push(`${i + 1}) ${a.nome} — não consegui abrir`); continue; }
+    const tipo = a.tipo || blob.type;
+    const b64 = Buffer.from(await blob.arrayBuffer()).toString("base64");
+    if (IMAGENS.has(tipo)) blocos.push({ type: "image", source: { type: "base64", media_type: tipo as any, data: b64 } });
+    else if (tipo === "application/pdf") blocos.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } });
+    else { listaAnexos.push(`${i + 1}) ${a.nome} — formato não suportado (${tipo})`); continue; }
+    listaAnexos.push(`${i + 1}) ${a.nome} — anexo_caminho=${a.caminho}`);
+  }
+  // o texto guarda a lista com os caminhos: nas voltas seguintes o modelo não vê
+  // mais a imagem, mas sabe qual anexo_caminho usar ao confirmar/ajustar.
+  const textoUsuario = listaAnexos.length ? `${mensagem}\n\n[Anexos, na ordem:\n${listaAnexos.join("\n")}]` : mensagem;
+  const conteudoAtual: string | Anthropic.ContentBlockParam[] = blocos.length
+    ? [...blocos, { type: "text", text: textoUsuario }]
+    : textoUsuario;
+
   // grava a mensagem do usuário
   await admin.from("agente_mensagens").insert({
     empresa_consultora_id: empresaId,
     conversa_id: conversaId,
     papel: "user",
-    conteudo: mensagem,
+    conteudo: textoUsuario,
   });
 
-  const ctx: Contexto = { sb, admin, empresaId, usuarioId: user.id, conversaId: conversaId!, podeAgir: ehDono, podeTarefas, podeConduzir, modo };
+  const ctx: Contexto = { sb, admin, empresaId, usuarioId: user.id, conversaId: conversaId!, podeAgir: ehDono, podeTarefas, podeConduzir, podeLancar, modo };
 
   let resultado;
   try {
-    resultado = await conversar({ ctx, modelo, nomeAssistente: nome, podeAgir: ehDono, podeTarefas, podeConduzir, modo, usuario, empresaNome, historico, mensagemUsuario: mensagem });
+    resultado = await conversar({ ctx, modelo, nomeAssistente: nome, podeAgir: ehDono, podeTarefas, podeConduzir, podeLancar, modo, usuario, empresaNome, historico, mensagemUsuario: conteudoAtual });
   } catch (e: any) {
     await admin.from("agente_execucoes").insert({
       empresa_consultora_id: empresaId, agente: "chat", origem: "chat", usuario_id: user.id,

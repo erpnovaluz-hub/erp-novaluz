@@ -5,7 +5,7 @@
 // com status 'executada', para o log e o Desfazer. Idempotência pela chave.
 // =============================================================================
 import type { Acao, Contexto, ResultadoFerramenta } from "./tipos";
-import { META, FERRAMENTAS_TAREFA } from "./ferramentas";
+import { META, FERRAMENTAS_TAREFA, FERRAMENTAS_LANCAMENTO } from "./ferramentas";
 import { indicadoresFinanceiros, checagensFinanceiras, projecaoCaixa, tendenciaFinanceira } from "./financeiro";
 import { ehGestao, executarGestao, executarAmarelaGestao, resumoAmarelaGestao, AMARELAS_GESTAO } from "./gestao";
 
@@ -52,7 +52,8 @@ export async function executar(nome: string, input: any, ctx: Contexto): Promise
   // consulta só leitura. Mesmo que o modelo tente, aqui é barrado.
   if (META[nome]?.faixa !== "leitura" && !ctx.podeAgir) {
     const ehTarefa = ctx.podeTarefas && FERRAMENTAS_TAREFA.has(nome);
-    if (!ehTarefa) {
+    const ehLancamento = !!ctx.podeLancar && FERRAMENTAS_LANCAMENTO.has(nome);
+    if (!ehTarefa && !ehLancamento) {
       return {
         ok: false,
         erro: ctx.podeTarefas
@@ -63,7 +64,7 @@ export async function executar(nome: string, input: any, ctx: Contexto): Promise
   }
 
   // Amarelas não executam no loop: viram uma proposta pendente (cartão).
-  if (META[nome]?.faixa === "amarela") return proporAmarela(nome, p, ctx);
+  if (META[nome]?.faixa === "amarela" || META[nome]?.faixa === "vermelha") return proporAmarela(nome, p, ctx);
 
   switch (nome) {
     // ---- LEITURA -------------------------------------------------------------
@@ -163,6 +164,60 @@ export async function executar(nome: string, input: any, ctx: Contexto): Promise
     }
     case "conferir_financeiro": {
       return { ok: true, dados: await checagensFinanceiras(sb, ctx.empresaId) };
+    }
+
+    // ---- FINANCEIRO · lançamentos por documento (0074) -----------------------
+    case "listar_contas": {
+      const { data, error } = await sb.from("contas_bancarias").select("id,nome,tipo,saldo_atual").eq("ativo", true).order("nome");
+      return error ? { ok: false, erro: error.message } : { ok: true, dados: data };
+    }
+    case "listar_categorias": {
+      const [c, sc] = await Promise.all([
+        sb.from("categorias_financeiras").select("id,nome,natureza").eq("ativo", true).order("nome"),
+        sb.from("subcategorias_financeiras").select("id,nome,categoria_id").eq("ativo", true).order("nome").range(0, 999),
+      ]);
+      if (c.error) return { ok: false, erro: c.error.message };
+      return { ok: true, dados: { categorias: c.data, subcategorias: sc.data ?? [] } };
+    }
+    case "buscar_fornecedor": {
+      const doc = String(p.documento ?? "").replace(/\D/g, "");
+      const termo = String(p.texto ?? "").replace(/[(),%]/g, " ").trim();
+      if (!doc && !termo) return falta("documento ou texto");
+      const { data, error } = await sb.from("fornecedores").select("id,nome,documento,forma_pagamento").eq("ativo", true).range(0, 4999);
+      if (error) return { ok: false, erro: error.message };
+      const t = termo.toLowerCase();
+      const achados = (data ?? []).filter((f: any) =>
+        (doc && String(f.documento ?? "").replace(/\D/g, "") === doc) || (t && String(f.nome ?? "").toLowerCase().includes(t)),
+      ).slice(0, 15);
+      return { ok: true, dados: achados.length ? achados : { nenhum: true, dica: "Não cadastrado: informe fornecedor_nome e fornecedor_documento no lançamento — ele é cadastrado ao confirmar." } };
+    }
+    case "candidatos_baixa": {
+      if (!p.tipo || typeof p.valor !== "number") return falta("tipo/valor");
+      const valores = [p.valor, p.valor_original].filter((v) => typeof v === "number" && v > 0) as number[];
+      const dataRef = /^\d{4}-\d{2}-\d{2}$/.test(p.data ?? "") ? p.data : hojeStr();
+      const mais = (n: number) => new Date(Date.parse(dataRef) + n * 86400000).toISOString().slice(0, 10);
+      let forn: string | null = null;
+      const doc = String(p.fornecedor_documento ?? "").replace(/\D/g, "");
+      if (doc) {
+        const { data: fs } = await sb.from("fornecedores").select("id,documento").range(0, 4999);
+        forn = (fs ?? []).find((f: any) => String(f.documento ?? "").replace(/\D/g, "") === doc)?.id ?? null;
+      }
+      const sel = "id,tipo,descricao,valor,vencimento,status,data_pagamento,fornecedor_id,cliente_id,conta_bancaria_id";
+      const [ab, pg] = await Promise.all([
+        sb.from("titulos_financeiros").select(sel).eq("tipo", p.tipo).eq("status", "aberto").limit(300)
+          .or(`vencimento.is.null,and(vencimento.gte.${mais(-60)},vencimento.lte.${mais(45)})`),
+        sb.from("titulos_financeiros").select(sel).eq("tipo", p.tipo).eq("status", "pago")
+          .gte("data_pagamento", mais(-5)).lte("data_pagamento", mais(5)).limit(300),
+      ]);
+      if (ab.error) return { ok: false, erro: ab.error.message };
+      const bateValor = (v: number) => valores.some((x) => Math.abs(Number(v) - x) < 0.005);
+      const palavras = String(p.texto ?? "").toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+      const bateTexto = (d: string) => palavras.some((w) => String(d ?? "").toLowerCase().includes(w));
+      const pontua = (x: any) => (bateValor(x.valor) ? 3 : 0) + (forn && x.fornecedor_id === forn ? 2 : 0) + (bateTexto(x.descricao) ? 1 : 0);
+      const em_aberto = (ab.data ?? []).map((x: any) => ({ ...x, pontos: pontua(x) })).filter((x: any) => x.pontos >= 2)
+        .sort((a: any, b: any) => b.pontos - a.pontos).slice(0, 8);
+      const ja_pagos = (pg.data ?? []).filter((x: any) => bateValor(x.valor) && (!forn || x.fornecedor_id === forn || bateTexto(x.descricao))).slice(0, 5);
+      return { ok: true, dados: { fornecedor_id: forn, em_aberto, ja_pagos_parecidos: ja_pagos } };
     }
 
     // ---- FINANCEIRO · projeções e crescimento (F3) ---------------------------
@@ -350,9 +405,17 @@ export function resumoAmarela(nome: string, p: any): string {
     case "concluir_os":
       return "Concluir a OS (abre a tarefa de faturar)";
     case "criar_titulo":
-      return `Criar título a ${p.tipo === "receber" ? "receber" : "pagar"}: "${p.descricao}" · ${brl(Number(p.valor))}` + (p.vencimento ? ` · venc ${p.vencimento}` : "");
+      return `Criar título a ${p.tipo === "receber" ? "receber" : "pagar"}: "${p.descricao}" · ${brl(Number(p.valor))}` + (p.vencimento ? ` · venc ${p.vencimento}` : "") +
+        (p.fornecedor_nome && !p.fornecedor_id ? ` · fornecedor ${p.fornecedor_nome}` : "");
     case "alterar_vencimento_titulo":
       return `Reagendar o vencimento do título para ${p.vencimento}`;
+    case "baixar_titulo":
+      return `DAR BAIXA: "${p.titulo_descricao ?? "título"}" pago em ${p.data_pagamento} · ${brl(Number(p.valor))}` + (p.conta_nome ? ` · conta ${p.conta_nome}` : "");
+    case "lancar_pago":
+      return `LANÇAR PAGO (${p.tipo === "receber" ? "entrada" : "saída"}): "${p.descricao}" em ${p.data_pagamento} · ${brl(Number(p.valor))}` +
+        (p.conta_nome ? ` · conta ${p.conta_nome}` : "") +
+        (p.competencia ? ` · comp. ${String(p.competencia).slice(5, 7)}/${String(p.competencia).slice(0, 4)}` : "") +
+        (p.fornecedor_nome && !p.fornecedor_id ? ` · fornecedor ${p.fornecedor_nome}` : "");
     default:
       return nome;
   }
@@ -368,9 +431,16 @@ async function proporAmarela(nome: string, p: any, ctx: Contexto): Promise<Resul
     : typeof p.custo_estimado === "number" ? p.custo_estimado
     : typeof p.custo_unitario === "number" ? p.custo_unitario
     : null;
+  const faixa = META[nome].faixa === "vermelha" ? "vermelha" : "amarela";
+  // vermelha mexe no saldo: valida o essencial já na proposta
+  if (faixa === "vermelha") {
+    if (!p.conta_bancaria_id) return { ok: false, erro: "Falta a conta (conta_bancaria_id). Use listar_contas e, se houver mais de uma, pergunte de qual conta saiu/entrou o dinheiro." };
+    if (!(Number(p.valor) > 0)) return { ok: false, erro: "Falta o valor pago (maior que zero)." };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(p.data_pagamento ?? "")) return { ok: false, erro: "Falta a data do pagamento (AAAA-MM-DD)." };
+  }
   const acao: Acao = {
     ferramenta: nome,
-    faixa: "amarela",
+    faixa,
     status: "pendente",
     vinculo_tipo: p.os_id ? "os" : p.titulo_id ? "titulo" : null,
     vinculo_id: p.os_id ?? p.titulo_id ?? null,
@@ -390,7 +460,7 @@ async function proporAmarela(nome: string, p: any, ctx: Contexto): Promise<Resul
       parametros: p,
       vinculo_tipo: acao.vinculo_tipo,
       vinculo_id: acao.vinculo_id,
-      faixa: "amarela",
+      faixa,
       status: "pendente",
       justificativa: resumoAmarela(nome, p),
     })
@@ -421,6 +491,9 @@ const ACAO_OS: Record<string, string> = {
 const ACAO_FIN: Record<string, string> = {
   criar_titulo: "criar_titulo",
   alterar_vencimento_titulo: "vencimento",
+  // vermelhas (0074): mexem no saldo, só após o clique da pessoa
+  baixar_titulo: "baixar",
+  lancar_pago: "criar_pago",
 };
 
 // Executa a ação amarela já confirmada, sob o RLS do usuário (ctx.sb). Lê o
@@ -442,6 +515,13 @@ export async function executarAmarela(
       const { data: t } = await ctx.sb.from("titulos_financeiros").select("vencimento").eq("id", p.titulo_id).maybeSingle();
       antesFin = t ?? undefined;
     }
+    if (nome === "baixar_titulo" && p.titulo_id) {
+      const { data: t } = await ctx.sb.from("titulos_financeiros")
+        .select("status,valor,conta_bancaria_id,forma_pagamento,anexo_caminho").eq("id", p.titulo_id).maybeSingle();
+      if (!t) return { ok: false, erro: "Título não encontrado." };
+      if (t.status !== "aberto") return { ok: false, erro: `O título já está ${t.status} — nada foi feito.` };
+      antesFin = t;
+    }
     const { data, error } = await ctx.sb.rpc("agente_financeiro", { p_acao: pAcaoFin, p });
     if (error) return { ok: false, erro: error.message };
     const ids = (data as any) || {};
@@ -449,7 +529,7 @@ export async function executarAmarela(
     const acao: Acao = {
       id: row.id,
       ferramenta: nome,
-      faixa: "amarela",
+      faixa: META[nome].faixa,
       status: "executada",
       vinculo_tipo: titId ? "titulo" : null,
       vinculo_id: titId,

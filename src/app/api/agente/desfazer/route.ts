@@ -92,6 +92,25 @@ export async function POST(req: Request) {
     case "criar_titulo":
       // só remove se ainda estiver em aberto (nunca mexe num título já pago/baixado)
       ({ error: erro } = normalizar(await sb.from("titulos_financeiros").delete().eq("id", res.titulo_id).eq("status", "aberto")));
+      if (!erro && res.fornecedor_criado && res.fornecedor_id) await sb.from("fornecedores").delete().eq("id", res.fornecedor_id);
+      break;
+    case "baixar_titulo":
+      // volta para aberto como estava; o trigger estorna o saldo da conta
+      ({ error: erro } = normalizar(await sb.from("titulos_financeiros").update({
+        status: "aberto",
+        valor: res.antes?.valor ?? undefined,
+        conta_bancaria_id: res.antes?.conta_bancaria_id ?? null,
+        forma_pagamento: res.antes?.forma_pagamento ?? null,
+        anexo_caminho: res.antes?.anexo_caminho ?? null,
+      }).eq("id", res.titulo_id).eq("status", "pago")));
+      break;
+    case "lancar_pago":
+      // cancelar estorna o saldo (trigger); depois apaga o título
+      ({ error: erro } = normalizar(await sb.from("titulos_financeiros").update({ status: "cancelado" }).eq("id", res.titulo_id).eq("status", "pago")));
+      if (!erro) {
+        await sb.from("titulos_financeiros").delete().eq("id", res.titulo_id).eq("status", "cancelado");
+        if (res.fornecedor_criado && res.fornecedor_id) await sb.from("fornecedores").delete().eq("id", res.fornecedor_id);
+      }
       break;
     case "alterar_vencimento_titulo":
       ({ error: erro } = normalizar(await sb.from("titulos_financeiros").update({ vencimento: res.antes?.vencimento ?? null }).eq("id", res.titulo_id)));
