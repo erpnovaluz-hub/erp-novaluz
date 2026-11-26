@@ -37,7 +37,9 @@ export async function POST(req: Request) {
   // RLS: o usuário só enxerga as próprias ações (ou gerência)
   const { data: acao } = await sb.from("acoes_agente").select("*").eq("id", acaoId).maybeSingle();
   if (!acao) return NextResponse.json({ error: "Ação não encontrada." }, { status: 404 });
-  if (acao.faixa !== "amarela") return NextResponse.json({ error: "Só ações amarelas passam por confirmação." }, { status: 400 });
+  // vermelha (baixa/lançamento pago) também passa aqui — sempre um cartão por vez,
+  // nunca pelo aprovar-lote — e só o dono decide (cartaoGestao é só amarela).
+  if (acao.faixa !== "amarela" && acao.faixa !== "vermelha") return NextResponse.json({ error: "Só propostas (amarela/vermelha) passam por confirmação." }, { status: 400 });
   if (acao.status !== "pendente") return NextResponse.json({ error: `Ação já ${acao.status}.` }, { status: 409 });
 
   const cartaoGestao = AMARELAS_GESTAO.has(acao.ferramenta) && acao.solicitante_id === user.id;

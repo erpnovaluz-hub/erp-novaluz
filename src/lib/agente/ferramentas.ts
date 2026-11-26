@@ -7,6 +7,7 @@ import type { Faixa } from "./tipos";
 
 const VINCULOS = ["os", "obra", "cliente", "oportunidade", "proposta", "titulo", "requisicao", "pedido"];
 const PRIORIDADES = ["baixa", "media", "alta", "urgente"];
+const FORMAS = ["pix", "boleto", "transferencia", "cartao", "dinheiro", "cheque"];
 
 export type DefFerramenta = {
   name: string;
@@ -53,6 +54,14 @@ export const META: Record<string, { faixa: Faixa; reversivel: boolean }> = {
   salvar_cenario_caixa: { faixa: "verde", reversivel: true },
   criar_titulo: { faixa: "amarela", reversivel: true },
   alterar_vencimento_titulo: { faixa: "amarela", reversivel: true },
+  // lançamentos por documento/comprovante (0074)
+  listar_contas: { faixa: "leitura", reversivel: false },
+  listar_categorias: { faixa: "leitura", reversivel: false },
+  buscar_fornecedor: { faixa: "leitura", reversivel: false },
+  candidatos_baixa: { faixa: "leitura", reversivel: false },
+  // VERMELHAS: mexem no saldo — cartão item a item, nunca em lote
+  baixar_titulo: { faixa: "vermelha", reversivel: true },
+  lancar_pago: { faixa: "vermelha", reversivel: true },
 };
 
 // Ferramentas que a GERÊNCIA (não-dono) pode usar: criar e manter tarefas,
@@ -390,7 +399,7 @@ export const FERRAMENTAS: DefFerramenta[] = [
   },
   {
     name: "criar_titulo",
-    description: "Propõe criar um título (previsão a pagar/receber), sempre 'aberto'. NÃO dá baixa nem mexe em saldo. Vira cartão de confirmação.",
+    description: "Propõe criar um título (previsão a pagar/receber: boleto, NF ou conta a vencer), sempre 'aberto'. NÃO dá baixa nem mexe em saldo. Vira cartão de confirmação. Para um COMPROVANTE (já pago) use baixar_titulo ou lancar_pago.",
     input_schema: {
       type: "object",
       properties: {
@@ -398,9 +407,16 @@ export const FERRAMENTAS: DefFerramenta[] = [
         descricao: { type: "string" },
         valor: { type: "number" },
         vencimento: { type: "string", description: "AAAA-MM-DD" },
+        competencia: { type: "string", description: "AAAA-MM-01 (mês de competência, se informado)" },
         categoria_id: { type: "string" },
+        subcategoria_id: { type: "string" },
         cliente_id: { type: "string" },
-        fornecedor_id: { type: "string" },
+        fornecedor_id: { type: "string", description: "se já achou com buscar_fornecedor" },
+        fornecedor_nome: { type: "string", description: "sem fornecedor_id: nome de quem recebe (acha pelo CNPJ ou cadastra)" },
+        fornecedor_documento: { type: "string", description: "CNPJ/CPF de quem recebe, como está no documento" },
+        forma_pagamento: { type: "string", enum: FORMAS },
+        dados_pagamento: { type: "string", description: "linha digitável/código de barras do boleto ou chave PIX" },
+        anexo_caminho: { type: "string", description: "caminho do anexo enviado no chat (o documento)" },
       },
       required: ["tipo", "descricao", "valor"],
     },
@@ -412,6 +428,86 @@ export const FERRAMENTAS: DefFerramenta[] = [
       type: "object",
       properties: { titulo_id: { type: "string" }, vencimento: { type: "string", description: "AAAA-MM-DD" } },
       required: ["titulo_id", "vencimento"],
+    },
+  },
+
+  // ---- FINANCEIRO · lançamentos por documento/comprovante (0074) -------------
+  {
+    name: "listar_contas",
+    description: "Lista as contas bancárias/caixa (id, nome, saldo). Use para saber de qual conta saiu/entrou o dinheiro de um comprovante.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "listar_categorias",
+    description: "Lista as categorias financeiras (id, nome, natureza receita/despesa) e subcategorias, para classificar o lançamento.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "buscar_fornecedor",
+    description: "Procura fornecedor por CNPJ/CPF (de 'quem recebeu' no comprovante) ou por trecho do nome.",
+    input_schema: {
+      type: "object",
+      properties: { documento: { type: "string" }, texto: { type: "string" } },
+    },
+  },
+  {
+    name: "candidatos_baixa",
+    description: "Antes de lançar um comprovante: procura títulos EM ABERTO que ele pode quitar (mesmo valor original ou total, fornecedor, vencimento próximo) e títulos JÁ PAGOS parecidos (para não lançar em dobro).",
+    input_schema: {
+      type: "object",
+      properties: {
+        tipo: { type: "string", enum: ["pagar", "receber"] },
+        valor: { type: "number", description: "valor pago (total)" },
+        valor_original: { type: "number", description: "valor antes de juros/multa/desconto, se houver" },
+        data: { type: "string", description: "AAAA-MM-DD do pagamento" },
+        fornecedor_documento: { type: "string" },
+        texto: { type: "string", description: "trecho da descrição/nome" },
+      },
+      required: ["tipo", "valor"],
+    },
+  },
+  {
+    name: "baixar_titulo",
+    description: "VERMELHA. Propõe dar baixa (pago) num título EM ABERTO a partir de um comprovante. Mexe no saldo da conta — vira cartão que a pessoa confirma um a um. Use o valor efetivamente pago (com juros/multa).",
+    input_schema: {
+      type: "object",
+      properties: {
+        titulo_id: { type: "string" },
+        titulo_descricao: { type: "string", description: "descrição do título, para o cartão" },
+        conta_bancaria_id: { type: "string" },
+        conta_nome: { type: "string", description: "nome da conta, para o cartão" },
+        data_pagamento: { type: "string", description: "AAAA-MM-DD" },
+        valor: { type: "number", description: "valor pago" },
+        forma_pagamento: { type: "string", enum: FORMAS },
+        anexo_caminho: { type: "string" },
+      },
+      required: ["titulo_id", "conta_bancaria_id", "data_pagamento", "valor"],
+    },
+  },
+  {
+    name: "lancar_pago",
+    description: "VERMELHA. Propõe lançar um título JÁ PAGO a partir de um comprovante que não tem título em aberto. Mexe no saldo — vira cartão que a pessoa confirma um a um.",
+    input_schema: {
+      type: "object",
+      properties: {
+        tipo: { type: "string", enum: ["pagar", "receber"] },
+        descricao: { type: "string" },
+        valor: { type: "number", description: "valor pago (total)" },
+        data_pagamento: { type: "string", description: "AAAA-MM-DD" },
+        competencia: { type: "string", description: "AAAA-MM-01" },
+        conta_bancaria_id: { type: "string" },
+        conta_nome: { type: "string", description: "nome da conta, para o cartão" },
+        categoria_id: { type: "string" },
+        subcategoria_id: { type: "string" },
+        cliente_id: { type: "string" },
+        fornecedor_id: { type: "string" },
+        fornecedor_nome: { type: "string" },
+        fornecedor_documento: { type: "string" },
+        forma_pagamento: { type: "string", enum: FORMAS },
+        dados_pagamento: { type: "string", description: "código de barras / ID da transação" },
+        anexo_caminho: { type: "string" },
+      },
+      required: ["tipo", "descricao", "valor", "data_pagamento", "conta_bancaria_id"],
     },
   },
 ];

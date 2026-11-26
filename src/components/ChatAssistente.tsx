@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 type Acao = {
   id?: string;
@@ -14,16 +15,40 @@ type Acao = {
   link?: string | null;
   reversivel: boolean;
 };
-type Msg = { papel: "user" | "assistant"; texto: string; acoes?: Acao[] };
+type Msg = { papel: "user" | "assistant"; texto: string; acoes?: Acao[]; anexos?: string[] };
+type Anexo = { caminho: string; tipo: string; nome: string };
+
+// Foto de celular tem 3-8 MB: reduz para ~1600px JPEG antes de subir (o texto
+// do comprovante continua legível e a IA aceita no máximo 5 MB por imagem).
+async function reduzirImagem(arq: File): Promise<Blob> {
+  if (!arq.type.startsWith("image/") || arq.type === "image/gif") return arq;
+  try {
+    const bmp = await createImageBitmap(arq);
+    const escala = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * escala);
+    c.height = Math.round(bmp.height * escala);
+    c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+    const b = await new Promise<Blob | null>((ok) => c.toBlob(ok, "image/jpeg", 0.85));
+    return b ?? arq;
+  } catch {
+    return arq;
+  }
+}
 
 // campos que o usuário pode ajustar no cartão (os demais: cancelar e repedir)
-const EDITAVEIS = ["titulo", "data_hora", "valor", "causa", "prazo", "motivo", "local", "motivo_pausa", "pausa_obs", "horas", "quantidade", "custo_estimado", "custo_unitario", "descricao", "observacao"];
+const EDITAVEIS = ["titulo", "data_hora", "valor", "data_pagamento", "vencimento", "competencia", "causa", "prazo", "motivo", "local", "motivo_pausa", "pausa_obs", "horas", "quantidade", "custo_estimado", "custo_unitario", "descricao", "observacao"];
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 // Chat de gestão (Ritmo de Gestão · Bloco 3): mesmo componente, outra persona
 // no servidor (modo "gestao"), conversa guardada em chave própria.
-export default function ChatAssistente({ nome, modo = "geral", atalhos = [], inicial = "", vazio }: {
+export default function ChatAssistente({ nome, modo = "geral", atalhos = [], inicial = "", vazio, empresaId }: {
   nome: string; modo?: "geral" | "gestao"; atalhos?: string[]; inicial?: string; vazio?: string;
+  empresaId?: string; // habilita anexar boleto/NF/comprovante (bucket "anexos", 1ª pasta = empresa)
 }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [anexos, setAnexos] = useState<Anexo[]>([]);
+  const [subindo, setSubindo] = useState(false);
+  const podeAnexar = !!empresaId && modo === "geral";
   const CHAVE = modo === "gestao" ? "gestao:conversa" : "assistente:conversa"; // id da conversa aberta, por navegador
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState(inicial);
@@ -119,19 +144,43 @@ export default function ChatAssistente({ nome, modo = "geral", atalhos = [], ini
     setMsgs((m) => m.map((msg) => ({ ...msg, acoes: msg.acoes?.map((a) => (a.id === id ? { ...a, ...patch } : a)) })));
   }
 
+  async function anexar(arqs: FileList | null) {
+    if (!arqs?.length || !empresaId) return;
+    setSubindo(true);
+    try {
+      const novos: Anexo[] = [];
+      for (const arq of Array.from(arqs).slice(0, 8 - anexos.length)) {
+        const ehPdf = arq.type === "application/pdf" || /\.pdf$/i.test(arq.name);
+        if (!ehPdf && !arq.type.startsWith("image/")) { alert(`${arq.name}: envie foto/imagem ou PDF.`); continue; }
+        const corpo = ehPdf ? arq : await reduzirImagem(arq);
+        const tipo = ehPdf ? "application/pdf" : corpo.type || arq.type;
+        const ext = ehPdf ? "pdf" : tipo === "image/png" ? "png" : tipo === "image/webp" ? "webp" : "jpg";
+        const caminho = `${empresaId}/financeiro/${new Date().toISOString().slice(0, 7)}/${crypto.randomUUID()}.${ext}`;
+        const up = await supabase.storage.from("anexos").upload(caminho, corpo, { contentType: tipo });
+        if (up.error) { alert(`${arq.name}: ${up.error.message}`); continue; }
+        novos.push({ caminho, tipo, nome: arq.name });
+      }
+      setAnexos((a) => [...a, ...novos]);
+    } finally {
+      setSubindo(false);
+    }
+  }
+
   async function enviar(e: React.FormEvent, textoDireto?: string) {
     e.preventDefault();
     const texto = (textoDireto ?? input).trim();
-    if (!texto || carregando) return;
+    const anexosEnvio = textoDireto ? [] : anexos;
+    if ((!texto && !anexosEnvio.length) || carregando || subindo) return;
     pararMic();
     setInput("");
-    setMsgs((m) => [...m, { papel: "user", texto }]);
+    setAnexos([]);
+    setMsgs((m) => [...m, { papel: "user", texto: texto || "Lance este(s) documento(s).", anexos: anexosEnvio.map((a) => a.nome) }]);
     setCarregando(true);
     try {
       const r = await fetch("/api/agente/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mensagem: texto, conversa_id: conversaId, modo }),
+        body: JSON.stringify({ mensagem: texto, conversa_id: conversaId, modo, anexos: anexosEnvio }),
       });
       const data = await r.json();
       if (!r.ok) setMsgs((m) => [...m, { papel: "assistant", texto: "⚠️ " + (data?.error ?? "Falha ao responder.") }]);
@@ -210,18 +259,24 @@ export default function ChatAssistente({ nome, modo = "geral", atalhos = [], ini
         {msgs.map((m, i) => (
           <div key={i} className={m.papel === "user" ? "flex justify-end" : "flex justify-start"}>
             <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.papel === "user" ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-800"}`}>
+              {m.anexos && m.anexos.length > 0 && (
+                <p className="mb-1 text-xs opacity-80">📎 {m.anexos.join(", ")}</p>
+              )}
               {m.texto && <p className="whitespace-pre-wrap">{m.texto}</p>}
               {m.acoes && m.acoes.length > 0 && (
                 <div className="mt-2 space-y-2">
                   {m.acoes.map((a, ai) => {
-                    const pend = a.faixa === "amarela" && a.status === "pendente";
+                    const verm = a.faixa === "vermelha";
+                    const pend = (a.faixa === "amarela" || verm) && a.status === "pendente";
                     if (pend) {
                       return (
-                        <div key={ai} className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-gray-800">
-                          <p className="text-xs font-semibold text-amber-800">Confirmação necessária</p>
+                        <div key={ai} className={`rounded-lg border p-2 text-gray-800 ${verm ? "border-red-300 bg-red-50" : "border-amber-300 bg-amber-50"}`}>
+                          <p className={`text-xs font-semibold ${verm ? "text-red-800" : "text-amber-800"}`}>
+                            {verm ? "🔴 Mexe no saldo — confira antes de confirmar" : "Confirmação necessária"}
+                          </p>
                           <p className="mt-0.5 text-sm">{a.resumo}</p>
                           {typeof a.valor === "number" && a.valor > 0 && (
-                            <p className="mt-0.5 text-sm font-bold text-amber-900">Valor: {brl(a.valor)}</p>
+                            <p className={`mt-0.5 text-sm font-bold ${verm ? "text-red-900" : "text-amber-900"}`}>Valor: {brl(a.valor)}</p>
                           )}
                           {editando === a.id ? (
                             <div className="mt-2 space-y-1">
@@ -275,7 +330,27 @@ export default function ChatAssistente({ nome, modo = "geral", atalhos = [], ini
         <div ref={fim} />
       </div>
 
+      {anexos.length > 0 && (
+        <div className="flex flex-wrap gap-1 border-t pt-2 text-xs">
+          {anexos.map((a, i) => (
+            <span key={a.caminho} className="flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5">
+              📎 {a.nome}
+              <button type="button" onClick={() => setAnexos((x) => x.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-600">×</button>
+            </span>
+          ))}
+        </div>
+      )}
       <form onSubmit={enviar} className="flex items-end gap-2 border-t bg-white pt-3">
+        {podeAnexar && (
+          <label
+            title="Anexar comprovante, boleto ou NF (foto ou PDF)"
+            className={`cursor-pointer rounded-lg border px-3 py-2 text-lg text-gray-500 hover:bg-gray-50 ${subindo || carregando ? "pointer-events-none opacity-40" : ""}`}
+          >
+            {subindo ? "⏳" : "📎"}
+            <input type="file" multiple accept="image/*,application/pdf" className="hidden"
+              onChange={(e) => { anexar(e.target.files); e.target.value = ""; }} />
+          </label>
+        )}
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -301,7 +376,7 @@ export default function ChatAssistente({ nome, modo = "geral", atalhos = [], ini
             {ouvindo ? "⏹" : "🎤"}
           </button>
         )}
-        <button type="submit" disabled={carregando || !input.trim()} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">
+        <button type="submit" disabled={carregando || subindo || (!input.trim() && !anexos.length)} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40">
           Enviar
         </button>
       </form>
