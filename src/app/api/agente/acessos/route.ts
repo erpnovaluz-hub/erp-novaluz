@@ -1,8 +1,21 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ehDonoDoAgente } from "@/lib/agente/donos";
+import { ehDonoDoAgente, listaEmails } from "@/lib/agente/donos";
 import { empresaEmUso, pessoasDaEmpresa } from "@/lib/agente/acessos";
+
+// Lê quem pode lançar (para a coluna "Lança pelo chat" em Usuários e acessos).
+// Para quem não é dono devolve só { dono: false } — a coluna nem aparece.
+export async function GET() {
+  const sb = await createClient();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  const { data: perfil } = await sb.from("perfis").select("papel").eq("id", user.id).maybeSingle();
+  if (!(await ehDonoDoAgente(sb, user.email, perfil?.papel))) return NextResponse.json({ dono: false });
+  const { data: prem } = await sb.from("premissas_agente").select("chave,valor").in("chave", ["agente_lancadores", "agente_donos"]);
+  const val = (k: string) => (prem ?? []).find((x) => x.chave === k)?.valor;
+  return NextResponse.json({ dono: true, emails: listaEmails(val("agente_lancadores")), donos: listaEmails(val("agente_donos")) });
+}
 
 // Grava quem pode lançar pelo chat (premissa agente_lancadores da empresa em
 // uso). Só o dono do agente. A premissa é protegida por RLS (0075), por isso a

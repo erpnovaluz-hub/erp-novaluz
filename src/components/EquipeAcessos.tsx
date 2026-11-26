@@ -37,6 +37,32 @@ export default function EquipeAcessos({ empresaId, empresaNome, meuId }: { empre
   const [eEmail, setEEmail] = useState("");
   const [salvando, setSalvando] = useState(false);
 
+  // "Lança pelo chat" (0075): só o dono do agente vê e altera (null = não mostra)
+  const [lanc, setLanc] = useState<{ emails: string[]; donos: string[] } | null>(null);
+
+  const carregarLanc = useCallback(async () => {
+    try {
+      const r = await fetch("/api/agente/acessos");
+      const j = await r.json();
+      setLanc(r.ok && j.dono ? { emails: j.emails ?? [], donos: j.donos ?? [] } : null);
+    } catch { setLanc(null); }
+  }, []);
+
+  useEffect(() => { carregarLanc(); }, [carregarLanc, empresaId]);
+
+  async function alternarLanc(p: Perfil, marcar: boolean) {
+    if (!lanc || !p.email) return;
+    const email = p.email.toLowerCase();
+    const emails = marcar ? [...new Set([...lanc.emails, email])] : lanc.emails.filter((e) => e !== email);
+    const r = await fetch("/api/agente/acessos", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emails }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { setErro(j.error ?? "Falha ao salvar."); return; }
+    setLanc({ ...lanc, emails: j.emails ?? emails });
+    aviso(marcar ? `${p.nome ?? p.email} agora lança pelo chat do Assistente.` : `${p.nome ?? p.email} não lança mais pelo chat.`);
+  }
+
   const carregar = useCallback(async () => {
     if (!empresaId) return;
     setCarregando(true);
@@ -156,12 +182,17 @@ export default function EquipeAcessos({ empresaId, empresaNome, meuId }: { empre
                 <th className="px-4 py-3">Perfil</th>
                 <th className="px-4 py-3">Situação</th>
                 <th className="px-4 py-3" title="Ritmo de Gestão: pode criar, conduzir e fechar atas de reunião">Conduz reuniões</th>
+                {lanc && (
+                  <th className="px-4 py-3" title="Assistente: pode anexar comprovante/boleto/NF ou pedir por texto e confirmar os próprios lançamentos (precisa também do Financeiro com edição)">
+                    Lança pelo chat
+                  </th>
+                )}
                 <th className="px-4 py-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {carregando ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Carregando…</td></tr>
+                <tr><td colSpan={lanc ? 7 : 6}className="px-4 py-8 text-center text-gray-400">Carregando…</td></tr>
               ) : perfis.map((p) => {
                 const eu = p.id === meuId;
                 const ativo = p.ativo !== false;
@@ -201,6 +232,24 @@ export default function EquipeAcessos({ empresaId, empresaNome, meuId }: { empre
                           </label>
                         )}
                     </td>
+                    {lanc && (() => {
+                      const email = (p.email ?? "").toLowerCase();
+                      const dono = !!email && lanc.donos.includes(email);
+                      const marcado = !!email && lanc.emails.includes(email);
+                      return (
+                        <td className="px-4 py-2">
+                          {dono ? <span className="text-xs text-gray-500">dono — sim</span>
+                            : !email ? <span className="text-xs text-gray-300">sem e-mail</span>
+                            : (
+                              <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs">
+                                <input type="checkbox" checked={marcado} disabled={!ativo}
+                                  onChange={(e) => alternarLanc(p, e.target.checked)} />
+                                {marcado ? "Sim" : "Não"}
+                              </label>
+                            )}
+                        </td>
+                      );
+                    })()}
                     <td className="whitespace-nowrap px-4 py-2 text-right">
                       {editando ? (
                         <>
